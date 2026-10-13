@@ -1,0 +1,20 @@
+{
+  "name": "c-playground",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "toolchain": "node scripts/fetch-toolchain.mjs"
+  },
+  "dependencies": {
+    "@runno/wasi": "0.10.0",
+    "fflate": "0.8.2"
+  },
+  "devDependencies": {
+    "vite": "6.4.1"
+  }
+}
