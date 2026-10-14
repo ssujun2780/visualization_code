@@ -21,7 +21,8 @@ pnpm preview
 
 ## 기능
 
-- 기본 `main.c`, C 코드 입력, 줄 번호, Tab 들여쓰기
+- Hello World 기본 `main.c`, C 코드 입력, 줄 번호
+- Enter 자동 들여쓰기, 선택한 여러 줄의 Tab / Shift+Tab 들여쓰기·내어쓰기
 - 컴파일·실행 버튼, Ctrl/Cmd+Enter, 사용자 중지
 - `scanf` 등을 위한 표준 입력과 EOF 전달
 - 표준 출력, 표준 오류, 컴파일 경고·오류와 위치 이동

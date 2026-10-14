@@ -1,8 +1,11 @@
 import "./styles.css";
+import { enterEdit, tabEdit } from "./editor.js";
 
+const defaultCode = '#include <stdio.h>\n\nint main(){\n\tprintf("Hello World!\\n");\n\treturn 0;\n}\n';
+const previousDefault = '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n';
 const templates = {
-  template: '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n',
-  hello: '#include <stdio.h>\n\nint main() {\n    printf("Hello, World!\\n");\n    return 0;\n}\n',
+  template: defaultCode,
+  hello: defaultCode,
   sum: '#include <stdio.h>\n\nint main() {\n    int a, b;\n    if (scanf("%d %d", &a, &b) != 2) {\n        fprintf(stderr, "두 정수를 입력해주세요.\\n");\n        return 1;\n    }\n    printf("%d\\n", a + b);\n    return 0;\n}\n',
 };
 const elements = Object.fromEntries(["code", "stdin", "run", "stop", "output", "diagnostics", "status", "timing", "example", "exit-code", "line-numbers", "cursor-position", "diagnostics-section", "go-to-error"].map(id => [id, document.getElementById(id)]));
@@ -19,7 +22,7 @@ let outputPlaceholder = "출력 결과가 여기에 표시됩니다.";
 
 try {
   const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
-  elements.code.value = saved?.code ?? templates.template;
+  elements.code.value = saved?.code === previousDefault ? defaultCode : (saved?.code ?? defaultCode);
   elements.stdin.value = saved?.stdin ?? "";
 } catch {
   elements.code.value = templates.template;
@@ -39,11 +42,19 @@ elements.stdin.addEventListener("input", save);
 elements.code.addEventListener("scroll", () => { elements["line-numbers"].scrollTop = elements.code.scrollTop; });
 for (const event of ["click", "keyup", "select"]) elements.code.addEventListener(event, updateEditor);
 elements.code.addEventListener("keydown", event => {
-  if (event.key === "Tab") {
-    event.preventDefault();
-    elements.code.setRangeText("    ", elements.code.selectionStart, elements.code.selectionEnd, "end");
-    save(); updateEditor();
-  }
+  const editor = elements.code;
+  if (editor.readOnly || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.key !== "Tab" && event.key !== "Enter") return;
+  event.preventDefault();
+  const direction = editor.selectionDirection;
+  const edit = event.key === "Tab"
+    ? tabEdit(editor.value, editor.selectionStart, editor.selectionEnd, event.shiftKey)
+    : enterEdit(editor.value, editor.selectionStart, editor.selectionEnd);
+  const scrollTop = editor.scrollTop;
+  editor.setRangeText(edit.text, edit.start, edit.end, "preserve");
+  editor.setSelectionRange(edit.selectionStart, edit.selectionEnd, direction);
+  editor.scrollTop = scrollTop;
+  save(); updateEditor();
 });
 elements.example.addEventListener("change", () => {
   const template = templates[elements.example.value];
