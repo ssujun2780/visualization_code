@@ -1,5 +1,5 @@
 import "./styles.css";
-import { enterEdit, tabEdit } from "./editor.js";
+import { createCodeEditor, setCompilerDiagnostics } from "./code-editor.js";
 
 const defaultCode = '#include <stdio.h>\n\nint main(){\n\tprintf("Hello World!\\n");\n\treturn 0;\n}\n';
 const previousDefault = '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n';
@@ -8,7 +8,7 @@ const templates = {
   hello: defaultCode,
   sum: '#include <stdio.h>\n\nint main() {\n    int a, b;\n    if (scanf("%d %d", &a, &b) != 2) {\n        fprintf(stderr, "두 정수를 입력해주세요.\\n");\n        return 1;\n    }\n    printf("%d\\n", a + b);\n    return 0;\n}\n',
 };
-const elements = Object.fromEntries(["code", "stdin", "run", "stop", "output", "diagnostics", "status", "timing", "example", "exit-code", "line-numbers", "cursor-position", "diagnostics-section", "go-to-error"].map(id => [id, document.getElementById(id)]));
+const elements = Object.fromEntries(["code", "stdin", "run", "stop", "output", "diagnostics", "status", "timing", "example", "exit-code", "cursor-position", "diagnostics-section", "go-to-error", "find-code", "expand-editor"].map(id => [id, document.getElementById(id)]));
 const storageKey = "c-workbench-v1";
 let worker;
 let activeRun;
@@ -19,52 +19,45 @@ let diagnostics = "";
 let errorLocation;
 let outputScheduled = false;
 let outputPlaceholder = "출력 결과가 여기에 표시됩니다.";
+let initialCode = defaultCode;
 
 try {
   const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
-  elements.code.value = saved?.code === previousDefault ? defaultCode : (saved?.code ?? defaultCode);
+  initialCode = typeof saved?.code === "string" && saved.code !== previousDefault ? saved.code : defaultCode;
   elements.stdin.value = saved?.stdin ?? "";
-} catch {
-  elements.code.value = templates.template;
-}
+} catch { /* Keep the default when storage is unavailable. */ }
+const codeEditor = createCodeEditor(elements.code, initialCode, run);
 
 function save() {
-  try { localStorage.setItem(storageKey, JSON.stringify({ code: elements.code.value, stdin: elements.stdin.value })); } catch { /* Private browsing or a full store must not prevent editing. */ }
+  try { localStorage.setItem(storageKey, JSON.stringify({ code: codeEditor.getValue(), stdin: elements.stdin.value })); } catch { /* Private browsing or a full store must not prevent editing. */ }
 }
 function updateEditor() {
-  const lines = elements.code.value.split("\n");
-  elements["line-numbers"].textContent = lines.map((_, index) => index + 1).join("\n");
-  const preceding = elements.code.value.slice(0, elements.code.selectionStart).split("\n");
-  elements["cursor-position"].textContent = `줄 ${preceding.length}, 열 ${preceding.at(-1).length + 1}`;
+  const position = codeEditor.getPosition();
+  const selections = codeEditor.getSelections();
+  elements["cursor-position"].textContent = `줄 ${position.lineNumber}, 열 ${position.column}${selections.length > 1 ? ` · 커서 ${selections.length}개` : ""}`;
 }
-elements.code.addEventListener("input", () => { save(); updateEditor(); });
+codeEditor.onDidChangeModelContent(() => { setCompilerDiagnostics(codeEditor, ""); save(); updateEditor(); });
+codeEditor.onDidChangeCursorSelection(updateEditor);
 elements.stdin.addEventListener("input", save);
-elements.code.addEventListener("scroll", () => { elements["line-numbers"].scrollTop = elements.code.scrollTop; });
-for (const event of ["click", "keyup", "select"]) elements.code.addEventListener(event, updateEditor);
-elements.code.addEventListener("keydown", event => {
-  const editor = elements.code;
-  if (editor.readOnly || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
-  if (event.key !== "Tab" && event.key !== "Enter") return;
-  event.preventDefault();
-  const direction = editor.selectionDirection;
-  const edit = event.key === "Tab"
-    ? tabEdit(editor.value, editor.selectionStart, editor.selectionEnd, event.shiftKey)
-    : enterEdit(editor.value, editor.selectionStart, editor.selectionEnd);
-  const scrollTop = editor.scrollTop;
-  editor.setRangeText(edit.text, edit.start, edit.end, "preserve");
-  editor.setSelectionRange(edit.selectionStart, edit.selectionEnd, direction);
-  editor.scrollTop = scrollTop;
-  save(); updateEditor();
+elements["find-code"].addEventListener("click", () => { codeEditor.focus(); codeEditor.getAction("actions.find").run(); });
+elements["expand-editor"].addEventListener("click", () => {
+  const expanded = document.querySelector(".workspace").classList.toggle("editor-expanded");
+  elements["expand-editor"].setAttribute("aria-pressed", String(expanded));
+  elements["expand-editor"].textContent = expanded ? "원래 크기" : "편집기 확대";
+  codeEditor.focus();
 });
 elements.example.addEventListener("change", () => {
   const template = templates[elements.example.value];
   if (!template) return;
-  if (elements.code.value !== templates.template && elements.code.value !== template && !confirm("현재 코드를 예제 코드로 바꾸시겠습니까?")) {
+  if (codeEditor.getValue() !== templates.template && codeEditor.getValue() !== template && !confirm("현재 코드를 예제 코드로 바꾸시겠습니까?")) {
     elements.example.value = ""; return;
   }
-  elements.code.value = template;
+  codeEditor.pushUndoStop();
+  codeEditor.executeEdits("example", [{ range: codeEditor.getModel().getFullModelRange(), text: template }]);
+  codeEditor.pushUndoStop();
   if (elements.example.value === "sum") elements.stdin.value = "10 20\n";
   save(); updateEditor(); elements.example.value = "";
+  codeEditor.setPosition({ lineNumber: 1, column: 1 }); codeEditor.focus();
 });
 
 function setStatus(message, kind = "ready") {
@@ -86,6 +79,7 @@ function renderOutput() {
   const match = diagnostics.match(/\/?main\.c:(\d+):(\d+):/);
   errorLocation = match ? { line: Number(match[1]), column: Number(match[2]) } : null;
   elements["go-to-error"].hidden = !errorLocation;
+  setCompilerDiagnostics(codeEditor, diagnostics);
 }
 function scheduleOutput() {
   if (!outputScheduled) { outputScheduled = true; requestAnimationFrame(renderOutput); }
@@ -98,7 +92,7 @@ function finish(message, kind = "ready", exitCode) {
   const run = activeRun; activeRun = null;
   elements.run.disabled = false; elements.stop.disabled = true;
   elements.example.disabled = false;
-  elements.code.readOnly = false; elements.stdin.readOnly = false;
+  codeEditor.updateOptions({ readOnly: false }); elements.stdin.readOnly = false;
   elements["exit-code"].textContent = exitCode === undefined ? "" : `종료 코드 ${exitCode}`;
   if (run) elements.timing.textContent = `준비 ${((run.executionStarted ?? performance.now()) - run.started).toFixed(0)} ms${run.executionStarted ? ` · 실행 ${(performance.now() - run.executionStarted).toFixed(0)} ms` : ""}`;
   outputPlaceholder = exitCode === 0 ? "정상 종료했습니다. 출력 내용이 없습니다." : "출력 내용이 없습니다.";
@@ -144,16 +138,16 @@ function ensureWorker() {
 }
 function run() {
   if (activeRun) return;
-  if (!elements.code.value.trim()) { setStatus("C 코드를 입력해주세요.", "error"); elements.code.focus(); return; }
+  if (!codeEditor.getValue().trim()) { setStatus("C 코드를 입력해주세요.", "error"); codeEditor.focus(); return; }
   save(); stdout = ""; diagnostics = ""; outputPlaceholder = "실행 결과를 기다리고 있습니다…"; renderOutput();
   elements["exit-code"].textContent = "";
   activeRun = { id: ++requestId, started: performance.now() };
   elements.run.disabled = true; elements.stop.disabled = false; elements.example.disabled = true;
-  elements.code.readOnly = true; elements.stdin.readOnly = true;
+  codeEditor.updateOptions({ readOnly: true }); elements.stdin.readOnly = true;
   elements.timing.textContent = "준비 중… · 실행 제한 5초";
   setStatus("실행 환경 준비 중…", "busy");
   setDeadline(60000, "실행 환경 준비 또는 컴파일이 60초를 초과했습니다. 다시 실행해주세요.");
-  try { ensureWorker().postMessage({ id: activeRun.id, code: elements.code.value, stdin: elements.stdin.value }); }
+  try { ensureWorker().postMessage({ id: activeRun.id, code: codeEditor.getValue(), stdin: elements.stdin.value }); }
   catch (error) { diagnostics = error.message; stopWorker(); finish("실행 환경 준비 실패", "error"); }
 }
 elements.run.addEventListener("click", run);
@@ -161,10 +155,11 @@ elements.stop.addEventListener("click", () => { if (activeRun) { stopWorker(); f
 document.addEventListener("keydown", event => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); run(); } });
 elements["go-to-error"].addEventListener("click", () => {
   if (!errorLocation) return;
-  const lines = elements.code.value.split("\n");
-  const position = lines.slice(0, errorLocation.line - 1).reduce((sum, line) => sum + line.length + 1, 0) + errorLocation.column - 1;
-  elements.code.focus(); elements.code.setSelectionRange(position, position + 1);
-  elements.code.scrollTop = Math.max(0, (errorLocation.line - 4) * parseFloat(getComputedStyle(elements.code).lineHeight));
-  elements["line-numbers"].scrollTop = elements.code.scrollTop; updateEditor();
+  const model = codeEditor.getModel();
+  const lineNumber = Math.min(errorLocation.line, model.getLineCount());
+  const column = Math.min(errorLocation.column, model.getLineMaxColumn(lineNumber));
+  codeEditor.setPosition({ lineNumber, column });
+  codeEditor.revealPositionInCenter({ lineNumber, column });
+  codeEditor.focus(); updateEditor();
 });
 updateEditor();

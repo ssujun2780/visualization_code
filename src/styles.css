@@ -33,10 +33,19 @@ kbd { font-family: Consolas, monospace; font-size: 11px; font-weight: 400; }
 .example-label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
 select { font-size: 12px; color: #d7e2e3; border: 1px solid var(--border); background: #202a2f; padding: 5px 8px; border-radius: 5px; max-width: 145px; }
 .editor-panel { display: flex; flex-direction: column; min-height: 520px; }
-.editor-shell { display: flex; flex: 1; min-height: 0; height: 454px; background: #151c20; }
-.editor-shell pre, #code, #stdin, #output, #diagnostics { font-family: Consolas, "Cascadia Code", "Malgun Gothic", monospace; font-size: 14px; line-height: 1.8; tab-size: 4; }
-#line-numbers { margin: 0; padding: 23px 13px 23px 18px; width: 54px; flex-shrink: 0; text-align: right; color: #64747b; overflow: hidden; user-select: none; }
-#code { display: block; width: 100%; height: 100%; min-height: 420px; border: 0; resize: none; color: #d3e4df; background: transparent; padding: 23px 22px 23px 4px; }
+.editor-shell { position: relative; flex: 1; min-height: 360px; height: 454px; background: #1e1e1e; }
+#stdin, #output, #diagnostics { font-family: Consolas, "Cascadia Code", "Malgun Gothic", monospace; font-size: 14px; line-height: 1.8; tab-size: 4; }
+#code { position: absolute; inset: 0; }
+.editor-panel .panel-heading { background: #252526; }
+.file-tab { align-self: stretch; border-bottom: 2px solid var(--accent); padding: 0 4px; }
+.editor-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 16px; color: #a9a9a9; font-size: 12px; background: #1e1e1e; }
+.editor-toolbar > div { display: flex; gap: 6px; }
+.editor-toolbar button { border: 0; border-radius: 3px; background: transparent; color: #bdbdbd; padding: 4px 7px; font-size: 11px; }
+.editor-toolbar button:hover, .editor-toolbar button[aria-pressed="true"] { background: #333; color: #fff; }
+.workspace.editor-expanded { grid-template-columns: minmax(0, 1fr); }
+.editor-expanded .io-panels { display: none; }
+.editor-expanded .editor-shell { min-height: min(65vh, 650px); }
+.monaco-editor textarea:focus-visible { outline: none; }
 .editor-footer { padding: 10px 17px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
 .io-panels { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .input-panel { flex-shrink: 0; }
@@ -60,6 +69,6 @@ textarea::placeholder { color: #75888f; }
 #status[data-kind="busy"] .status-dot { background: #e8ce90; }
 .page-footer { margin: 22px 0; padding: 18px 0; border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 11px; }
 @media (min-height: 900px) and (min-width: 900px) { .editor-panel { min-height: 620px; } }
-@media (max-width: 850px) { #app { padding: 0 22px; } .workspace { grid-template-columns: 1fr; } .workspace-heading { align-items: flex-start; } .primary kbd { display: none; } .editor-panel { min-height: 400px; } #code { min-height: 330px; } .editor-shell { height: 350px; } .output-panel { min-height: 230px; } }
-@media (max-width: 540px) { #app { padding: 0 14px; } .topbar { height: 68px; } .workspace-heading { flex-direction: column; margin-top: 26px; gap: 18px; } h1 { font-size: 22px; } .run-controls { width: 100%; } .primary { flex: 1; justify-content: center; } .environment { font-size: 11px; } .panel-heading { padding: 0 13px; } .editor-shell pre, #code, #stdin { font-size: 13px; } .input-footer { line-height: 1.6; } }
+@media (max-width: 850px) { #app { padding: 0 22px; } .workspace { grid-template-columns: 1fr; } .workspace-heading { align-items: flex-start; } .primary kbd { display: none; } .editor-panel { min-height: 400px; } .editor-shell { height: 350px; min-height: 330px; } .output-panel { min-height: 230px; } }
+@media (max-width: 540px) { #app { padding: 0 14px; } .topbar { height: 68px; } .workspace-heading { flex-direction: column; margin-top: 26px; gap: 18px; } h1 { font-size: 22px; } .run-controls { width: 100%; } .primary { flex: 1; justify-content: center; } .environment { font-size: 11px; } .panel-heading { padding: 0 13px; } #stdin { font-size: 13px; } .input-footer { line-height: 1.6; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

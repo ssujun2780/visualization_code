@@ -24,8 +24,9 @@
         <div class="workspace">
           <section class="panel editor-panel" aria-label="C 코드 편집기">
             <div class="panel-heading"><span class="file-tab"><span class="file-icon">C</span> main.c</span><label class="example-label">예제 <select id="example" aria-label="예제 코드 선택"><option value="">선택</option><option value="template">기본 코드</option><option value="hello">Hello World!</option><option value="sum">두 수 더하기</option></select></label></div>
-            <div class="editor-shell"><pre id="line-numbers" aria-hidden="true"></pre><textarea id="code" aria-label="C 소스 코드" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off"></textarea></div>
-            <div class="editor-footer"><span>C · main.c</span><span id="cursor-position">줄 1, 열 1</span></div>
+            <div class="editor-toolbar"><span>main.c <span aria-hidden="true">›</span> C</span><div><button id="find-code" type="button" title="찾기 Ctrl+F · 바꾸기 Ctrl+H">찾기</button><button id="expand-editor" type="button" aria-pressed="false">편집기 확대</button></div></div>
+            <div class="editor-shell"><div id="code"></div></div>
+            <div class="editor-footer"><span>C · 탭 크기 4 · UTF-8</span><span id="cursor-position">줄 1, 열 1</span></div>
           </section>
           <aside class="io-panels">
             <section class="panel input-panel">
@@ -42,7 +43,7 @@
         </div>
         <footer class="statusbar"><span id="status" role="status" aria-live="polite"><span class="status-dot"></span>실행 준비</span><span id="timing">실행 제한 5초 · 첫 실행은 준비 시간이 필요합니다.</span></footer>
       </main>
-      <footer class="page-footer"><span>코드는 이 브라우저 안에서 실행됩니다.</span><span>실행 <kbd>Ctrl</kbd> + <kbd>Enter</kbd> · 들여쓰기 <kbd>Tab</kbd> · 내어쓰기 <kbd>Shift</kbd> + <kbd>Tab</kbd></span></footer>
+      <footer class="page-footer"><span>코드는 이 브라우저 안에서 실행됩니다.</span><span>실행 Ctrl+Enter · 찾기 Ctrl+F · 바꾸기 Ctrl+H · 자동 완성 Ctrl+Space</span></footer>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>
