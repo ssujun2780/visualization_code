@@ -6,6 +6,9 @@
   "packageManager": "pnpm@11.25.0",
   "scripts": {
     "test": "node --test",
+    "trace:c": "node scripts/trace-model.mjs",
+    "trace:prototype": "node scripts/trace-c.mjs",
+    "trace:regex": "node scripts/experiments/regex-equivalence/run.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",

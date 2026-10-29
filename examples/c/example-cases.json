@@ -1,0 +1,700 @@
+{
+  "standard": "C11",
+  "naming": "NoN.c; randomized user-defined identifiers",
+  "scope": "Standalone C compilation and program correctness only; no visualization instrumentation.",
+  "platformNotes": {
+    "2": "Expected output assumes 8-bit unsigned char and 32-bit unsigned int.",
+    "16": "Requires standard math.h NaN, infinity and signed-zero support."
+  },
+  "numberingNote": "The original row 32 was split: No32 = disjoint sets, No33 = grid DP, No34 = red-black tree, No35 = regex equivalence.",
+  "examples": [
+    {
+      "number": 1,
+      "file": "blind/No1.c",
+      "title": "정수 산술과 대입",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "-10 -6 50 60 8 4\n",
+          "exit": 0
+        }
+      ],
+      "sha256": "cc90089f39b926b51af0578f007ea0f0ad94e07cc61d1d1abf0c77d287f12044",
+      "syntax": "int 선언·초기화, 괄호, 사칙연산, 재대입",
+      "structures": "변수와 식의 의존관계"
+    },
+    {
+      "number": 2,
+      "file": "blind/No2.c",
+      "title": "정수 승격과 부호 변환",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "260\n4\n4294967295\n0\n1\n4294967295\n",
+          "exit": 0
+        }
+      ],
+      "sha256": "53128cf1681755dd8c9156e2d579e0d78ce911213e440cd0bb80ecd3d5d2808a",
+      "syntax": "정수 승격, 축소 변환, signed·unsigned 연산",
+      "structures": "계산형·저장형·비트 폭"
+    },
+    {
+      "number": 3,
+      "file": "blind/No3.c",
+      "title": "조건 분기와 switch",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "3 307\n",
+          "exit": 0
+        }
+      ],
+      "sha256": "f2bf0b729cc6720cf97e04ed99538ee002bfc1005c506d90ad08a38c4aaa045b",
+      "syntax": "if·else, switch, break와 연속 진입",
+      "structures": "실제 분기와 미실행 경로"
+    },
+    {
+      "number": 4,
+      "file": "blind/No4.c",
+      "title": "반복과 누적",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "18 7\n8 0\n6 3\n",
+          "exit": 0
+        }
+      ],
+      "sha256": "ec4e2fe9bd49d95d983c8fa35ed6444dcb0f14650343b183c02a8d3179d3c9ac",
+      "syntax": "for·while·do, continue·break, 누적",
+      "structures": "반복 상태와 이동 위치"
+    },
+    {
+      "number": 5,
+      "file": "blind/No5.c",
+      "title": "단락 평가와 조건 연산자",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "0 0\n1 0\n1 1\n1 2\n1 2 1\n0 2 0\n",
+          "exit": 0
+        }
+      ],
+      "sha256": "e7e6390c3de39b49fe0d949d92d9f2257861a51942ccb1b89328b64f65132c2b",
+      "syntax": "논리 연산과 조건 연산자의 단락 평가",
+      "structures": "미평가 식과 부수 효과"
+    },
+    {
+      "number": 6,
+      "file": "blind/No6.c",
+      "title": "증가와 복합 대입",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "6 5\n7 7\n8 12\n9 63\n1\n1 15 20 30\n",
+          "exit": 0
+        }
+      ],
+      "sha256": "c90b45bc13070433a95caf78446cec2258010bbf8298130efa7f87274fe48f96",
+      "syntax": "전위·후위 증가, 복합 대입",
+      "structures": "식의 값·저장값·대상 평가 횟수"
+    },
+    {
+      "number": 7,
+      "file": "blind/No7.c",
+      "title": "스코프와 수명",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "10\n20\n31\n20\n10\n1 1\n2 1\n1 2 10\n",
+          "exit": 0
+        }
+      ],
+      "sha256": "2aabeba323566d3dcf3415a564bed27a6d2f35bc230fa7710eefc9658b6282f4",
+      "syntax": "전역·지역·static, 블록 이름 가림",
+      "structures": "서로 다른 객체와 수명"
+    },
+    {
+      "number": 8,
+      "file": "blind/No8.c",
+      "title": "배열 초기화와 복사",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "3 6 0 0 0\n0 10 0 20 0\n3 16 0 20 0\n99 6 0 0 0\n3 16 0 20 0\n3 20 0 20 0\n",
+          "exit": 0
+        }
+      ],
+      "sha256": "5d36390a28de46b20f87b90ab16eadd73b14471dbc12d8e9e40b86abaabb1158",
+      "syntax": "부분·지정 초기화, 배열 원소 복사",
+      "structures": "초기화 상태·원소별 출처·복사 독립성"
+    },
+    {
+      "number": 9,
+      "file": "blind/No9.c",
+      "title": "문자열과 바이트 복사",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "12 3\n4 3\nAbc abcde\n6 2\npq0rs0\npq-rs 5\nabcde +abcde\n",
+          "exit": 0
+        }
+      ],
+      "sha256": "9c4ffc857f2444169785f35081618946a166f5abc382a3c5f01b44d0b2b39fcf",
+      "syntax": "문자열 리터럴, strlen·strcpy·strcat·memcpy·memmove",
+      "structures": "문자열 길이·용량·널 문자·겹치는 복사"
+    },
+    {
+      "number": 10,
+      "file": "blind/No10.c",
+      "title": "포인터와 별칭",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "10 10 10\n15 15 15\n15 22 15 22\n3 6 23 12\n2 1\n3 29 23 12\n1\n4 1\n",
+          "exit": 0
+        }
+      ],
+      "sha256": "1854be58234efa6d69732242e8c37835b0a414e615f9ee52fa53100257a9362c",
+      "syntax": "주소·역참조·포인터 산술·차이",
+      "structures": "별칭·참조 대상 변경·배열 끝 다음 위치"
+    },
+    {
+      "number": 11,
+      "file": "blind/No11.c",
+      "title": "이중·삼중 포인터",
+      "syntax": "다단계 역참조, 포인터 저장 위치 변경",
+      "structures": "참조 경로, 공유 객체, 포인터 슬롯",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "15 15 15\n15 27 27\n99 27 27 99\n1 1 1\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 6,
+      "sha256": "97c68a50a5d2568710790fdbe95f5e0d225d849ff2503898bd73504a612bcddf"
+    },
+    {
+      "number": 12,
+      "file": "blind/No12.c",
+      "title": "연속 이차원 배열",
+      "syntax": "다차원 배열, 배열 포인터, sizeof",
+      "structures": "격자와 연속 메모리의 대응",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "1 2 3\n13 5 26\n1 2 3\n1\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 4,
+      "sha256": "fd6942a662f3bae1d27f46dbef270bc5caacc96a882c96505dd54f21ab615065"
+    },
+    {
+      "number": 13,
+      "file": "blind/No13.c",
+      "title": "비연속·가변 길이 행",
+      "syntax": "포인터 배열, 행별 malloc/free",
+      "structures": "서로 다른 할당으로 구성한 격자",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "0 1\n10 11 99 13\n20\n1 4\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 5,
+      "sha256": "73bf6de0e0d630e2f15e671179dd29b6eecaa8ee786298691b4a2a6f67d21ce4"
+    },
+    {
+      "number": 14,
+      "file": "blind/No14.c",
+      "title": "구조체 복사와 전달",
+      "syntax": "중첩 구조체, 값 전달·반환, 포인터 멤버",
+      "structures": "복사된 객체와 공유 참조의 구분",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "3 14 107\n1 107\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 9,
+      "sha256": "07db37ee694a32e326999bca94877f103fd78dbe8f0990419e00a36670095a8f"
+    },
+    {
+      "number": 15,
+      "file": "blind/No15.c",
+      "title": "재귀 계산",
+      "syntax": "재귀 호출, 전역 호출 횟수, 반환값 결합",
+      "structures": "호출 트리와 프레임별 지역변수",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "8 25\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 6,
+      "sha256": "54fb714caf42550343ec478abe7de1b5e37895c352ddad77076312b944df1f72"
+    },
+    {
+      "number": 16,
+      "file": "blind/No16.c",
+      "title": "실수 계산",
+      "syntax": "실수·정수 변환, math.h 분류와 반올림",
+      "structures": "실제 실수 값, 음의 0·NaN·무한대",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "2.50 -3\n-4 -3 -4\n1 1\n1 1\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 5,
+      "sha256": "35175d869d34b9e84943d996dbb12354d4fcfa992d6d27cfbd1a010e39c5b2b5"
+    },
+    {
+      "number": 17,
+      "file": "blind/No17.c",
+      "title": "컴파일 시 결정되는 식",
+      "syntax": "sizeof, _Alignof, _Generic, _Static_assert",
+      "structures": "미평가 식과 실제 호출의 구분",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "2 12 1\n4 2.5\n1\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 7,
+      "sha256": "566942438e22ecab575accc3b83b9ef2de973529f7eab8017db44d234635a205"
+    },
+    {
+      "number": 18,
+      "file": "blind/No18.c",
+      "title": "태그가 있는 공용체",
+      "syntax": "enum, union, 구조체 복사, 지정 초기화",
+      "structures": "같은 저장 영역의 서로 다른 변형",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "42 2.5\nxy\n1 1\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 13,
+      "sha256": "97c0dbdc38ac0043fdc1b96aa5766801b662d187f4daad1a85f8ce9759e6a5f3"
+    },
+    {
+      "number": 19,
+      "file": "blind/No19.c",
+      "title": "비트필드와 비트 집합",
+      "syntax": "비트필드, uint64_t, 시프트·마스크",
+      "structures": "부분 비트 변경과 64비트 값 보존",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "6 17 0\n0000000000000008 8000000000000000\n1 1\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 6,
+      "sha256": "08e859880aba47d7b4f6f540241b07d6149a87bfa1f710bca4a11b27a428e3fe"
+    },
+    {
+      "number": 20,
+      "file": "blind/No20.c",
+      "title": "동적 메모리의 수명",
+      "syntax": "malloc, calloc, free, 별칭",
+      "structures": "미초기화 할당·0 초기화·해제",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "1 2 3 4\n0 0 0 0\n9 1\n1 1 1\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 4,
+      "sha256": "a9211b67edf800739ba3775f9c988d8b3bf24f515fabacadbf675e5b16d8c132"
+    },
+    {
+      "number": 21,
+      "file": "blind/No21.c",
+      "title": "동적 배열",
+      "syntax": "void *, realloc, memcpy, 크기 검사",
+      "structures": "길이·용량·원소 폭과 저장 공간 교체",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "5 8\n3 1 4 1 5\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 11,
+      "sha256": "49fbe39bd6ef58a28a2e026b3e0c7c3bafcee3e7f0a9e887c065f223849facbb"
+    },
+    {
+      "number": 22,
+      "file": "blind/No22.c",
+      "title": "단방향 연결 리스트",
+      "syntax": "자기 참조 구조체, 이중 포인터 삭제",
+      "structures": "연결·분리와 머리 포인터 변경",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "3 2 1\n1\n3 1\n1\n1\n1\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 12,
+      "sha256": "632b28ecf02eb1ed6ac2c4513c051797a62a3ace90b8ea81ca144dd9f7341db6"
+    },
+    {
+      "number": 23,
+      "file": "blind/No23.c",
+      "title": "양방향·원형 리스트",
+      "syntax": "자기 참조, 센티널, 역방향 순회",
+      "structures": "실제 순환과 양방향 연결",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "1 2 3\n3 2 1\n1 3\n3 1\n1 1\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 12,
+      "sha256": "09ca012c01f811dc3cd173d066d29c7dfd727b70a09f4c55dd3b132422110c50"
+    },
+    {
+      "number": 24,
+      "file": "blind/No24.c",
+      "title": "스택·큐·원형 버퍼",
+      "syntax": "구조체 배열, 인덱스와 나머지 연산",
+      "structures": "물리적 배열과 논리적 원소 순서",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "30 20 40 10\n1 2\n5 6 3 4\n3 4 5 6\n0 0\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 13,
+      "sha256": "dc8eb7ad92db40827516255f7bde337d173467afe4fe31a871edb9f15c52fe4d"
+    },
+    {
+      "number": 25,
+      "file": "blind/No25.c",
+      "title": "삽입 정렬",
+      "syntax": "구조체 배열, 임시 객체, 원소 이동",
+      "structures": "비교·복사 순서와 안정성",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "1:1 1:3 2:2 3:0 3:4\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 7,
+      "sha256": "c8325891849763b689282c59a8cd985af737767f61d490cc949c915478bc39e7"
+    },
+    {
+      "number": 26,
+      "file": "blind/No26.c",
+      "title": "합병 정렬",
+      "syntax": "재귀, 공유 배열, 필드별 저장·후위 증가",
+      "structures": "프레임별 구간, 임시 배열과 안정적 병합",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "1:1 1:3 2:4 3:2 4:0 4:5\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 13,
+      "sha256": "9027efe3ef76d429d046969a0166e1fe0f18e17715e5a7b19dcfd4b08184a977"
+    },
+    {
+      "number": 27,
+      "file": "blind/No27.c",
+      "title": "퀵정렬",
+      "syntax": "함수 포인터, 분할, 교환, 재귀",
+      "structures": "실제 비교 대상·피벗·교환과 부분 구간",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "1 2 2 4 5 5\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 15,
+      "sha256": "c858009f840bb8aad57bb14d8baf45ad74f6ea5031759f7d1808d5abc8089353"
+    },
+    {
+      "number": 28,
+      "file": "blind/No28.c",
+      "title": "이진 힙",
+      "syntax": "인덱스 부모·자식 계산, 구조체 포인터",
+      "structures": "한 배열의 트리 표현, 상향·하향 이동",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "9 3 8 1 2 5\n9 8 5 3 2 1\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 14,
+      "sha256": "e343da2afc3cfeb24c2d31f0f2dc5404e7ab052c3b3062573260983daea88caf"
+    },
+    {
+      "number": 29,
+      "file": "blind/No29.c",
+      "title": "이진 탐색 트리",
+      "syntax": "자기 참조, 재귀, 이중 포인터 삽입·삭제",
+      "structures": "부분 트리 교체와 값 복사",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "1234567\n123567\n5\n2357\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 14,
+      "sha256": "719af42ec215444c032cddedc2709e97ad901e413e11c3bb5afed32980930a69"
+    },
+    {
+      "number": 30,
+      "file": "blind/No30.c",
+      "title": "그래프 DFS·BFS",
+      "syntax": "인접 리스트, 재귀, 방문 배열과 큐",
+      "structures": "순환 그래프와 서로 다른 탐색 순서",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "013452\n012345\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 17,
+      "sha256": "d256b3bc9f1fa70b14bf22c9e5c746a257f5f40466d8cfcad060a9a5074a1a76"
+    },
+    {
+      "number": 31,
+      "file": "blind/No31.c",
+      "title": "해시 테이블",
+      "syntax": "버킷·체인, 재해시, 링크 갱신",
+      "structures": "배열과 연결 리스트의 결합, 노드 수명 유지",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "4 4\n50\n55\n1\n90 3 4\n0\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 21,
+      "sha256": "1e4b92c00036e9f524ec96e275eb13ffda69609cfac349e7d6827080da891626"
+    },
+    {
+      "number": 32,
+      "file": "blind/No32.c",
+      "title": "서로소 집합",
+      "syntax": "부모 인덱스, 재귀 경로 압축, 크기 기반 합치기",
+      "structures": "배열과 숲 표현, 압축에 따른 연결 변경",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "2 0 2 2 2 4 6\n2 2\n2 2 2 2 2 2 6\n6 1\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 10,
+      "sha256": "b1ca9bbd9a515a0817ceae3e8e2c2120f048f4dbfccb8689ff753852d7b297ff"
+    },
+    {
+      "number": 33,
+      "file": "blind/No33.c",
+      "title": "격자 동적 계획법",
+      "syntax": "이차원 점화식, 조건부 대입, 역추적",
+      "structures": "셀 간 계산 의존관계와 경로",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "0 0 0 0 0\n0 1 1 1 1\n0 1 1 2 2\n0 1 2 2 2\n0 1 2 2 3\n3 ABD\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 8,
+      "sha256": "74c781d5ed2de3f19834b1d218cfb1de50bc522df8ca88f11d7b167a3d4cd544"
+    },
+    {
+      "number": 34,
+      "file": "blind/No34.c",
+      "title": "Red-black tree",
+      "syntax": "삽입·삭제 보정, 회전, enum, 센티널",
+      "structures": "참조 변경·재색칠·부모 관계·검은 높이 불변식",
+      "cases": [
+        {
+          "stdin": "",
+          "stdout": "1:1 5:0 10:1 15:0 20:0 25:1 30:0\n1:1 5:0 10:1 15:0 25:0 30:0\n10:0 15:0 25:0\n0 1\n",
+          "exit": 0
+        }
+      ],
+      "identifierCount": 48,
+      "sha256": "266d4bacfe1760cbcb16e02d1864531c117b5776b225a18e453e0e3d1ebaf78e"
+    },
+    {
+      "number": 35,
+      "file": "blind/No35.c",
+      "title": "정규식 동치 판정기",
+      "syntax": "함수 포인터 디스패치, 범용 컨테이너, 가변 인자, 유연한 배열, 아레나",
+      "structures": "AST·NFA·DFA·비트셋·해시·곱 그래프 종합",
+      "cases": [
+        {
+          "stdin": "(a|b)*\n(a*b*)*\n",
+          "stdout": "EQUIVALENT\n",
+          "exit": 0
+        },
+        {
+          "stdin": "ab\na(b|c)\n",
+          "stdout": "NOT EQUIVALENT\nWITNESS \"ac\"\nLENGTH 2\nACCEPTED_BY 2\n",
+          "exit": 0
+        },
+        {
+          "stdin": "a*\na+\n",
+          "stdout": "NOT EQUIVALENT\nWITNESS \"\"\nLENGTH 0\nACCEPTED_BY 1\n",
+          "exit": 0
+        },
+        {
+          "stdin": "[]\na[]\n",
+          "stdout": "EQUIVALENT\n",
+          "exit": 0
+        },
+        {
+          "stdin": "[a-c]\n(a|b|c)\n",
+          "stdout": "EQUIVALENT\n",
+          "exit": 0
+        },
+        {
+          "stdin": "\\xFF\n\\xFF\n",
+          "stdout": "EQUIVALENT\n",
+          "exit": 0
+        },
+        {
+          "stdin": "(\na\n",
+          "stdout": "",
+          "exit": 2,
+          "stderrPrefix": "ERROR: "
+        }
+      ],
+      "identifierCount": 209,
+      "sha256": "1c619d3e5d56b3ec71b0b0a5d40d793cf51a97e84e6b2958e5836610791c2d11"
+    },
+    {
+      "number": 36,
+      "file": "blind/No36.c",
+      "title": "미초기화 읽기",
+      "syntax": "C11에서 의도적으로 정의되지 않은 동작을 유발하는 오류 예제",
+      "structures": "초기화되지 않은 int의 값을 계산에 사용",
+      "mode": "compile-only",
+      "intentionalUndefinedBehavior": true,
+      "firstInvalidLine": 4,
+      "firstInvalidOperation": "초기화되지 않은 int의 값을 계산에 사용",
+      "cases": [],
+      "verification": "Compile only. Native output, crash behavior and exit status are not a correctness oracle.",
+      "identifierCount": 2,
+      "sha256": "22ce3f33f207464f795407b2b32f8ec96b5ffdd710b1e9f058147e7889f4f964"
+    },
+    {
+      "number": 37,
+      "file": "blind/No37.c",
+      "title": "0 나눗셈",
+      "syntax": "C11에서 의도적으로 정의되지 않은 동작을 유발하는 오류 예제",
+      "structures": "정수 나눗셈의 제수가 0",
+      "mode": "compile-only",
+      "intentionalUndefinedBehavior": true,
+      "firstInvalidLine": 5,
+      "firstInvalidOperation": "정수 나눗셈의 제수가 0",
+      "cases": [],
+      "verification": "Compile only. Native output, crash behavior and exit status are not a correctness oracle.",
+      "identifierCount": 3,
+      "sha256": "b0bff393eba897f9c786048b7c608f91c605292ffaa77e024ace15c1e65b6525"
+    },
+    {
+      "number": 38,
+      "file": "blind/No38.c",
+      "title": "signed 오버플로",
+      "syntax": "C11에서 의도적으로 정의되지 않은 동작을 유발하는 오류 예제",
+      "structures": "INT_MAX + 1을 signed int로 계산",
+      "mode": "compile-only",
+      "intentionalUndefinedBehavior": true,
+      "firstInvalidLine": 5,
+      "firstInvalidOperation": "INT_MAX + 1을 signed int로 계산",
+      "cases": [],
+      "verification": "Compile only. Native output, crash behavior and exit status are not a correctness oracle.",
+      "identifierCount": 2,
+      "sha256": "e0290f7393b3fea49cd412ce0331d6e5afc070ca54a2e57d5301e4bd61f9a8e1"
+    },
+    {
+      "number": 39,
+      "file": "blind/No39.c",
+      "title": "배열 경계 초과",
+      "syntax": "C11에서 의도적으로 정의되지 않은 동작을 유발하는 오류 예제",
+      "structures": "원소 2개인 배열의 인덱스 2에 쓰기",
+      "mode": "compile-only",
+      "intentionalUndefinedBehavior": true,
+      "firstInvalidLine": 5,
+      "firstInvalidOperation": "원소 2개인 배열의 인덱스 2에 쓰기",
+      "cases": [],
+      "verification": "Compile only. Native output, crash behavior and exit status are not a correctness oracle.",
+      "identifierCount": 2,
+      "sha256": "ba86e38d55d5f4833ea1e90adb6d50535dfe2685d5ea7c4b38b3df63f37828c0"
+    },
+    {
+      "number": 40,
+      "file": "blind/No40.c",
+      "title": "해제 후 접근",
+      "syntax": "C11에서 의도적으로 정의되지 않은 동작을 유발하는 오류 예제",
+      "structures": "해제된 객체를 가리키던 별칭을 재사용하여 읽기 시도",
+      "mode": "compile-only",
+      "intentionalUndefinedBehavior": true,
+      "firstInvalidLine": 9,
+      "firstInvalidOperation": "해제된 객체를 가리키던 별칭을 재사용하여 읽기 시도",
+      "cases": [],
+      "verification": "Compile only. Native output, crash behavior and exit status are not a correctness oracle.",
+      "identifierCount": 3,
+      "sha256": "6000fd48c69c7fcf8e46c294dca024701256a584a6c106aed5d30ac6fd34779d"
+    },
+    {
+      "number": 41,
+      "file": "blind/No41.c",
+      "title": "이중 해제",
+      "syntax": "C11에서 의도적으로 정의되지 않은 동작을 유발하는 오류 예제",
+      "structures": "해제된 포인터 재사용과 두 번째 free 시도",
+      "mode": "compile-only",
+      "intentionalUndefinedBehavior": true,
+      "firstInvalidLine": 8,
+      "firstInvalidOperation": "해제된 포인터 재사용과 두 번째 free 시도",
+      "cases": [],
+      "verification": "Compile only. Native output, crash behavior and exit status are not a correctness oracle.",
+      "identifierCount": 2,
+      "sha256": "4c2661d4291159f06534195b09c9c7b45bebe401b41cd13c79b393c497f9860f"
+    },
+    {
+      "number": 42,
+      "file": "blind/No42.c",
+      "title": "널 포인터 역참조",
+      "syntax": "C11에서 의도적으로 정의되지 않은 동작을 유발하는 오류 예제",
+      "structures": "널 포인터를 통한 저장 시도",
+      "mode": "compile-only",
+      "intentionalUndefinedBehavior": true,
+      "firstInvalidLine": 4,
+      "firstInvalidOperation": "널 포인터를 통한 저장 시도",
+      "cases": [],
+      "verification": "Compile only. Native output, crash behavior and exit status are not a correctness oracle.",
+      "identifierCount": 1,
+      "sha256": "5e03c994d3ea59633fd3b6d471d1126393efa81a3b0d6d954b7dace724a06845"
+    }
+  ],
+  "normalExamples": 35,
+  "compileOnlyErrorExamples": 7
+}
