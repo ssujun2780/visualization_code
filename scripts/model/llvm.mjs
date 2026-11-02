@@ -35,14 +35,19 @@ export function metadata(ir) {
   const nodes=new Map();for(const line of ir.split("\n")) {const m=/^!(\d+) = (.*)/.exec(line);if(m)nodes.set(m[1],m[2]);}
   const field=(id,key)=>new RegExp(`(?:^|[, (])${key}: ("(?:[^"\\\\]|\\\\.)*"|![0-9]+|[^,)]+)`).exec(nodes.get(String(id))??"")?.[1];
   const clean=v=>v?.replace(/^!/,"").replace(/^"|"$/g,"");
+  const locationCache=new Map();
   function location(id,seen=new Set()) {
-    if(!id||seen.has(id))return null;seen.add(id);
-    const n=nodes.get(String(id));if(!n)return null;
+    if(!id)return null;id=String(id);
+    if(locationCache.has(id))return locationCache.get(id);
+    if(seen.has(id))return null;seen.add(id);
+    const n=nodes.get(id);if(!n)return null;
     const line=Number(field(id,"line")),column=Number(field(id,"column")??0);
     const fileId=clean(field(id,"file")),scope=clean(field(id,"scope"));
-    if(n.includes("DIFile("))return {file:clean(field(id,"filename"))};
+    if(n.includes("DIFile(")){
+      const result={file:clean(field(id,"filename"))};locationCache.set(id,result);return result;
+    }
     const parent=location(fileId??scope,seen);
-    return {...parent,...(line?{line,column}:{})};
+    const result={...parent,...(line?{line,column}:{})};locationCache.set(id,result);return result;
   }
   const types=[...nodes].filter(([,n])=>/!DI(?:Basic|Derived|Composite|Subroutine)Type\(/.test(n)).map(([id,n])=>({
     id:`debug:${id}`,kind:/!DI(\w+)Type/.exec(n)[1],name:clean(field(id,"name")),tag:field(id,"tag"),
@@ -56,8 +61,13 @@ export function metadata(ir) {
     const base=byId.get(t.baseType);if(base)decorate(base,seen);
     const inherits=t.kind==="Derived"&&["DW_TAG_typedef","DW_TAG_const_type","DW_TAG_volatile_type","DW_TAG_restrict_type"].includes(t.tag);
     if(inherits){t.encoding??=base?.encoding??null;t.sizeBits||=base?.sizeBits??0;}
+    if(t.tag==='DW_TAG_array_type')t.dimensions=t.elements.map(id=>{
+      const count=field(id.slice(6),'count');return /^\d+$/.test(count??'')?Number(count):null;
+    });
     t.signedness=/^DW_ATE_signed(?:_char)?$/.test(t.encoding)?"signed":/^DW_ATE_unsigned(?:_char)?$/.test(t.encoding)?"unsigned":null;
     t.display={label:t.name?.replace(/^unsigned\s+/,"")??base?.display?.label??null,badges:t.signedness==="unsigned"?["u"]:[]};
+    if(t.dimensions)t.display={label:base?.display?.label==null?null:base.display.label+t.dimensions.map(n=>`[${n??''}]`).join(''),badges:base?.display?.badges??[]};
+    else if(inherits&&base)t.display={label:t.name??base.display.label,badges:base.display.badges};
   }
   for(const t of types)decorate(t);
   return {nodes,field,clean,location,types};

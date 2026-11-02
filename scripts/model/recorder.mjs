@@ -1,6 +1,7 @@
 import {randomUUID} from "node:crypto";
 import {topology} from "./structure.mjs";
 import {MemorySnapshots,filledMemory,initializationOf} from "./memory-state.mjs";
+import {RangeOrigins} from './ranges.mjs';
 
 export class TraceStopped extends Error {}
 const unsigned=(value,bits=64)=>BigInt.asUintN(bits,BigInt(value));
@@ -11,13 +12,70 @@ export class ModelRecorder {
     Object.assign(this,{plan,abi,maxEvents,onEvents});this.runId=randomUUID();this.events=[];this.objects=[];this.frames=[];
     this.stack=[];this.references=new Map();this.views=[];this.diagnostics=[];this.pendingArguments=new Map();this.sequence=0;this.batch=[];
     this.coverageGaps=new Set();this.globalsBySymbol=new Map();this.captureErrors=true;
-    this.memorySnapshots=new MemorySnapshots();this.streamOffsets={stdout:0,stderr:0};
+    this.memorySnapshots=new MemorySnapshots();this.streamOffsets={stdout:0,stderr:0};this.stdioOffsets={stdout:0,stderr:0};
+    this.nativeOrigins=new RangeOrigins();
   }
   setMemory=memory=>{this.memory=memory;};
   output=(channel,text)=>{
     const call=this.frame()?.activeCall,byteLength=Buffer.byteLength(text),streamOffset=this.streamOffsets[channel]??0;
     this.event("WRITE",call?.operation??null,{action:"output",channel,text,byteLength,streamOffset,callEventId:call?.event?.eventId??null,evidence:"observed stream output"});
     this.streamOffsets[channel]=streamOffset+byteLength;
+  };
+  outputBytes=(channel,bytes,regions=[])=>{
+    const call=this.frame()?.activeCall,streamOffset=this.streamOffsets[channel]??0;
+    const delivery=this.event('WRITE',call?.operation??null,{action:'output.delivery',channel,bytesHex:Buffer.from(bytes).toString('hex'),
+      text:new TextDecoder().decode(bytes),byteLength:bytes.length,streamOffset,callEventId:call?.event?.eventId??null,
+      evidence:'observed WASI delivery'});
+    this.streamOffsets[channel]=streamOffset+bytes.length;
+    // The WASI iovec identifies the bytes actually delivered. Recover their
+    // producing calls from observed memory stores, never from text matching.
+    let offset=0;
+    for(const region of regions)for(const part of this.nativeOrigins.get(region.address,region.size)){
+      const length=part.end-part.start,userStorage=this.lookup(part.start,length),owner=userStorage?call:(part.value??call),chunk=Buffer.from(bytes).subarray(offset,offset+length);
+      this.event('WRITE',owner?.operation??null,{action:'output',channel,bytesHex:chunk.toString('hex'),text:chunk.toString('utf8'),byteLength:length,
+        streamOffset:streamOffset+offset,callEventId:owner?.event?.eventId??null,activationId:owner?.event?.activationId??null,
+        outputOrigin:'delivery-attributed',deliveryObservationId:delivery.eventId,deliveryOffset:offset,
+        dataInputs:[...(owner?.event?.dataInputs??[]),...this.nativeReadInputs(owner)],
+        readRegions:this.nativeReadRegions(owner),bufferWriterCallEventId:part.value?.event?.eventId??null,
+        evidence:!userStorage&&part.value?'observed runtime-buffer writer and WASI delivery':'observed WASI delivery in active call'});
+      offset+=length;
+    }
+  };
+  nativeReadInputs(call){return [...new Set([...(call?.nativeReads?.values()??[])].flatMap(r=>[...r.inputs]))];}
+  nativeReadRegions(call){return [...(call?.nativeReads?.values()??[])].flatMap(r=>r.ranges.ranges.map(p=>({objectId:r.object.id,address:hex(r.object.address+p.start),
+    offset:p.start,size:p.end-p.start,dataInputs:[...r.inputs],evidence:'observed linked memory reads'})));}
+  nativeMemory=(phase,address,size)=>{
+    address>>>=0;size>>>=0;if(!size)return;
+    const active=this.frame()?.activeCall,call=active&&(active.operation.external||active.operation.callee.startsWith('%'))?active:null;
+    if(phase===2)this.nativeOrigins.set(address,size,call);
+    if(!call)return;
+    call.nativeReads??=new Map();call.nativeWrites??=new Map();
+    for(const object of this.objects){
+      if(object.lifecycle!=='alive'||address>=object.address+object.size||address+size<=object.address)continue;
+      const start=Math.max(address,object.address)-object.address,end=Math.min(address+size,object.address+object.size)-object.address;
+      const map=phase===1?call.nativeReads:call.nativeWrites;let entry=map.get(object.id);
+      if(!entry){entry={object,ranges:new RangeOrigins(),inputs:new Set()};map.set(object.id,entry);}
+      entry.ranges.set(start,end-start,true);
+      if(phase===1)for(const r of this.segments(object,start,end-start))if(r.writer&&r.writer!=='unobserved')entry.inputs.add(r.writer);
+    }
+  };
+  recordNativeWrites(op,call,returned){
+    for(const entry of call.nativeWrites?.values()??[])for(const range of entry.ranges.ranges){
+      const object=entry.object,address=object.address+range.start,size=range.end-range.start;
+      const e=this.event('WRITE',op,{action:'write.range',target:{objectId:object.id,address:hex(address),offset:range.start,size},
+        memoryState:this.captureMemory(address,size),dataInputs:[...this.nativeReadInputs(call),...(call.event.dataInputs??[]),...(call.inputEvents??[]),...(call.callbackReturnEventIds??[])],
+        readRegions:this.nativeReadRegions(call),callEventId:call.event.eventId,returnEventId:returned?.eventId??null,evidence:'observed linked memory stores'});
+      this.mark(object,address,size,e.eventId);this.refreshPointers(object,address,size,e);
+    }
+    call.nativeWrites?.clear();
+  }
+  stdioOutput=(descriptor,address,size)=>{
+    const channel=descriptor===1?'stdout':'stderr',call=this.frame()?.activeCall,streamOffset=this.stdioOffsets[channel]??0;
+    const bytes=new Uint8Array(this.memory.buffer,address>>>0,size>>>0);
+    this.event('WRITE',call?.operation??null,{action:'output',channel,bytesHex:Buffer.from(bytes).toString('hex'),
+      text:new TextDecoder().decode(bytes),byteLength:bytes.length,streamOffset,callEventId:call?.event?.eventId??null,
+      outputOrigin:'stdio',dataInputs:call?.event?.dataInputs??[],evidence:'observed libc formatted bytes accepted by stream'});
+    this.stdioOffsets[channel]=streamOffset+bytes.length;
   };
   input=(bytes,streamOffset)=>{
     const call=this.frame()?.activeCall,event=this.event("READ",call?.operation??null,{action:"input",channel:"stdin",bytesHex:Buffer.from(bytes).toString("hex"),
@@ -123,11 +181,22 @@ export class ModelRecorder {
     if(!object||object.lifecycle!=="alive")return;
     object.lifecycle="ended";const e=this.event("SPACE",op,{action:"object.end",objectId:object.id,reason});object.endedBy=e.eventId;
   }
-  pointerWrite(object,address,type,value,event) {
+  pointerTarget(value,type,origin=null) {
+    const destination=value?(origin??this.lookup(value,0)):null,offset=destination?value-destination.address:null;
+    const onePast=!!destination&&offset===destination.size;let width=0;
+    try{width=this.abi.layout(type.slice(0,-1)).size;}catch{}
+    return {targetObjectId:destination?.id??null,targetOffset:offset,onePast,
+      status:!value?'null':!destination?'unknown':destination.lifecycle!=='alive'?'ended':onePast?'one-past':offset<0||offset>=destination.size?'out-of-bounds':'in-bounds',
+      dereferenceable:!!destination&&destination.lifecycle==='alive'&&width>0&&offset>=0&&offset+width<=destination.size,
+      evidence:origin?'observed pointer origin':'address lookup'};
+  }
+  pointerWrite(object,address,type,value,event,origin=null) {
     if(!object||!type.endsWith("*"))return;
-    const destination=this.lookup(value,0),base=type.slice(0,-1);if(destination)this.view(destination,value,base);
+    const target=this.pointerTarget(value,type,origin),destination=this.objects.find(o=>o.id===target.targetObjectId),base=type.slice(0,-1);
+    if(destination)this.view(destination,value,base);
     this.references.set(`${object.id}:${address-object.address}`,{objectId:object.id,offset:address-object.address,address:value,
-      targetObjectId:destination?.id??null,targetOffset:destination?value-destination.address:null,type,eventId:event.eventId});
+      ...target,type,eventId:event.eventId});
+    if(event.value?.address&&event.target?.objectId===object.id&&event.target.address===hex(address))event.value.reference=target;
   }
   refreshPointers(object,address,size,event) {
     if(!object)return;
@@ -154,12 +223,18 @@ export class ModelRecorder {
     if(op.flags?.nuw){const n=calculate(ua,ub);if(n!==null&&(n<0||n>=(1n<<BigInt(bits))))this.fault("unsigned-poison","컴파일러의 정수 연산 전제 조건을 위반했습니다.",op);}
   }
   emit=(index,phase,address,size,x,y)=>{
+    if(index===-1){this.nativeMemory(phase,address,size);return;}
     const op=this.plan.instructions[index-1];if(!op)throw new Error(`알 수 없는 명령 ${index}`);
     x=unsigned(x);y=unsigned(y);address>>>=0;size>>>=0;
     if(op.action==="function.enter"){
+      // A source callback can read changes made by an opaque caller before that
+      // caller returns. Commit pending observations at the callback boundary.
+      const pending=this.frame()?.activeCall;
+      if(pending?.nativeWrites?.size)this.recordNativeWrites(pending.operation,pending,null);
       const parent=this.frame(),frame={id:`f${this.frames.length+1}`,functionId:op.functionId,functionName:op.functionName,parent:parent?.id??null,
-        ended:false,definitions:new Map(),origins:new Map(),selects:new Map(),calls:new Map(),sourceDecisions:new Map(),block:op.block??"entry"};
-      this.frames.push(frame);this.stack.push(frame);this.event("SPACE",op,{action:"frame.begin",frameId:frame.id});this.event("FLOW",op,{action:"enter",frameId:frame.id});return;
+        ended:false,definitions:new Map(),origins:new Map(),allocations:new Map(),selects:new Map(),calls:new Map(),sourceDecisions:new Map(),block:op.block??"entry"};
+      if(pending?.operation.external)frame.callbackOfCallEventId=pending.event.eventId;
+      this.frames.push(frame);this.stack.push(frame);this.event("SPACE",op,{action:"frame.begin",frameId:frame.id,callbackOfCallEventId:frame.callbackOfCallEventId});this.event("FLOW",op,{action:"enter",frameId:frame.id});return;
     }
     const frame=this.frame();
     if(op.action==="short-circuit") {
@@ -170,7 +245,7 @@ export class ModelRecorder {
       const previous=frame.sourceDecisions.get(op.anchorInstructionId)??[];frame.sourceDecisions.set(op.anchorInstructionId,[...previous,e.eventId]);return;
     }
     if(op.action==="function.argument") {
-      const p=op.parameter,parent=this.stack.at(-2),call=parent?.activeCall;
+      const p=op.parameter,parent=this.stack.at(-2),call=frame.callbackOfCallEventId?null:parent?.activeCall;
       const argument=call?.operation?.args[p.index],producer=argument&&parent?.definitions.get(argument.value);
       const e=this.event("WRITE",op,{action:"argument",parameterIndex:p.index,name:op.local?.name??null,value:this.semanticValue(this.scalar(p.type,x),op.cType),callEventId:call?.event?.eventId??null,dataInputs:[producer?.eventId].filter(Boolean)});
       frame.definitions.set(p.value,e);
@@ -179,13 +254,39 @@ export class ModelRecorder {
         const object=this.create(address,size,op,{storage:"automatic",name:op.local?.name,type,initialRanges,copiedFrom:source?{objectId:source.id,offset,size}:null});
         if(!source)this.coverageGaps.add("byval-initialization-source-unobserved");
         frame.origins.set(p.value,object);
-      }else if(p.type.endsWith("*"))frame.origins.set(p.value,this.lookup(this.address(x),0));
+      }else if(p.type.endsWith("*")){
+        const origin=call&&(parent.origins.get(argument?.value)??this.globalsBySymbol.get(argument?.value));
+        frame.origins.set(p.value,origin??this.lookup(this.address(x),0));
+        e.value.reference=this.pointerTarget(this.address(x),p.type,origin);
+      }
       return;
     }
     if(frame&&op.block&&frame.block!==op.block){frame.previousBlock=frame.block;frame.block=op.block;}
     if(op.action==="globals.ready") {for(const o of this.objects.filter(o=>o.storage==="static"))this.refreshPointers(o,o.address,o.size,{eventId:o.createdBy});return;}
     if(op.action==="global.begin") {const g=op.global;if(this.globalsBySymbol.has(g.symbol))return;const o=this.create(address,size,op,{storage:"static",name:g.name,type:g.type,cType:g.cType,debugTypeId:g.debugTypeId,initialized:true,constant:g.constant});this.globalsBySymbol.set(g.symbol,o);return;}
-    if(op.action==="object.begin") {const o=this.create(address,this.address(x),op,{storage:"automatic",name:op.local?.name,type:op.type,cType:op.cType,debugTypeId:op.local?.debugTypeId});frame.origins.set(op.result,o);return;}
+    if(op.action==="object.begin") {
+      const storage={address,size:this.address(x),operation:op};frame.allocations.set(op.id,storage);
+      if(op.lifetimeManaged)storage.reservationObservationId=this.event("SPACE",op,{action:"storage.reserve",address:hex(address),size:storage.size}).eventId;
+      else{const o=this.create(address,storage.size,op,{storage:"automatic",name:op.local?.name,type:op.type,cType:op.cType,debugTypeId:op.local?.debugTypeId});frame.origins.set(op.result,o);}
+      return;
+    }
+    if(op.action==="lifetime.start"||op.action==="lifetime.end") {
+      const storage=frame.allocations.get(op.allocationObservationId),allocation=storage?.operation;
+      if(!allocation||storage.address!==address)this.fault("lifetime-binding","객체의 수명 표식과 할당 주소를 연결하지 못했습니다.",op);
+      if(op.action==="lifetime.start"){
+        const prior=frame.origins.get(allocation.result);
+        if(prior?.lifecycle==="alive")return; // A declaration reached again in the same lifetime is not a new object.
+        const o=this.create(address,storage.size,op,{storage:"automatic",name:allocation.local?.name,type:allocation.type,cType:allocation.cType,debugTypeId:allocation.local?.debugTypeId});
+        this.events.at(-1).reservationObservationId=storage.reservationObservationId;
+        frame.origins.set(allocation.result,o);
+      }else this.end(frame.origins.get(allocation.result),op,op.endReason??"scope-exit");
+      return;
+    }
+    if(op.action==="source.declaration") {
+      const object=frame.origins.get(op.pointer.value)??this.lookup(address,0);
+      this.event("SPACE",op,{action:"declaration",objectId:object?.id??null,address:hex(address),
+        evidence:"observed source declaration"});return;
+    }
     if(op.action==="call"){this.call(op,phase,x);return;}
     if(op.action==="load"||op.action==="store") {
       const isStore=op.action==="store",origin=this.origin(op.pointer);
@@ -196,13 +297,21 @@ export class ModelRecorder {
         value:this.semanticValue(this.snapshot(address,size,op.type),op.cType??(object?.type===op.type?object.cType:null)),dataInputs:isStore?inputs:[...new Set(previous.filter(id=>id!=="unobserved"))],addressInputs:[this.inputEvent(op.pointer)?.eventId].filter(Boolean),
         initializationEvidence:object&&!previous.includes("unobserved")?"tracked":"unobserved",controlInputs:frame.sourceDecisions.get(op.id)??[]});
       frame.sourceDecisions.delete(op.id);
-      if(isStore){this.mark(object,address,size,e.eventId);if(op.type.endsWith("*"))this.pointerWrite(object,address,op.type,new DataView(this.memory.buffer).getUint32(address,true),e);else this.refreshPointers(object,address,size,e);}
-      else if(op.result){frame.definitions.set(op.result,e);if(op.type.endsWith("*")){const n=new DataView(this.memory.buffer).getUint32(address,true);frame.origins.set(op.result,this.lookup(n,0)??this.objects.findLast(o=>n>=o.address&&n<o.address+o.size));}}
+      if(isStore){this.mark(object,address,size,e.eventId);if(op.type.endsWith("*"))this.pointerWrite(object,address,op.type,new DataView(this.memory.buffer).getUint32(address,true),e,this.origin(op.inputs[0]));else this.refreshPointers(object,address,size,e);}
+      else if(op.result){frame.definitions.set(op.result,e);if(op.type.endsWith("*")){
+        const n=new DataView(this.memory.buffer).getUint32(address,true),reference=object&&this.references.get(`${object.id}:${address-object.address}`);
+        const target=reference?.address===n?this.objects.find(o=>o.id===reference.targetObjectId):null;
+        frame.origins.set(op.result,target??this.lookup(n,0)??this.objects.findLast(o=>n>=o.address&&n<o.address+o.size));
+        e.value.reference=this.pointerTarget(n,op.type,target);
+      }}
       return;
     }
     if(op.action==="function.return") {
       const returned=op.type==="void"?null:this.event("WRITE",op,{action:"return.value",value:this.semanticValue(this.scalar(op.type,x),op.cType??this.inputEvent(op.inputs?.[0])?.value?.cType),dataInputs:this.inputs(op),controlInputs:frame.sourceDecisions.get(op.id)??[]});
-      const parent=this.stack.at(-2);if(parent?.activeCall&&returned)parent.activeCall.returnEventId=returned.eventId;
+      const parent=this.stack.at(-2);if(parent?.activeCall&&returned){
+        if(frame.callbackOfCallEventId)(parent.activeCall.callbackReturnEventIds??=[]).push(returned.eventId);
+        else {parent.activeCall.returnEventId=returned.eventId;if(op.type.endsWith('*'))parent.activeCall.returnOrigin=this.origin(op.inputs[0]);}
+      }
       this.event("FLOW",op,{action:"return",frameId:frame.id});for(const o of this.objects.filter(o=>o.frameId===frame.id))this.end(o,op,"function-return");
       this.event("SPACE",op,{action:"frame.end",frameId:frame.id});frame.ended=true;this.stack.pop();return;
     }
@@ -213,12 +322,15 @@ export class ModelRecorder {
     if(op.action==="unreachable"){this.fault("unreachable","실행할 수 없는 코드 위치에 도달했습니다.",op);}
     if(phase===0){if(op.action==="calculate")this.guard(op,x,y);if(op.action==="select")frame.selects.set(op.id,!!x);return;}
     const e=this.event("CALC",op,{action:op.action,operator:op.opcode,predicate:op.predicate,value:op.valueEvidence?{evidence:op.valueEvidence}:this.semanticValue(this.scalar(op.type,x),op.cType,op.cBoolean),dataInputs:this.inputs(op)});
+    if(op.action==='merge')e.selectedInput=op.incoming.find(i=>i.block===frame.previousBlock)??null;
+    if(op.action==='select')e.selectedInput=op.inputs[frame.selects.get(op.id)?1:2];
     if(op.conversion){const input=this.inputEvent(op.inputs[0]),literal=/^-?\d+$/.test(op.inputs[0].value)?op.inputs[0].value:null,
       bits=op.conversion.bitsUnchanged?x:input?.value?.bits??literal;
       e.conversion={...op.conversion,fromValue:bits!==null&&bits!==undefined?this.semanticValue(this.scalar(op.inputs[0].type,BigInt(bits)),op.conversion.fromType):{cType:op.conversion.fromType,evidence:"unobserved"}};}
     if(op.result)frame.definitions.set(op.result,e);
     if(op.type?.endsWith("*")){
       const n=this.address(x),origin=this.origin(op.pointer??op.inputs?.[0])??this.lookup(n,0);frame.origins.set(op.result,origin);
+      e.value.reference=this.pointerTarget(n,op.type,origin);
       if(origin)this.view(origin,n,op.type.slice(0,-1));
     }
   };
@@ -289,7 +401,8 @@ export class ModelRecorder {
       if(op.external&&["strcpy","strncpy","strcat"].includes(name))call.stringEffect=this.prepareStringEffect(op,call,name);
       return;
     }
-    const e=this.event("FLOW",op,{action:"call.end",callee:op.callee,value:this.semanticValue(this.scalar(op.returnType,x),op.cType),callEventId:call.event.eventId,dataInputs:[call.returnEventId].filter(Boolean)});
+    const e=this.event("FLOW",op,{action:"call.end",callee:op.callee,value:this.semanticValue(this.scalar(op.returnType,x),op.cType),callEventId:call.event.eventId,
+      dataInputs:[call.returnEventId,...(call.callbackReturnEventIds??[]),...this.nativeReadInputs(call)].filter(Boolean),readRegions:this.nativeReadRegions(call)});
     if(op.result)frame.definitions.set(op.result,e);
     const a=i=>this.address(call.args[i]??0n),returned=this.address(x);
     if(name==="malloc"||name==="calloc"||name==="realloc") {
@@ -305,6 +418,7 @@ export class ModelRecorder {
     } else if(call.copy) {
       const {destination,size,segments}=call.copy,object=this.lookup(destination,size);const event=this.event("WRITE",op,{action:"copy",target:{objectId:object?.id??null,address:hex(destination),offset:object?destination-object.address:null,size},
         sourceAddress:hex(call.copy.source),sourceObjectId:call.copy.sourceObjectId,sourceOffset:call.copy.sourceOffset,
+        callEventId:call.event.eventId,returnEventId:e.eventId,addressInputs:this.inputs(op),sourceSize:size,
         memoryState:this.captureMemory(destination,size,segments??[{start:0,end:size,writer:"unobserved"}]),
         dataInputs:[...new Set(segments?.map(s=>s.writer).filter(id=>id&&id!=="unobserved"))],evidence:"library API effect"});
       this.mark(object,destination,size,segments?null:"unobserved");for(const r of segments??[])this.mark(object,destination+r.start,r.end-r.start,r.writer==="unobserved"?"unobserved":r.writer?event.eventId:null);
@@ -313,17 +427,24 @@ export class ModelRecorder {
       const object=this.lookup(a(0),a(2)),event=this.event("WRITE",op,{action:"fill",target:{objectId:object?.id??null,address:hex(a(0)),offset:object?a(0)-object.address:null,size:a(2)},
         byte:a(1)&255,memoryState:filledMemory(a(2),a(1)&255),evidence:"library API effect"});this.mark(object,a(0),a(2),event.eventId);
     } else if(name.startsWith("llvm.va_start")) {const object=this.lookup(a(0));if(object)this.mark(object,a(0),object.address+object.size-a(0),e.eventId);}
-    else if(["scanf","__isoc99_scanf","sscanf","fscanf"].includes(name))this.scanf(op,call,x);
+    else if(["scanf","__isoc99_scanf","sscanf","fscanf"].includes(name)&&!this.nativeMemoryCoverage)this.scanf(op,call,x);
     else if(name==="fgets"&&returned) {
       const object=this.lookup(returned),s=this.cstring(returned,Math.min(a(1),object?object.address+object.size-returned:a(1))),size=s.length+(s.terminated?1:0);
       this.check(returned,size,op,{write:true});const written=this.event("WRITE",op,{action:"input",target:{objectId:object?.id??null,address:hex(returned),offset:object?returned-object.address:null,size},
         memoryState:this.captureMemory(returned,size),dataInputs:call.inputEvents??[],callEventId:call.event.eventId,evidence:"library API effect"});this.mark(object,returned,size,written.eventId);
     }
+    else if(this.nativeMemoryCoverage){
+      this.recordNativeWrites(op,call,e);
+      if(op.returnType.endsWith('*')&&returned&&!call.returnOrigin&&!this.lookup(returned,0)){
+        this.coverageGaps.add('external-return-storage-untracked');e.uncertainRegions=[{address:hex(returned),reason:'returned storage has no observed allocation contract'}];
+      }
+    }
     else if(op.external&&!name.startsWith("llvm.")&&!["free","strlen","strcmp","strncmp","memcmp","printf","fprintf","puts","fputs","putchar","fputc","fgetc","getchar","clock","ferror","fflush","vfprintf","exit","abort"].includes(name)){
       this.coverageGaps.add(`external-effects:${name}`);e.uncertainRegions=[];
       for(const [index,arg]of op.args.entries())if(arg.type.endsWith("*")){const address=a(index),object=this.lookup(address);if(object&&!object.constant){const size=object.address+object.size-address;this.mark(object,address,size,"unobserved");e.uncertainRegions.push({objectId:object.id,address:hex(address),size});}}
     }
-    if(op.returnType.endsWith("*")&&!frame.origins.has(op.result))frame.origins.set(op.result,this.lookup(returned,0));
+    if(op.returnType.endsWith("*")&&!frame.origins.has(op.result))frame.origins.set(op.result,call.returnOrigin??this.lookup(returned,0));
+    if(op.returnType.endsWith('*'))e.value.reference=this.pointerTarget(returned,op.returnType,frame.origins.get(op.result));
     frame.calls.delete(op.id);if(frame.activeCall===call)frame.activeCall=null;
   }
   scanf(op,call,result) {
@@ -351,7 +472,9 @@ export class ModelRecorder {
       groups.push({type,nodes:nodes.map(v=>v.id),edges:links,...topology(nodes,links),snapshot:"last observed references, including ended objects"});}
     return {schemaVersion:2,programId:this.plan.programId,runId:this.runId,backend:this.plan.backend,status,exitCode:execution.exitCode,
       events:this.events,objects:this.objects.map(({writes,...o})=>({...o,initializationRanges:writes})),
-      frames:this.frames.map(({definitions,origins,selects,calls,activeCall,sourceDecisions,...f})=>f),views:this.views,references:edges,structures:groups,
-      diagnostics:this.diagnostics,coverage:{...this.plan.coverage,memorySnapshots:this.memorySnapshots.summary(),gaps:[...this.coverageGaps]}};
+      frames:this.frames.map(({definitions,origins,allocations,selects,calls,activeCall,sourceDecisions,...f})=>f),views:this.views,references:edges,structures:groups,
+      diagnostics:this.diagnostics,coverage:{...this.plan.coverage,
+        ...(this.nativeMemoryCoverage?{linkedMemory:this.nativeMemoryCoverage,memory:'user LLVM accesses and linked WASM scalar accesses to tracked objects; allocation contracts remain explicit',libraryInternals:'linked scalar memory reads/stores observed; library arithmetic and source frames are not instrumented'}:{}),
+        memorySnapshots:this.memorySnapshots.summary(),gaps:[...this.coverageGaps]}};
   }
 }

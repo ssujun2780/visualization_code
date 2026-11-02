@@ -41,17 +41,8 @@ function context(node) {
   return null;
 }
 
-export function foldedShortCircuits(nodes,source,filename,types) {
-  const bytes=Buffer.from(source,"utf8"),lines=[0];for(let i=0;i<bytes.length;i++)if(bytes[i]===10)lines.push(i+1);
-  function range(raw) {
-    if(!raw||raw.file!=="/main.c")return null;
-    const start=lines[raw.start.line-1]+raw.start.column-1,last=lines[raw.end.line-1]+raw.end.column-1;
-    if(!Number.isInteger(start)||!Number.isInteger(last)||start<0||last>=bytes.length)return null;
-    const token=/^(?:[\p{ID_Start}_][\p{ID_Continue}_]*|(?:\d[\w.]*|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|\+\+|--|&&|\|\||.))/us.exec(bytes.subarray(last).toString("utf8"))?.[0];
-    if(!token)return null;const end=last+Buffer.byteLength(token);
-    return {file:filename,line:raw.start.line,column:raw.start.column,start:{line:raw.start.line,column:raw.start.column,byte:start},
-      end:{line:raw.end.line,column:raw.end.column+end-last,byte:end},expression:bytes.subarray(start,end).toString("utf8")};
-  }
+export function foldedShortCircuits(nodes,sourceMap,filename,types) {
+  const range=raw=>sourceMap.range(raw,{text:true});
   const expressions=nodes.filter(logical).map((node,index)=>{
     const op=operator(node),truth=literalTruth(node.children[0],types),skip=truth===null?null:op==="&&"?!truth:truth;
     return {id:`logical${index+1}`,node,operator:op,leftTruth:truth,skipped:skip,source:range(node.source),
@@ -74,8 +65,8 @@ export function foldedShortCircuits(nodes,source,filename,types) {
     }
     return result;
   }
-  const describe=e=>({id:e.id,operator:e.operator,source:e.source,left:{source:e.left,truth:e.leftTruth,evidence:"compiler AST literal"},
-    right:{source:e.right,evaluation:e.skipped===null?"runtime-dependent":e.skipped?"skipped":"required"},
+  const describe=e=>({id:e.id,nodeId:e.node.id,operator:e.operator,source:e.source,left:{nodeId:e.node.children[0]?.id,source:e.left,truth:e.leftTruth,evidence:"compiler AST literal"},
+    right:{nodeId:e.node.children[1]?.id,source:e.right,evaluation:e.skipped===null?"runtime-dependent":e.skipped?"skipped":"required"},
     reason:e.skipped?(e.operator==="&&"?"and-left-false":"or-left-true"):null,
     anchorInstructionIds:[...e.bound]});
   return {before,describe,

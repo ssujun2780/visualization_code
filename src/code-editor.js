@@ -15,6 +15,7 @@ import "monaco-editor/editor/contrib/gotoError/browser/gotoError.js";
 import "monaco-editor/languages/definitions/cpp/register.js";
 import EditorWorker from "monaco-editor/editor/editor.worker.js?worker";
 import { parseCompilerDiagnostics } from "./compiler-diagnostics.js";
+import {diagnosticTooltip} from './diagnostic-messages.ko.js';
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 const snippets = [
@@ -65,12 +66,13 @@ export function createCodeEditor(container, value, onRun) {
 export function setCompilerDiagnostics(editor, text) {
   const model = editor.getModel();
   const severities = { error: monaco.MarkerSeverity.Error, warning: monaco.MarkerSeverity.Warning, note: monaco.MarkerSeverity.Info };
-  const markers = parseCompilerDiagnostics(text).filter(item => item.line <= model.getLineCount()).map(item => {
+  const items = Array.isArray(text) ? text : parseCompilerDiagnostics(text);
+  const markers = items.filter(item => item.line > 0 && item.line <= model.getLineCount()).map(item => {
     const column = Math.min(item.column, model.getLineMaxColumn(item.line));
     return {
       startLineNumber: item.line, startColumn: column, endLineNumber: item.line,
       endColumn: model.getWordAtPosition({ lineNumber: item.line, column })?.endColumn ?? column + 1,
-      severity: severities[item.severity], message: item.message, source: "Clang",
+      severity: severities[item.severity], message: diagnosticTooltip(item), source: item.source ?? "Clang", code: item.code,
     };
   });
   monaco.editor.setModelMarkers(model, "clang", markers);

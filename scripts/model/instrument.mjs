@@ -14,7 +14,7 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast=""}={}) {
     backend:{compiler:"bundled Clang 8.0.1",target:"wasm32-unknown-wasi",pointerBits:32,byteOrder:"little",method:"automatic LLVM observation"},
     instructions:[],functions:[],globals:[],types:meta.types,llvmTypes:{},coverage:{
       memory:"user translation-unit scalar/aggregate loads and stores; library effects through explicit adapters",
-      lifetime:"stack allocation to function return; lexical C lifetime is not fully modeled",
+      lifetime:"observed Clang lifetime intrinsics for automatic objects; unmarked storage falls back to function return",
       calculations:"compiled operations; source expressions may be lowered or constant-folded by Clang",
       unsupported:["atomic/volatile accesses","inline assembly","vector and extended floating-point values"],
       libraryInternals:"unobserved",pointerProvenance:"best effort from observed pointer operations; not a complete C provenance model"}};
@@ -24,12 +24,16 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast=""}={}) {
   const functions=[];
   for(let i=0;i<lines.length;i++)if(lines[i].startsWith("define ")){
     const m=new RegExp(`@(${symbol})\\(`).exec(lines[i]);if(!m)throw new UnsupportedC("LLVM 함수 정의를 해석하지 못했습니다.");
-    const fn={id:`fn${functions.length+1}`,name:m[1].replace(/^"|"$/g,""),symbol:`@${m[1]}`,start:i,locals:new Map()};
+    const fn={id:`fn${functions.length+1}`,name:m[1].replace(/^"|"$/g,""),symbol:`@${m[1]}`,start:i,locals:new Map(),allocations:new Map(),pointerAliases:new Map(),lifetimeRoots:new Set()};
     const open=m.index+m[0].length;let end=open,level=1;for(;end<lines[i].length;end++){if(lines[i][end]==="(")level++;if(lines[i][end]===")"&&!--level)break;}
     fn.parameters=splitTop(lines[i].slice(open,end)).filter(p=>p&&p!=="...").map((p,index)=>({...operand(p),index,byval:/\bbyval\b/.test(p),sret:/\bsret\b/.test(p)}));
     while(++i<lines.length&&lines[i]!=="}") {
       const d=/@llvm\.dbg\.declare\(metadata (.*?), metadata !(\d+),/.exec(lines[i]);
       if(d){const p=operand(d[1]),argument=Number(meta.field(d[2],"arg")??0);fn.locals.set(p.value,{name:meta.clean(meta.field(d[2],"name")),debugTypeId:`debug:${meta.clean(meta.field(d[2],"type"))}`,scopeId:meta.clean(meta.field(d[2],"scope")),source:meta.location(d[2]),sourceParameterIndex:argument?argument-1:null});}
+      const cast=/^\s*(%[-\w.$]+) = bitcast .*? (%[-\w.$]+) to /.exec(lines[i]);
+      if(cast)fn.pointerAliases.set(cast[1],fn.pointerAliases.get(cast[2])??cast[2]);
+      const lifetime=/@llvm\.lifetime\.start[^\s(]*\(i64 [^,]+, i8\* (%[-\w.$]+)/.exec(lines[i]);
+      if(lifetime)fn.lifetimeRoots.add(fn.pointerAliases.get(lifetime[1])??lifetime[1]);
     }
     fn.end=i;functions.push(fn);plan.functions.push({id:fn.id,name:fn.name,symbol:fn.symbol});
   }
@@ -102,6 +106,8 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast=""}={}) {
     if(opcode==="alloca") {
       const parts=splitTop(clean.slice(7)),p=typed(parts[0]),layout=abi.layout(p.type),count=parts[1]&&!parts[1].startsWith("align")?operand(parts[1]):{type:"i32",value:"1"};
       operation=op("SPACE",{action:"object.begin",type:p.type,size:layout.size,local:fn.locals.get(result),count});
+      operation.lifetimeManaged=fn.lifetimeRoots.has(result);
+      fn.allocations.set(result,operation);
       operation.cType=semantics.types.debug(operation.local?.debugTypeId);
       const end=temp(),bytes=temp();post.push(`  ${end} = getelementptr ${p.type}, ${p.type}* null, ${count.type} ${count.value}`,`  ${bytes} = ptrtoint ${p.type}* ${end} to i64`);
       emit(operation,1,{pointer:{type:`${p.type}*`,value:result},x:bytes},post);
@@ -112,8 +118,30 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast=""}={}) {
       emit(operation,0,{pointer,size:layout.size},pre);
       emit(operation,1,{pointer,size:layout.size},post);
     } else if(opcode==="call") {
+      // Debug declarations occur at the source declaration, whereas fixed-size
+      // allocas are commonly hoisted to function entry. Observe both boundaries;
+      // the public IR uses the former to introduce a programmer-visible box.
+      const declaration=/@llvm\.dbg\.declare\(metadata (.*?), metadata !(\d+),/.exec(line);
+      if(declaration){
+        const pointer=operand(declaration[1]),allocation=fn.allocations.get(pointer.value),local=fn.locals.get(pointer.value);
+        if(allocation&&local?.sourceParameterIndex===null){
+          const marker=op("SPACE",{action:"source.declaration",result:undefined,pointer,local,type:allocation.type,
+            cType:allocation.cType,allocationObservationId:allocation.id});
+          allocation.declarationObservationId=marker.id;
+          out.push(...emit(marker,1,{pointer}),line);continue;
+        }
+      }
       const call=parseCall(clean);
       if(call.callee.startsWith("@llvm.dbg.")){out.push(line);continue;}
+      const lifetime=/^@llvm\.lifetime\.(start|end)\./.exec(call.callee);
+      if(lifetime){
+        const pointer=call.args[1],root=fn.pointerAliases.get(pointer.value)??pointer.value,allocation=fn.allocations.get(root);
+        if(!allocation)throw new UnsupportedC("수명 표식의 할당 대상을 연결하지 못했습니다.",common.source);
+        operation=op("SPACE",{action:`lifetime.${lifetime[1]}`,result:lifetime[1]==='start'?allocation.result:undefined,pointer,
+          allocationObservationId:allocation.id,local:allocation.local,type:allocation.type,cType:allocation.cType});
+        emit(operation,1,{pointer},pre);
+        out.push(...pre,line);continue;
+      }
       operation=op("FLOW",{action:"call",...call,type:call.returnType,inputs:call.args});
       for(const [index,arg] of call.args.entries())emit(operation,10+index,{x:pack(arg.type,arg.value,pre)},pre);
       const calleeName=call.callee.slice(1).replace(/^"|"$/g,"");operation.external=call.callee[0]==="@"&&!functions.some(f=>f.name===calleeName);
@@ -183,7 +211,11 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast=""}={}) {
   for(const [name,body]of abi.definitions)plan.llvmTypes[name]={body,...abi.layout(name)};
   plan.coverage.cConversions=semantics.report();
   plan.coverage.shortCircuits=semantics.shortCircuits.report();
+  plan.coverage.automaticLifetimes={source:'Clang lifetime intrinsics; LLVM optimization passes disabled',
+    managedAllocations:plan.instructions.filter(o=>o.action==='object.begin'&&o.lifetimeManaged).length,
+    unmarkedLocals:plan.instructions.filter(o=>o.action==='object.begin'&&o.local?.sourceParameterIndex===null&&!o.lifetimeManaged)
+      .map(o=>({observationId:o.id,name:o.local.name,source:o.local.source,reason:'no compiler lifetime marker; function-return fallback'}))};
   const declaration='declare void @__cvm_emit(i32, i32, i32, i32, i64, i64) "wasm-import-module"="cvtrace" "wasm-import-name"="emit"';
-  const publicPlan=buildIRPlan(plan,semantics,source,filename);
+  const publicPlan=buildIRPlan(plan,semantics,source,filename,abi);
   return {plan:publicPlan,observationPlan:plan,llvm:out.join("\n")+"\n"+declaration+"\n",abi};
 }

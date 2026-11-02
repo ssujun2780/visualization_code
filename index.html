@@ -26,7 +26,8 @@
             <div class="panel-heading"><span class="file-tab"><span class="file-icon">C</span> main.c</span><label class="example-label">예제 <select id="example" aria-label="예제 코드 선택"><option value="">선택</option><option value="template">기본 코드</option><option value="hello">Hello World!</option><option value="sum">두 수 더하기</option></select></label></div>
             <div class="editor-toolbar"><span>main.c <span aria-hidden="true">›</span> C</span><div><button id="find-code" type="button" title="찾기 Ctrl+F · 바꾸기 Ctrl+H">찾기</button><button id="expand-editor" type="button" aria-pressed="false">편집기 확대</button></div></div>
             <div class="editor-shell"><div id="code"></div></div>
-            <div class="editor-footer"><span>C · 탭 크기 4 · UTF-8</span><span id="cursor-position">줄 1, 열 1</span></div>
+            <section id="code-problems" class="code-problems" aria-label="코드 검사 결과" hidden><ul id="code-problems-list"></ul></section>
+            <div class="editor-footer"><span>C · 탭 크기 4 · UTF-8</span><span id="analysis-status" role="status" aria-live="polite">검사 준비 중…</span><span id="cursor-position">줄 1, 열 1</span></div>
           </section>
           <aside class="io-panels">
             <section class="panel input-panel">
@@ -37,7 +38,7 @@
             <section class="panel output-panel">
               <div class="panel-heading"><span>실행 결과 <span class="subtle">stdout</span></span><span id="exit-code" class="optional"></span></div>
               <pre id="output" tabindex="0" aria-label="프로그램 출력"><span class="placeholder">출력 결과가 여기에 표시됩니다.</span></pre>
-              <div id="diagnostics-section" class="diagnostics" hidden><div class="diagnostics-heading">오류 · 경고</div><pre id="diagnostics" tabindex="0" aria-label="컴파일 및 실행 진단"></pre><button id="go-to-error" class="error-link" hidden>오류 위치로 이동 →</button></div>
+              <div id="diagnostics-section" class="diagnostics" hidden><div class="diagnostics-heading">오류 · 경고</div><pre id="diagnostics" tabindex="0" aria-label="컴파일 및 실행 진단"></pre><details id="diagnostics-original" hidden><summary>원문 보기</summary><pre id="diagnostics-original-text" tabindex="0"></pre></details><button id="go-to-error" class="error-link" hidden>오류 위치로 이동 →</button></div>
             </section>
           </aside>
         </div>

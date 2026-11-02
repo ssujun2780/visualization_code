@@ -12,7 +12,7 @@ function runWorker(source,{timeoutMs=25000,...options}={},mode) {
   return new Promise((resolve,reject)=>{
     const worker=new Worker(new URL("./worker.mjs",import.meta.url),{workerData:{source,options,mode},execArgv:[]});
     let prepared={},events=[],done=false;
-    const finish=result=>{if(done)return;done=true;clearTimeout(timer);void worker.terminate();resolve(result);};
+    const finish=(result,interrupt=false)=>{if(done)return;done=true;clearTimeout(timer);if(interrupt)void worker.terminate();resolve(result);};
     const fail=error=>{if(done)return;done=true;clearTimeout(timer);void worker.terminate();reject(error);};
     const timer=setTimeout(()=>{
       try {
@@ -22,7 +22,7 @@ function runWorker(source,{timeoutMs=25000,...options}={},mode) {
       const trace=prepared.plan?recordIR(prepared.plan,prepared.observationPlan,observedTrace):
         {...observedTrace,schemaVersion:3,events:[{...event,schemaVersion:3,eventId:"x1",executionId:"x1",action:"fault",phase:"failed"}]};
       const {observationPlan,type,...info}=prepared;
-      finish({...info,stdout:"",stderr:"",compilerDiagnostics:"",trace,...(options.includeObservations?{observations:{plan:observationPlan??null,trace:observedTrace}}:{})});
+      finish({...info,stdout:"",stderr:"",compilerDiagnostics:"",trace,...(options.includeObservations?{observations:{plan:observationPlan??null,trace:observedTrace}}:{})},true);
       }catch(error){fail(error);}
     },timeoutMs);
     worker.on("message",message=>{if(message.type==="prepared")prepared=message;if(message.type==="observations")events.push(...message.events);

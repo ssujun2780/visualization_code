@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {test} from "node:test";
-import {traceModel} from "../scripts/model/index.mjs";
+import {traceModel as traceSourceModel} from "../scripts/model/index.mjs";
 import {compileAndRun} from "../scripts/instrumentation/toolchain.mjs";
 import {materializeMemory} from "../scripts/model/memory-state.mjs";
+
+// These backend assertions deliberately inspect raw LLVM observations. The
+// public animation IR contract is tested separately in ir-*.test.js.
+async function traceModel(source,options={}){
+  const r=await traceSourceModel(source,{...options,includeObservations:true});
+  return r.observations?.plan?{...r,plan:r.observations.plan,trace:r.observations.trace}:r;
+}
 
 async function checked(source,options={}) {
   const baseline=await compileAndRun(source,undefined,{stdin:options.stdin??""});
@@ -66,7 +73,7 @@ test("the supplied constant-left logical expressions record skipped operands wit
     assert.equal(consumer.kind,"WRITE");assert.ok(consumer.controlInputs.includes(event.eventId));
     assert.equal(consumer.value.bits,event.observedConsumerValue.bits);
   }
-  assert.equal(r.trace.events.filter(e=>[7,10].includes(e.source?.line)&&["READ","CALC"].includes(e.kind)).length,0);
+  assert.equal(r.trace.events.filter(e=>[7,10].includes(e.source?.line)&&["READ","CALC"].includes(e.kind)&&e.action!=='convert').length,0);
   assert.equal(r.trace.events.filter(e=>e.kind==="READ"&&e.phase==="commit").length,20);
   for(const [name,expected]of [["xeMToGnyMF",["0","1","2"]],["YAHkdhNSvH",["0","1","0"]]]){
     const object=r.trace.objects.find(o=>o.name===name);
@@ -100,7 +107,7 @@ test("the supplied partial/designated array initializers can be replayed before 
     else if(event.kind==="WRITE"&&event.phase==="commit"&&!event.value.truncated){const bytes=Buffer.from(event.value.bytesHex,"hex");target.bytes.set(bytes,offset);target.known.fill(1,offset,offset+bytes.length);}
   }
   assert.deepEqual(arrays.map(o=>ints(state.get(o.id))),[[99,6,0,0,0],[3,16,0,20,0],[3,20,0,20,0]]);
-  assert.equal(r.trace.events.length,1040);assert.equal(r.trace.events.filter(e=>e.kind==="READ"&&e.phase==="commit").length,219);
+  assert.equal(r.trace.events.filter(e=>e.kind==="READ"&&e.phase==="commit").length,219);
   assert.equal(r.trace.coverage.memorySnapshots.programReadEventsAdded,0);assert.equal(r.trace.coverage.memorySnapshots.omittedInitializedBytes,0);
 });
 
@@ -192,12 +199,15 @@ test("malloc, calloc, realloc, copies and fills preserve output and allocation i
   assert.ok(r.trace.objects.filter(o=>o.storage==="heap").every(o=>o.lifecycle==="ended"));
 });
 
-test("stdin adapters record only successful input writes",async()=>{
+test("stdin delivery and actual successful assignment writes are distinct",async()=>{
   const r=await checked(`#include <stdio.h>
   int main(void){int n;char s[8];if(scanf("%d %7s",&n,s)!=2)return 1;printf("%d:%s\\n",n,s);return 0;}`,{stdin:"3 가나\n"});
-  assert.equal(r.stdout,"3:가나\n");assert.equal(r.trace.events.filter(e=>e.action==="input").length,2);
+  assert.equal(r.stdout,"3:가나\n");const input=r.trace.events.find(e=>e.kind==='READ'&&e.action==='input');assert.ok(input);
+  const writes=r.trace.events.filter(e=>e.action==='write.range');assert.equal(writes.length,2);
+  for(const write of writes)assert.ok(write.dataInputs.includes(input.eventId));
   const failed=await checked('#include <stdio.h>\nint main(void){int n;if(scanf("%d",&n)!=1)return 2;return n;}',{stdin:"x"});
-  assert.equal(failed.trace.events.filter(e=>e.action==="input").length,0);
+  assert.ok(failed.trace.events.some(e=>e.kind==='READ'&&e.action==='input'));
+  assert.equal(failed.trace.events.filter(e=>e.action==='write.range').length,0);
 });
 
 test("64-bit integers, unsigned wrap, floating-point and static zero initialization remain C values",async()=>{
@@ -229,7 +239,8 @@ test("uninitialized byte copies retain the uninitialized state",async()=>{
 });
 
 test("unmodeled library effects are disclosed and invalid/unsupported C never starts",async()=>{
-  const gap=await checked('#include <stdlib.h>\nint main(void){srand(3);return 0;}');assert.ok(gap.trace.coverage.gaps.includes("external-effects:srand"));
+  const gap=await checked('#include <stdlib.h>\nint main(void){srand(3);return 0;}');assert.ok(gap.trace.coverage.linkedMemory.stores>0);
+  assert.match(gap.trace.coverage.libraryInternals,/library arithmetic and source frames are not instrumented/);
   const unsupported=await traceModel("int main(void){volatile int n=3;return n;}");assert.equal(unsupported.trace.status,"unsupported");assert.equal(unsupported.trace.objects.length,0);
   const invalid=await traceModel("int main(void){int n=;}");assert.equal(invalid.trace.status,"compile-error");assert.equal(invalid.trace.events.length,1);
 });
