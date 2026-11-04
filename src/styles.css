@@ -47,6 +47,14 @@ select { font-size: 12px; color: #d7e2e3; border: 1px solid var(--border); backg
 .editor-expanded .editor-shell { min-height: min(65vh, 650px); }
 .monaco-editor textarea:focus-visible { outline: none; }
 .editor-footer { padding: 10px 17px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
+.editor-footer { gap: 8px; flex-wrap: wrap; }
+.code-problems { max-height: 150px; overflow: auto; border-top: 1px solid var(--border); background: #1e1e1e; }
+.code-problems ul { margin: 0; padding: 8px 12px; list-style: none; }
+.code-problems button { display: block; width: 100%; text-align: left; padding: 5px; border: 0; background: transparent; font: inherit; font-size: 12px; color: #e8ce90; overflow-wrap: anywhere; }
+.code-problems button:hover { background: #2b3035; }
+.code-problems button[data-severity="error"] { color: #efabab; }
+.code-problems button[data-severity="note"] { color: #aecbdf; }
+#analysis-status[data-state="failed"] { color: #efabab; }
 .io-panels { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .input-panel { flex-shrink: 0; }
 .subtle { margin-left: 8px; color: #85979e; font-family: Consolas, monospace; font-size: 11px; }
@@ -60,6 +68,9 @@ textarea::placeholder { color: #75888f; }
 .diagnostics { border-top: 1px solid var(--border); padding: 14px 18px; background: #271f20; }
 .diagnostics-heading { color: #e5ac9f; font-size: 12px; margin-bottom: 8px; }
 #diagnostics { color: #efc6be; margin: 0; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 210px; overflow: auto; }
+#diagnostics-original { margin-top: 10px; font-size: 12px; color: #b6b6b6; }
+#diagnostics-original summary { cursor: pointer; }
+#diagnostics-original-text { max-height: 210px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .error-link { display: block; border: 0; padding: 0; background: transparent; color: #eebbae; font-size: 12px; margin-top: 10px; }
 .error-link[hidden], [hidden] { display: none !important; }
 .statusbar { padding: 14px 2px; display: flex; gap: 12px; justify-content: space-between; flex-wrap: wrap; font-size: 12px; color: var(--muted); }

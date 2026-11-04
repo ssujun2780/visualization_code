@@ -51,6 +51,95 @@ Worker를 종료합니다. 초기 버전은 단일 파일, C11, wasm32/WASI 환�
 추후 실행 시각화 엔진을 이 경계에 연결할 수 있습니다. 현재 버전은
 단계별 실행·메모리 시각화·캐릭터 애니메이션을 구현하지 않습니다.
 
+## 공통 C 중간언어 기본 모델
+
+AST의 소스 작업으로 중간언어 명령을 정의하고, LLVM 공통 계측으로 얻은 실제
+실행값을 연결합니다. 공개 출력은 스키마 3의 명령 정의와 실행 기록입니다.
+
+```sh
+pnpm trace:c examples/c/instrumentation-basic.c
+pnpm trace:c 코드.c --stdin 입력.txt --out-dir test-results/my-code
+pnpm trace:c 코드.c --compile-only --out-dir test-results/ir-only
+pnpm trace:c 코드.c --with-observations --out-dir test-results/ir-debug
+```
+
+`test-results/c-model`에 원본·계측 LLVM 코드, 중간언어 명령 정의, 실행 JSON/JSONL,
+객체·프레임·참조와 구조 표현 후보를 저장합니다. 함수·재귀·포인터·구조체·배열·
+분기·반복과 동적 할당을 공통 경로로 관찰하며, 정답이나 자료구조의 의미를 미리
+지정하는 인자는 없습니다. 미지원 항목과 미관측 라이브러리 효과는 따로 표시합니다.
+Clang AST를 함께 읽어 C의 부호 정보와 LLVM에서 사라진 동일 폭 정수 변환도
+연결합니다. unsigned는 자료형의 `u` 배지 정보로 기록합니다.
+`--compile-only`는 사용자 C를 실행하지 않습니다. 원시 관찰 자료는
+`--with-observations`로 별도 출력합니다. 애니메이션은 더미로 유지하며,
+이번 변환 구조 변경의 동작 검증은 이후 제공되는 예제로 진행합니다.
+
+정확한 지원 범위, 실행 제한, 기록 계약은 [공통 C 중간언어 모델](docs/design/c-model.md)에 있습니다.
+
+## 초기 최소 계측 시제품
+
+다음 명령은 예제 C를 Clang으로 분석하고, 관찰 코드를 자동 삽입한 C를 실제로
+컴파일·실행하여 중간 언어와 실행 사건을 기록합니다. 추가 패키지나 네이티브
+컴파일러 설치 없이 기존 `public/toolchain` 파일을 사용합니다.
+
+```sh
+pnpm trace:prototype
+pnpm trace:prototype examples/c/instrumentation-basic.c --out-dir test-results/my-trace
+```
+
+기본 예제는 `int a=10; int b=20; int c=a+b*2;`이며 실행 기록에서
+`a=10`, `b=20`, `c=50`을 확인할 수 있습니다. 계산은 C에서 수행하고,
+JavaScript는 관측한 값과 사건의 연결을 저장합니다.
+
+기본 기록 폴더는 `test-results/instrumentation-prototype`입니다.
+
+| 파일 | 내용 |
+| --- | --- |
+| `original.c`, `original.ast.txt` | 원본과 번들 Clang이 출력한 실제 AST |
+| `instrumented.c` | AST에서 자동 생성한 관찰 코드가 포함된 C |
+| `plan.json` | READ·WRITE·CALC·FLOW·SPACE의 관찰 계획과 장면 묶음 |
+| `trace.json`, `trace.jsonl` | 실제 실행값·주소·이전 쓰기·값의 출처와 오류 |
+| `diagnostics.txt` | 컴파일 경고와 도구 진단 |
+
+지원 범위는 매개변수 없는 `int main`, 일반 signed 32비트 int의 선언과 초기화,
+대입, 괄호, `+ - * / %`, 단항 `+ -`, 반환입니다. 여러 변수의 한 문장 선언과
+main의 암묵적인 0 반환도 처리합니다. 초기화되지 않은 값을 사용하거나 정수
+연산이 범위를 벗어나면 해당 읽기·연산 전에 기록하고 중단합니다.
+
+이번 구현은 Clang 8의 텍스트 AST를 사용하는 **소스 변환 기반 CLI 시제품**입니다.
+웹 UI와 LLVM 계측 패스는 아직 연결하지 않았습니다. 전처리 지시문, 다른 자료형,
+함수 호출, 조건·반복, 포인터 등 미지원 구문은 실행 전에 명시적으로 거부합니다.
+변수 이름은 ASCII 식별자만 지원하며 `__cv_` 접두사는 기록 코드용으로 예약합니다.
+관찰을 위해 지역변수의 주소를 전달하므로, 기록된 배치는 비계측 프로그램의
+배치나 성능을 대표하지 않습니다. 두 산술 CALC가 같은 표현식 장면에 속할 수 있으며,
+계획상의 나열 순서와 실제 실행 사건의 순서는 구분합니다.
+
+`pnpm test`는 실제 Clang/WASI 실행을 사용하여 변경된 입력, 출처 연결,
+비계측 실행과의 반환값 일치, 미초기화·0 나눗셈·오버플로 중단 등을 검증합니다.
+상위 설계는 [C 실행 관찰과 시각화 설계](docs/design/execution-visualization.md)에 있습니다.
+
+## 복합 C11 코드의 계측 실험
+
+900줄의 정규식 동치 판정기를 대상으로 고정된 예측과 실제 실행 기록을 비교합니다.
+
+```sh
+pnpm trace:regex
+```
+
+이 명령은 MinGW GCC를 사용합니다. 기본 경로는 `C:\msys64\mingw64\bin\gcc.exe`이며
+`CC` 환경변수로 다른 GCC 실행 파일을 지정할 수 있습니다. 원본은
+`examples/c/regex_equivalence.c`, 실행 전 예측은 `examples/c/regex-equivalence-predictions.json`입니다.
+
+GCC의 함수 진입·복귀 계측과 **이 예제에 명시적으로 선택한 소스 관찰 지점**을
+결합합니다. 범용 자동 C 계측기가 이 코드를 지원하게 된 것은 아닙니다.
+일반 정수 시제품의 `trace:prototype`과 새 공통 모델의 `trace:c`도 별개입니다.
+
+`test-results/regex-equivalence-trace`에 계측 C, 관찰 계획, 사건별 JSONL,
+구조별 JSON, 비교 결과와 실제 연결로 만든 `cycles.mmd`를 기록합니다.
+변수명 대신 관측된 참조·인덱스·복사 폭·접근 규칙으로 표현 후보를 제안합니다.
+구조 뷰는 정리 직전의 역사적 상태이며, 최종 할당은 별도로 해제 기록을 남깁니다.
+
+자세한 해석과 관찰 한계는 [복합 코드 계측 결과](docs/design/regex-equivalence-instrumentation.md)에 있습니다.
+
 ## 사용한 공개 도구
 
 - [Runno WASI](https://github.com/taybenlor/runno), MIT

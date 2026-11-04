@@ -1,5 +1,8 @@
 import "./styles.css";
 import { createCodeEditor, setCompilerDiagnostics } from "./code-editor.js";
+import {parseCompilerDiagnostics} from './compiler-diagnostics.js';
+import {createLiveDiagnostics} from './live-diagnostics.js';
+import {localizeDiagnostic,diagnosticTooltip,localizeCompilerOutput} from './diagnostic-messages.ko.js';
 
 const defaultCode = '#include <stdio.h>\n\nint main(){\n\tprintf("Hello World!\\n");\n\treturn 0;\n}\n';
 const previousDefault = '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n';
@@ -27,6 +30,39 @@ try {
   elements.stdin.value = saved?.stdin ?? "";
 } catch { /* Keep the default when storage is unavailable. */ }
 const codeEditor = createCodeEditor(elements.code, initialCode, run);
+const problemList=document.getElementById('code-problems-list');
+const problemPanel=document.getElementById('code-problems');
+const analysisStatus=document.getElementById('analysis-status');
+let liveDiagnostics=[],runSourceVersion=null;
+const liveChecks=createLiveDiagnostics({
+  createWorker:()=>new Worker(new URL('./diagnostics.worker.js',import.meta.url),{type:'module'}),
+  publish:items=>{
+    items=items.map(localizeDiagnostic);
+    liveDiagnostics=items;problemPanel.hidden=!items.length;problemList.replaceChildren();
+    for(const item of items){
+      const li=document.createElement('li'),button=document.createElement('button');
+      button.type='button';button.dataset.severity=item.severity;
+      button.title=diagnosticTooltip(item);
+      button.textContent=`${item.severity==='error'?'오류':item.severity==='warning'?'경고':'참고'} · ${item.line}줄: ${item.message}`;
+      button.addEventListener('click',()=>{
+        const position={lineNumber:item.line,column:item.column};
+        codeEditor.setPosition(position);codeEditor.revealPositionInCenter(position);codeEditor.focus();
+      });
+      li.append(button);problemList.append(li);
+    }
+    renderMarkers();
+  },
+  status:(state,value)=>{
+    analysisStatus.dataset.state=state;
+    const labels={waiting:'검사 대기…',checking:'코드 검사 중…',idle:'코드를 입력해 주세요.',failed:value};
+    analysisStatus.textContent=state==='done'?(value.length?`오류 ${value.filter(i=>i.severity==='error').length} · 경고 ${value.filter(i=>i.severity==='warning').length}`:'문제 없음'):labels[state];
+  }
+});
+function renderMarkers(){
+  const runItems=runSourceVersion===codeEditor.getModel().getVersionId()?parseCompilerDiagnostics(diagnostics).map(localizeDiagnostic):[];
+  const unique=new Map([...liveDiagnostics,...runItems].map(item=>[`${item.line}:${item.column}:${item.severity}:${item.message}`,item]));
+  setCompilerDiagnostics(codeEditor,[...unique.values()]);
+}
 
 function save() {
   try { localStorage.setItem(storageKey, JSON.stringify({ code: codeEditor.getValue(), stdin: elements.stdin.value })); } catch { /* Private browsing or a full store must not prevent editing. */ }
@@ -36,7 +72,7 @@ function updateEditor() {
   const selections = codeEditor.getSelections();
   elements["cursor-position"].textContent = `줄 ${position.lineNumber}, 열 ${position.column}${selections.length > 1 ? ` · 커서 ${selections.length}개` : ""}`;
 }
-codeEditor.onDidChangeModelContent(() => { setCompilerDiagnostics(codeEditor, ""); save(); updateEditor(); });
+codeEditor.onDidChangeModelContent(() => { runSourceVersion=null;liveChecks.update(codeEditor.getValue());save();updateEditor(); });
 codeEditor.onDidChangeCursorSelection(updateEditor);
 elements.stdin.addEventListener("input", save);
 elements["find-code"].addEventListener("click", () => { codeEditor.focus(); codeEditor.getAction("actions.find").run(); });
@@ -74,12 +110,15 @@ function renderOutput() {
     placeholder.textContent = outputPlaceholder;
     elements.output.append(placeholder);
   }
-  elements.diagnostics.textContent = diagnostics;
+  const localized=localizeCompilerOutput(diagnostics);
+  elements.diagnostics.textContent = localized;
+  document.getElementById('diagnostics-original').hidden=localized===diagnostics;
+  document.getElementById('diagnostics-original-text').textContent=diagnostics;
   elements["diagnostics-section"].hidden = !diagnostics;
   const match = diagnostics.match(/\/?main\.c:(\d+):(\d+):/);
   errorLocation = match ? { line: Number(match[1]), column: Number(match[2]) } : null;
   elements["go-to-error"].hidden = !errorLocation;
-  setCompilerDiagnostics(codeEditor, diagnostics);
+  renderMarkers();
 }
 function scheduleOutput() {
   if (!outputScheduled) { outputScheduled = true; requestAnimationFrame(renderOutput); }
@@ -139,6 +178,7 @@ function ensureWorker() {
 function run() {
   if (activeRun) return;
   if (!codeEditor.getValue().trim()) { setStatus("C 코드를 입력해주세요.", "error"); codeEditor.focus(); return; }
+  runSourceVersion=codeEditor.getModel().getVersionId();
   save(); stdout = ""; diagnostics = ""; outputPlaceholder = "실행 결과를 기다리고 있습니다…"; renderOutput();
   elements["exit-code"].textContent = "";
   activeRun = { id: ++requestId, started: performance.now() };
@@ -163,3 +203,5 @@ elements["go-to-error"].addEventListener("click", () => {
   codeEditor.focus(); updateEditor();
 });
 updateEditor();
+liveChecks.update(codeEditor.getValue());
+codeEditor.onDidDispose(()=>liveChecks.dispose());
