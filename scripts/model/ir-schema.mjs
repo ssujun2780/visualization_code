@@ -2,6 +2,15 @@ import {validateCalcPlan,validateCalcTrace} from './calc-contract.mjs';
 import {validateWorkTrace} from './work-contracts.mjs';
 import {validatePresentationContract} from './presentation-contract.mjs';
 import {validateResultDeliveryPlan,validateResultDeliveries} from './result-delivery.mjs';
+import {validateStructureOverlays} from './structure-overlay-contract.mjs';
+import {validateRecordIndexStructures} from './record-index-contract.mjs';
+import {validateLinkedProjections} from './linked-projection-contract.mjs';
+import {validateConversionConsumers} from './conversion-consumers.mjs';
+import {validateValueIndexStructures} from './value-index-views.mjs';
+import {validateParallelArrayStructures} from './parallel-array-views.mjs';
+import {arrayGeometry,arrayLocation} from './array-geometry.mjs';
+import {validateArrayValueDependencies} from './array-value-dependencies.mjs';
+import {validateArrayCursorPaths} from './array-cursor-paths.mjs';
 export const IR_VERSION=3;
 export const IR_KINDS=Object.freeze(['READ','WRITE','CALC','FLOW','SPACE','ERROR']);
 
@@ -68,6 +77,7 @@ export function validateIRPlan(plan){
   validateCalcPlan(plan);
   validatePresentationContract(plan);
   validateResultDeliveryPlan(plan);
+  validateConversionConsumers(plan);
   return plan;
 }
 
@@ -144,10 +154,15 @@ export function validateIRTrace(plan,trace){
       const range=r=>{if(!r)return;const o=objects.get(r.objectId);if(!o||r.offset<0||r.size<0||r.offset+r.size>o.size)
         throw new Error('배열 작업의 실제 저장 범위가 올바르지 않습니다.');};
       const evidence=list=>{if(list.some(id=>!ids.has(id)))throw new Error('배열 작업의 실행 근거가 없습니다.');};
-      for(const a of s.arrays){range(a.range);if(a.range.size!==a.elementBytes*a.capacity)throw new Error('배열 작업의 원소 크기가 올바르지 않습니다.');}
+      const storage=new Map(trace.structures.filter(a=>a.kind==='array').map(a=>[a.id,a]));
+      for(const a of s.arrays){range(a.range);if(a.range.size!==a.elementBytes*a.capacity)throw new Error('배열 작업의 원소 크기가 올바르지 않습니다.');
+        if(JSON.stringify(a.geometry)!==JSON.stringify(arrayGeometry(storage.get(a.arrayId),objects.get(a.range.objectId))))
+          throw new Error('배열 작업의 차원과 실제 저장 구조가 다릅니다.');}
       for(const a of s.accesses){range(a.target);evidence([a.executionId,...a.cursors.map(c=>c.executionId)]);
         const array=arrays.get(a.target.arrayId);if(!array||a.target.index!==Math.floor((a.target.offset-array.range.offset)/array.elementBytes))
-          throw new Error('배열 작업과 물리 인덱스의 대응이 올바르지 않습니다.');}
+          throw new Error('배열 작업과 물리 인덱스의 대응이 올바르지 않습니다.');
+        const actual=arrayLocation(a.target,storage.get(a.target.arrayId),objects.get(a.target.objectId));
+        if(JSON.stringify(a.target)!==JSON.stringify(actual))throw new Error('배열 작업의 좌표와 실제 바이트 범위가 다릅니다.');}
       for(const t of s.transfers){range(t.source);range(t.target);evidence([t.executionId,...(t.readExecutionId?[t.readExecutionId]:[])]);
         if(t.sourceTemporaryId&&!temps.has(t.sourceTemporaryId))throw new Error('복사 원본 임시값의 근거가 없습니다.');}
       for(const t of s.temporaries){range(t.target);range(t.source);range(t.origin);evidence([t.createdBy,...t.comparisonExecutionIds,...t.useExecutionIds]);
@@ -156,7 +171,9 @@ export function validateIRTrace(plan,trace){
         if(o.temporaryId&&!temps.has(o.temporaryId))throw new Error('비교 피연산자의 임시값이 없습니다.');}}
       for(const a of s.activations)for(const r of a.ranges){const array=arrays.get(r.arrayId);
         evidence([...r.executionIds,...r.observedAccessExecutionIds,...r.contradictingExecutionIds]);
-        if(!array||r.status==='supported'&&(!Number.isSafeInteger(r.start)||!Number.isSafeInteger(r.end)||r.start<0||r.end<r.start||r.end>array.capacity))
+        const axisCapacity=Number.isSafeInteger(r.axis)?array?.geometry?.dimensions[r.axis]:null;
+        if(!array||r.axisCapacity!==axisCapacity||r.status==='supported'&&(!Number.isSafeInteger(axisCapacity)||
+          !Number.isSafeInteger(r.start)||!Number.isSafeInteger(r.end)||r.start<0||r.end<r.start||r.end>axisCapacity))
           throw new Error('작업 구간과 공유 배열 범위가 일치하지 않습니다.');}
     }
     if(s.kind==='index-tree'){
@@ -219,6 +236,14 @@ export function validateIRTrace(plan,trace){
         (state.length>state.capacity||state.byteOffset+state.capacity*state.elementBytes>objects.get(state.backingObjectId).size))throw new Error('동적 배열 후보가 실제 저장 범위를 벗어납니다.');
     }
   }
+  validateStructureOverlays(trace);
+  validateRecordIndexStructures(trace);
+  validateLinkedProjections(trace);
+  validateValueIndexStructures(trace);
+  validateParallelArrayStructures(trace);
+  validateArrayValueDependencies(trace);
+  validateArrayCursorPaths(plan,trace);
+  validateConversionConsumers(plan,trace.events);
   validateCalcTrace(plan,trace);
   validateWorkTrace(plan,trace);
   validateResultDeliveries(plan,trace);

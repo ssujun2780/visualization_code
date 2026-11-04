@@ -1,5 +1,8 @@
 // Overlay work relations on existing storage. No source scans, expression
 // execution, synthetic memory accesses, or algorithm-name classification.
+import {createValueFlow} from './observed-value-flow.mjs';
+import {arrayGeometry,arrayLocation} from './array-geometry.mjs';
+import {arrayValueDependencies} from './array-value-dependencies.mjs';
 const walk=n=>n?[n,...(n.children??[]).flatMap(walk)]:[];
 const unwrap=n=>{while(n&&['ImplicitCastExpr','CStyleCastExpr','ParenExpr'].includes(n.kind))n=n.children?.[0];return n;};
 const unique=a=>[...new Set(a)];
@@ -20,19 +23,53 @@ function affine(n){
   return null;
 }
 
+function accessAxes(node){
+  const axes=[];let base=unwrap(node);
+  while(base?.kind==='ArraySubscriptExpr'){
+    axes.unshift({nodeId:base.nodeId,indexNodeId:base.children[1]?.nodeId,indexDeclarationIds:refs(base.children[1]),
+      index:affine(base.children[1]),byteStride:base.cType?.sizeBits>0?base.cType.sizeBits/8:null});
+    base=unwrap(base.children[0]);
+  }
+  return {baseDeclarationIds:refs(base),axes:axes.map((a,axis)=>({...a,axis}))};
+}
+// Only lvalue-base accesses describe this memory operation. An assignment's
+// RHS and subscripts inside an index expression are separate READ sites.
+function targetAccesses(definition,direction='target'){
+  if(!['READ','WRITE'].includes(definition.kind))return [];
+  let n=unwrap(definition.expression);
+  if(direction==='copy-source'){
+    if(n?.kind==='BinaryOperator'&&n.operator==='=')n=unwrap(n.children[1]);
+    else if(n?.kind==='VarDecl')n=unwrap(n.children.at(-1));else return [];
+  }else if(n?.kind==='CompoundAssignOperator'||n?.kind==='BinaryOperator'&&n.operator==='='||
+    n?.kind==='UnaryOperator'&&['++','--'].includes(n.operator))n=unwrap(n.children[0]);
+  const result=[];
+  while(n){
+    if(n.kind==='ArraySubscriptExpr')result.push(n.nodeId);
+    if(!['ArraySubscriptExpr','MemberExpr'].includes(n.kind))break;
+    n=unwrap(n.children[0]);
+  }
+  return result;
+}
+
 export function bindArrayWork(plan){
   const nodes=new Map(),declarationNodes=new Map(),initializers=new Map(),changed=new Set(),accesses=new Map(),ranges=[];
   for(const d of plan.instructions)if(d.action==='object.begin'&&d.declarationId&&d.sourceNodeId)declarationNodes.set(d.sourceNodeId,d.declarationId);
   for(const d of plan.instructions)for(const root of [d.expression,...d.arguments??[]])for(const n of walk(root)){
     nodes.set(n.nodeId,{node:n,functionId:d.functionId});
     if(n.kind==='ArraySubscriptExpr'){
+      const shape=accessAxes(n),axis=shape.axes.at(-1);
       let a=accesses.get(n.nodeId);if(!a)accesses.set(n.nodeId,a={nodeId:n.nodeId,functionId:d.functionId,
-        baseDeclarationIds:refs(n.children[0]),indexDeclarationIds:refs(n.children[1]),index:affine(n.children[1]),instructionIds:[]});
-      if(!a.instructionIds.includes(d.id))a.instructionIds.push(d.id);
+        ...shape,axis:axis.axis,indexStrideBytes:axis.byteStride,indexDeclarationIds:axis.indexDeclarationIds,index:axis.index,instructionIds:[],copySourceInstructionIds:[]});
     }
     const decl=n.kind==='VarDecl'?declarationNodes.get(n.nodeId):n.operator==='='?unwrap(n.children?.[0])?.declarationId:null;
     if(decl){if(!initializers.has(decl))initializers.set(decl,new Map());initializers.get(decl).set(n.nodeId,n.kind==='VarDecl'?n.children.at(-1):n.children[1]);}
     if(['++','--','+=','-=','*=','/='].includes(n.operator)){const id=unwrap(n.children?.[0])?.declarationId;if(id)changed.add(id);}
+  }
+  for(const d of plan.instructions)for(const id of targetAccesses(d)){
+    const access=accesses.get(id);if(access&&!access.instructionIds.includes(d.id))access.instructionIds.push(d.id);
+  }
+  for(const d of plan.instructions)for(const id of targetAccesses(d,'copy-source')){
+    const access=accesses.get(id);if(access&&!access.copySourceInstructionIds.includes(d.id))access.copySourceInstructionIds.push(d.id);
   }
   const initial=id=>{const values=[...(initializers.get(id)?.values()??[])].map(affine).filter(Boolean);
     return values.length&&unique(values.map(affineKey)).length===1?values[0]:null;};
@@ -40,7 +77,7 @@ export function bindArrayWork(plan){
   const seenRanges=new Map();
   function add(r){
     if(!r.from||!r.to||!r.baseDeclarationId)return;
-    const key=[r.functionId,r.baseDeclarationId,affineKey(r.from),affineKey(r.to),r.cursorDeclarationId??''].join(':');
+    const key=[r.functionId,r.baseDeclarationId,r.axis,r.indexStrideBytes,affineKey(r.from),affineKey(r.to),r.cursorDeclarationId??''].join(':');
     const previous=seenRanges.get(key);
     if(previous){previous.accessNodeIds=unique([...previous.accessNodeIds,...r.accessNodeIds]);previous.boundNodeIds=unique([...previous.boundNodeIds,...r.boundNodeIds]);return;}
     const candidate={...r,id:`work-range${ranges.length+1}`};seenRanges.set(key,candidate);ranges.push(candidate);
@@ -48,7 +85,7 @@ export function bindArrayWork(plan){
   for(const a of accesses.values())for(const baseDeclarationId of a.baseDeclarationIds){
     const index=a.index;if(!index)continue;
     if(index.declarationId&&!changed.has(index.declarationId)&&!initializers.has(index.declarationId)&&declarations.get(index.declarationId)?.kind==='ParmVarDecl')
-      add({functionId:a.functionId,baseDeclarationId,from:index,to:{...index,offset:index.offset+1},
+      add({functionId:a.functionId,baseDeclarationId,axis:a.axis,indexStrideBytes:a.indexStrideBytes,from:index,to:{...index,offset:index.offset+1},
         accessNodeIds:[a.nodeId],boundNodeIds:[],cursorDeclarationId:null,relation:'indexed-position',viaFunctionIds:[a.functionId]});
     if(!index.declarationId)continue;
     const start=initial(index.declarationId);if(!start)continue;
@@ -57,7 +94,7 @@ export function bindArrayWork(plan){
       let left=affine(n.children?.[0]),right=affine(n.children?.[1]),operator=n.operator;
       if(right?.declarationId===index.declarationId){[left,right]=[right,left];operator=({'<':'>','<=':'>=','>':'<','>=':'<='})[operator];}
       if(left?.declarationId!==index.declarationId||!right||!['<','<='].includes(operator))continue;
-      add({functionId:a.functionId,baseDeclarationId,from:{...start,offset:start.offset+index.offset},
+      add({functionId:a.functionId,baseDeclarationId,axis:a.axis,indexStrideBytes:a.indexStrideBytes,from:{...start,offset:start.offset+index.offset},
         to:{...right,offset:right.offset-left.offset+index.offset+(operator==='<='?1:0)},
         accessNodeIds:[a.nodeId],boundNodeIds:[n.nodeId],cursorDeclarationId:index.declarationId,
         relation:'cursor-bound',viaFunctionIds:[a.functionId]});
@@ -67,7 +104,7 @@ export function bindArrayWork(plan){
   // a last-element operand distinct from a loop which stops before it.
   function joinRanges(){
     const current=ranges.slice();for(const a of current)for(const b of current)
-      if(a.functionId===b.functionId&&a.baseDeclarationId===b.baseDeclarationId&&affineKey(a.to)===affineKey(b.from)&&affineKey(a.from)!==affineKey(b.to))
+      if(a.functionId===b.functionId&&a.baseDeclarationId===b.baseDeclarationId&&a.axis===b.axis&&a.indexStrideBytes===b.indexStrideBytes&&affineKey(a.to)===affineKey(b.from)&&affineKey(a.from)!==affineKey(b.to))
         add({...a,from:a.from,to:b.to,cursorDeclarationId:null,relation:'joined-bounds',accessNodeIds:unique([...a.accessNodeIds,...b.accessNodeIds]),
           boundNodeIds:unique([...a.boundNodeIds,...b.boundNodeIds])});
   }
@@ -96,7 +133,7 @@ export function bindArrayWork(plan){
     arrayWorkPolicy:'observed storage overlays; bounds are candidates, not algorithm identities or proofs of executed coverage'});
 }
 
-export function arrayWorkStructures(plan,{events,objects,views,frames=[],structures=[]}){
+export function arrayWorkStructures(plan,{events,objects,views,frames=[],structures=[],resultDeliveries=[],valueFlow}){
   const binding=plan.structureBindings?.arrayWork;if(!binding)return [];
   const defs=new Map(plan.instructions.map(d=>[d.id,d])),byEvent=new Map(events.map(e=>[e.eventId,e])),byObject=new Map(objects.map(o=>[o.id,o])),
     arrays=structures.filter(s=>s.kind==='array'),byDeclaration=new Map(),objectDeclaration=new Map(),values=new Map(),accesses=[],transfers=[],temporaries=[],comparisons=[],readOrigins=new Map(),copies=new Map();
@@ -107,11 +144,12 @@ export function arrayWorkStructures(plan,{events,objects,views,frames=[],structu
   const memoryRange=t=>{const o=byObject.get(t?.objectId);return !!o&&Number.isSafeInteger(t.offset)&&Number.isSafeInteger(t.size)&&t.offset>=0&&t.size>=0&&t.offset+t.size<=o.size;};
   const arrayAt=t=>memoryRange(t)&&arrays.filter(a=>a.objectId===t.objectId&&t.offset>=a.range.offset&&t.offset+t.size<=a.range.offset+a.range.size)
     .sort((a,b)=>a.range.size-b.range.size)[0];
-  const location=t=>{const a=arrayAt(t);return a?{...span(t),arrayId:a.id,index:Math.floor((t.offset-a.range.offset)/a.elementBytes),
-    elementOffset:(t.offset-a.range.offset)%a.elementBytes,elementBytes:a.elementBytes}:span(t);};
+  const geometry=new Map(arrays.map(a=>[a.id,arrayGeometry(a,byObject.get(a.objectId))]));
+  const location=t=>{const a=arrayAt(t);return a?arrayLocation(t,a,byObject.get(a.objectId)):span(t);};
   const overlap=(a,b)=>a?.objectId===b?.objectId&&a.offset<b.offset+b.size&&b.offset<a.offset+a.size;
   const contains=(a,b)=>a?.objectId===b?.objectId&&a.offset<=b.offset&&a.offset+a.size>=b.offset+b.size;
   const staticAccesses=new Map(plan.instructions.map(d=>[d.id,binding.accesses.filter(a=>a.instructionIds.includes(d.id))]));
+  const copySourceAccesses=new Map(plan.instructions.map(d=>[d.id,binding.accesses.filter(a=>a.copySourceInstructionIds?.includes(d.id))]));
   const cursorIds=new Set(binding.accesses.flatMap(a=>a.indexDeclarationIds));
   function addressReads(id,seen=new Set()){
     if(seen.has(id))return [];seen.add(id);const e=byEvent.get(id);if(!e)return [];
@@ -120,19 +158,16 @@ export function arrayWorkStructures(plan,{events,objects,views,frames=[],structu
   }
   function recordAccess(e,target,direction){
     const at=location(target);if(!at?.arrayId)return;
-    const sites=staticAccesses.get(e.instructionId)??[],cursorReads=unique((e.addressInputs??[]).flatMap(id=>addressReads(id)).map(e=>e.eventId));
+    const sites=(direction==='copy-source'?copySourceAccesses:staticAccesses).get(e.instructionId)??[],
+      cursorReads=unique((e.addressInputs??[]).flatMap(id=>addressReads(id)).map(e=>e.eventId));
+    const deepest=sites.slice().sort((a,b)=>b.axes.length-a.axes.length)[0];
     const a={executionId:e.eventId,activationId:e.activationId,kind:e.kind,direction,action:e.action,target:at,
-      sourceNodeIds:sites.map(s=>s.nodeId),cursors:cursorReads.map(id=>{const r=byEvent.get(id);return {declarationId:objectDeclaration.get(r.target.objectId),
+      sourceNodeIds:sites.map(s=>s.nodeId),accessSiteNodeId:deepest?.nodeId??null,axes:deepest?.axes??[],
+      cursors:cursorReads.map(id=>{const r=byEvent.get(id);return {declarationId:objectDeclaration.get(r.target.objectId),
         objectId:r.target.objectId,executionId:id,value:number(r.value)};}),status:sites.length||cursorReads.length?'supported':'partial'};
     accesses.push(a);return a;
   }
-  function sourceRead(id,seen=new Set()){
-    if(seen.has(id))return null;seen.add(id);const e=byEvent.get(id);if(!e)return null;
-    if(e.kind==='READ'&&memoryRange(e.target))return e;
-    // Only a recorded identity/conversion with one input preserves a copy.
-    if(e.kind==='CALC'&&!e.operator&&e.dataInputs?.length===1)return sourceRead(e.dataInputs[0],seen);
-    return null;
-  }
+  const {sourceRead,sourceReadOperand}=valueFlow??createValueFlow(plan,{events,resultDeliveries});
   function copyOrigin(target){return [...copies.values()].filter(c=>contains(c.target,target)).at(-1)??null;}
   for(const e of events){
     if(e.target&&['READ','WRITE'].includes(e.kind)){
@@ -142,7 +177,7 @@ export function arrayWorkStructures(plan,{events,objects,views,frames=[],structu
     if(e.kind==='READ'&&e.target){recordAccess(e,e.target,'read');readOrigins.set(e.eventId,copyOrigin(e.target));}
     if(e.kind==='WRITE'&&memoryRange(e.target)){
       recordAccess(e,e.target,'write');
-      const read=e.action==='copy'?null:(e.dataInputs?.length===1?sourceRead(e.dataInputs[0]):null),
+      const read=e.action==='copy'?null:sourceRead(e.eventId),
         source=e.action==='copy'&&e.sourceObjectId?{objectId:e.sourceObjectId,offset:e.sourceOffset??0,size:e.sourceSize??e.target.size}:read?.target;
       const previous=source?(read?readOrigins.get(read.eventId):copyOrigin(source)):null;
       const from=location(source),to=location(e.target);
@@ -169,7 +204,7 @@ export function arrayWorkStructures(plan,{events,objects,views,frames=[],structu
     if(e.kind==='CALC')for(const step of e.steps??[]){
       if(!comparison.has(step.operator))continue;
       const operands=(step.inputs??[]).map((input,index)=>{
-        const r=sourceRead(input.executionId);if(!r)return {position:index,executionId:input.executionId??null,role:'unresolved',status:'partial'};
+        const r=sourceReadOperand(input,e,step);if(!r)return {position:index,executionId:input.executionId??null,role:'unresolved',status:'partial'};
         const at=location(r.target),temp=readOrigins.get(r.eventId),role=temp?'copied-comparison-operand':at.arrayId?'array-comparison-operand':'scalar-comparison-operand';
         if(temp){temp.comparisonExecutionIds.push(e.eventId);temp.useExecutionIds.push(r.eventId);}
         return {position:index,executionId:r.eventId,role,storage:at,temporaryId:temp?.id??null,
@@ -194,23 +229,35 @@ export function arrayWorkStructures(plan,{events,objects,views,frames=[],structu
     for(const r of binding.ranges.filter(r=>r.functionId===f.functionId)){
       const bases=byDeclaration.get(declarationKey(f.id,r.baseDeclarationId))??[];
       for(const o of bases){
-        let a=arrays.find(a=>a.objectId===o.id),baseOffset=0,evidence=[];
-        if(!a){
+        let baseObjectId=o.id,baseOffsetBytes=0,evidence=[];
+        if(!arrays.some(a=>a.objectId===o.id)){
           const pointers=events.filter(e=>e.target?.objectId===o.id&&e.value?.reference?.targetObjectId),targets=unique(pointers.map(e=>`${e.value.reference.targetObjectId}:${e.value.reference.targetOffset??0}`));
           if(targets.length!==1)continue;
-          const p=pointers[0],ref=p.value.reference;a=arrays.find(a=>a.objectId===ref.targetObjectId&&ref.targetOffset>=a.range.offset&&ref.targetOffset<a.range.offset+a.range.size);
-          if(!a)continue;baseOffset=(ref.targetOffset-a.range.offset)/a.elementBytes;evidence=[p.eventId];
+          const p=pointers[0],ref=p.value.reference;baseObjectId=ref.targetObjectId;baseOffsetBytes=ref.targetOffset??0;evidence=[p.eventId];
         }
-        const from=bound(f.id,r.from),to=bound(f.id,r.to),start=from.value===null?null:from.value+baseOffset,end=to.value===null?null:to.value+baseOffset,
-          valid=Number.isInteger(start)&&Number.isInteger(end)&&start>=0&&end>=start&&end<=a.capacity,
-          related=ownAccesses.filter(x=>x.target.arrayId===a.id&&x.sourceNodeIds.some(id=>r.accessNodeIds.includes(id))),
-          outside=related.filter(x=>start!==null&&end!==null&&(x.target.index<start||x.target.index>=end)),
-          callExecuted=!r.callInstructionId||events.some(e=>e.activationId===f.id&&e.instructionId===r.callInstructionId&&e.action==='call');
-        ranges.push({bindingId:r.id,arrayId:a.id,objectId:a.objectId,baseDeclarationId:r.baseDeclarationId,cursorDeclarationId:r.cursorDeclarationId,
-          start,end,interval:'half-open',relation:r.relation,status:outside.length?'contradicted':valid?'supported':start===null||end===null||!callExecuted||!related.length?'partial':'contradicted',
-          executedForwarding:!!r.callInstructionId&&callExecuted,basis:'compiler-bound relation + recorded scalar values',
-          sourceNodeIds:[...r.accessNodeIds,...r.boundNodeIds],executionIds:unique([...evidence,...from.executionIds,...to.executionIds]),
-          bounds:{from:from.status,to:to.status},observedAccessExecutionIds:unique(related.map(x=>x.executionId)),contradictingExecutionIds:unique(outside.map(x=>x.executionId))});
+        // A storage object can have overlapping typed views. Use the views
+        // of the actual bound access sites, not the first type ever observed.
+        const siteAccesses=ownAccesses.filter(x=>x.target.objectId===baseObjectId&&x.sourceNodeIds.some(id=>r.accessNodeIds.includes(id))),
+          usedViews=unique(siteAccesses.map(x=>x.target.arrayId)),
+          candidates=usedViews.length?usedViews.map(id=>arrays.find(a=>a.id===id)):
+            [arrayAt({objectId:baseObjectId,offset:baseOffsetBytes,size:1})].filter(Boolean);
+        for(const a of candidates){
+          const baseByteOffset=baseOffsetBytes-a.range.offset,baseInside=baseByteOffset>=0&&baseByteOffset<a.range.size;
+          const shape=geometry.get(a.id),axisCandidates=shape?.byteStrides?.flatMap((stride,i)=>stride===r.indexStrideBytes?[i]:[])??[],
+            axis=axisCandidates.includes(r.axis)?r.axis:axisCandidates.length===1?axisCandidates[0]:!r.indexStrideBytes&&shape?.rank===1?0:null,
+            axisCapacity=axis===null?null:shape.dimensions[axis],stride=axis===null?null:shape.byteStrides[axis],
+            baseOffset=stride?Math.floor(baseByteOffset/stride)%axisCapacity:0;
+          const from=bound(f.id,r.from),to=bound(f.id,r.to),start=!baseInside||from.value===null?null:from.value+baseOffset,end=!baseInside||to.value===null?null:to.value+baseOffset,
+            valid=axis!==null&&Number.isInteger(start)&&Number.isInteger(end)&&start>=0&&end>=start&&end<=axisCapacity,
+            related=siteAccesses.filter(x=>x.target.arrayId===a.id),
+            outside=related.filter(x=>axis!==null&&x.target.coordinates&&start!==null&&end!==null&&(x.target.coordinates[axis]<start||x.target.coordinates[axis]>=end)),
+            callExecuted=!r.callInstructionId||events.some(e=>e.activationId===f.id&&e.instructionId===r.callInstructionId&&e.action==='call');
+          ranges.push({bindingId:r.id,arrayId:a.id,objectId:a.objectId,baseDeclarationId:r.baseDeclarationId,cursorDeclarationId:r.cursorDeclarationId,
+            axis,axisCapacity,start,end,interval:'half-open',relation:r.relation,status:outside.length?'contradicted':valid?'supported':axis===null||start===null||end===null||!callExecuted||!related.length?'partial':'contradicted',
+            executedForwarding:!!r.callInstructionId&&callExecuted,basis:'compiler-bound relation + recorded scalar values',
+            sourceNodeIds:[...r.accessNodeIds,...r.boundNodeIds],executionIds:unique([...evidence,...from.executionIds,...to.executionIds]),
+            bounds:{from:from.status,to:to.status},observedAccessExecutionIds:unique(related.map(x=>x.executionId)),contradictingExecutionIds:unique(outside.map(x=>x.executionId))});
+        }
       }
     }
     const runs=[];for(const t of ownTransfers){
@@ -223,8 +270,9 @@ export function arrayWorkStructures(plan,{events,objects,views,frames=[],structu
       accessExecutionIds:unique(ownAccesses.map(a=>a.executionId)),transferIds:ownTransfers.map(t=>t.id)});
   }
   const usedArrays=new Set([...accesses.map(a=>a.target.arrayId),...activations.flatMap(a=>a.arrayIds)]);
+  const computedDependencies=arrayValueDependencies(plan,{events,objects,structures,resultDeliveries,valueFlow,location});
   return [{id:'array-work',kind:'array-work',nodes:unique(arrays.filter(a=>usedArrays.has(a.id)).flatMap(a=>a.nodes??[])),edges:[],
-    arrays:arrays.filter(a=>usedArrays.has(a.id)).map(a=>({arrayId:a.id,range:a.range,elementBytes:a.elementBytes,capacity:a.capacity})),
-    accesses,transfers,temporaries,comparisons,activations,evidence:['compiler AST identities and bounds','recorded byte ranges and LLVM data/address dependencies'],
+    arrays:arrays.filter(a=>usedArrays.has(a.id)).map(a=>({arrayId:a.id,range:a.range,elementBytes:a.elementBytes,capacity:a.capacity,geometry:geometry.get(a.id)})),
+    accesses,transfers,temporaries,comparisons,computedDependencies,activations,evidence:['compiler AST identities and bounds','recorded byte ranges and LLVM data/address dependencies'],
     limitations:['range candidates do not assert every element was accessed','changing or unavailable bounds remain partial','no algorithm identity is inferred']}];
 }

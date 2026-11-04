@@ -23,6 +23,16 @@ function joins(blocks){
 
 export function buildControlFlow(plan,observations,{nodes,nearest,readSource,filename}){
   const flow={labels:[],edges:[],functions:[],gaps:[]},definitions=new Map(plan.instructions.map(i=>[i.id,i]));
+  const byAST=new Map(nodes.map(n=>[n.astId,n])),enumValues=new Map((plan.enumDeclarations??[])
+    .flatMap(e=>e.constants).filter(c=>c.value!==undefined&&c.value!==null).map(c=>[c.nodeId,c.value]));
+  const caseInteger=input=>{
+    let node=input;
+    while(node?.children.length===1&&(['ConstantExpr','ParenExpr'].includes(node.kind)||
+      node.kind==='ImplicitCastExpr'&&/<(?:IntegralCast|NoOp)>/.test(node.details)))node=node.children[0];
+    const literal=compilerInteger(node);if(literal!==null)return literal;
+    const declaration=node?.kind==='DeclRefExpr'&&byAST.get(/\bEnumConstant (0x[0-9a-f]+)/.exec(node.details)?.[1]);
+    return declaration?enumValues.get(declaration.id)??null:null;
+  };
   const localPoint=op=>op.source&&{...op.source,file:op.source.file===filename?'/main.c':op.source.file};
   for(const fn of observations.functions){
     const ops=observations.instructions.filter(o=>o.functionId===fn.id&&o.block),blocks=new Map();
@@ -50,7 +60,7 @@ export function buildControlFlow(plan,observations,{nodes,nearest,readSource,fil
       const labels=nodes.filter(n=>['CaseStmt','DefaultStmt'].includes(n.kind)&&closestSwitch(n)===owner&&n.source?.file==='/main.c')
         .sort((a,b)=>order(a.source.start,b.source.start));
       const entries=labels.map(node=>{
-        const value=node.kind==='CaseStmt'?compilerInteger(node.children[0]):null;
+        const value=node.kind==='CaseStmt'?caseInteger(node.children[0]):null;
         const label={id:`label${flow.labels.length+1}`,switchInstructionId:switchId,kind:node.kind==='DefaultStmt'?'default':'case',
           sourceNodeId:node.id,source:readSource({...node.source,end:node.source.start}),value};
         flow.labels.push(label);return {node,label};
@@ -67,8 +77,13 @@ export function buildControlFlow(plan,observations,{nodes,nearest,readSource,fil
         }
         targets.set(target,group);
       }
+      // Case expressions are converted to the promoted switch type. DWARF
+      // enumerators and LLVM case operands can spell the same bits with
+      // different signedness, so compare within that compiler-provided width.
+      const width=Number(/^i(\d+)$/.exec(dispatch.inputs?.[0]?.type)?.[1]),
+        bits=value=>value===null?null:width?BigInt.asUintN(width,BigInt(value)).toString():value;
       definition.cases=dispatch.cases.map(c=>{
-        const group=targets.get(c.destination)??[],match=group.find(e=>e.label.value===c.value)??(group.length===1?group[0]:null);
+        const group=targets.get(c.destination)??[],match=group.find(e=>bits(e.label.value)===bits(c.value))??(group.length===1?group[0]:null);
         if(match)match.label.value=c.value;
         else flow.gaps.push({functionId:fn.id,reason:'case-label-not-resolved',observationId:dispatch.id,value:c.value});
         return {...c,labelId:match?.label.id??null,labelIds:group.map(e=>e.label.id),source:match?.label.source??null};

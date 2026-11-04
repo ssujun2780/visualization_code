@@ -9,12 +9,16 @@ import {bitfieldBindings} from './bitfields.mjs';
 import {callProjection} from './call-abi.mjs';
 import {bindGuardConditions} from './guard-conditions.mjs';
 import {bindLinkedStructures} from './linked-views.mjs';
+import {bindLinkedRootCollections} from './linked-root-collections.mjs';
 import {bindArrayStructures} from './array-views.mjs';
 import {bindArrayWork} from './array-work.mjs';
 import {bindIndexRelations} from './index-relations.mjs';
 import {bindAssertions} from './assertions.mjs';
 import {bindPresentationContract} from './presentation-contract.mjs';
 import {bindResultDeliveries} from './result-delivery.mjs';
+import {resolvedCoverage} from './coverage-resolution.mjs';
+import {bindConversionConsumers} from './conversion-consumers.mjs';
+import {booleanRepresentationBindings} from './boolean-representation.mjs';
 const position=(a,b)=>a.line-b.line||a.column-b.column;
 const contains=(range,p)=>!!range&&!!p&&range.file===p.file&&position(range.start,p)<=0&&position(p,range.end)<=0;
 const operator=n=>n?.kind==='UnaryOperator'?/\b(?:prefix|postfix) '([^']+)'/.exec(n.details)?.[1]??null:
@@ -162,7 +166,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
   plan.coverage.sourceTemporaries={bound:aggregates.temporaries.size,unresolved:aggregates.temporaryGaps};
   const bitfields=bitfieldBindings(observations,{nearest,source:aggregateSource,types});
   plan.coverage.bitfields={accesses:bitfields.accesses.size,unresolved:bitfields.gaps};
-  const evaluations=evaluationBindings(observations,nearest),evaluationByNode=new Map(),logicalNots=logicalNotBindings(observations,{nodes:localNodes,types,nearest});
+  const evaluations=evaluationBindings(observations,nearest,nodes),evaluationByNode=new Map(),logicalNots=logicalNotBindings(observations,{nodes:localNodes,types,nearest});
   plan.evaluations=localNodes.filter(n=>evaluationKind(n)).map(n=>{
     const part=child=>({nodeId:child.id,source:sourceMap.range(child.source)}),kind=evaluationKind(n);
     const literal=observations.coverage.shortCircuits?.expressions?.find(e=>e.nodeId===n.id);
@@ -220,6 +224,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
     expressionOwners.set(original,owner);
   }
   const semanticNodes=new Map(localNodes.map(n=>[n.id,n]));
+  const booleanRepresentations=booleanRepresentationBindings(observations,{nodes:localNodes,types,nearest});
   // The text DWARF adapter may not describe a record pointee yet; the AST's
   // canonical pointer spelling still identifies its arithmetic semantics.
   const isPointer=n=>types.spelling(n.type,n.canonical)?.kind==='pointer'||/\*/.test(n.canonical??n.type??'');
@@ -260,6 +265,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
   }
   for(const op of observations.instructions){
     const binding={roles:{},administrative:false},node=nearest(op),declaration=declarationsFor(op),role=defaultRole(op);
+    if(op.addressBinding)binding.addressBinding=op.addressBinding;
     const put=(selector,kind,action,owner=node,fields={})=>{
       const key=`${op.functionId??'program'}:${kind}:${action}:${owner?.id??op.id}:${fields.accessType??''}`;
       const instruction=add(key,kind,action,op,owner,fields);binding.roles[selector]=instruction.id;return instruction;
@@ -281,7 +287,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
     const evaluation=evaluations.get(op.id);
     if(evaluation&&!logicalNot){
       const {node:owner,role:evaluationRole}=evaluation,spec=evaluationByNode.get(owner.id);
-      binding.evaluation={nodeId:owner.id,role:evaluationRole};
+      binding.evaluation={nodeId:owner.id,role:evaluationRole,...(evaluation.phiIncoming?{phiIncoming:evaluation.phiIncoming}:{})};
       const sourceOwner=expressionOwners.get(owner),work=sourceOwner?.kind==='expression'?sourceOwner.node:owner;
       if(['decision','truth-test','selection'].includes(evaluationRole)){
         if(spec.kind==='conditional'&&(evaluationRole==='decision'||evaluationRole==='selection'&&op.opcode==='select')){
@@ -309,7 +315,8 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
     // conversion or SSA consumer; retain it only in the observation trace.
     const unusedBooleanExtension=op.opcode==='zext'&&op.inputs?.[0]?.type==='i1'&&!op.conversion&&
       !usedValues.has(`${op.functionId}:${op.result}`);
-    if(op.action==='globals.ready'||op.action==='function.address'||op.action==='stack.save'||compilerSlots.has(op.id)||compilerSlotUses.has(op.id)||unusedBooleanExtension||addressIndexAdaptations.has(op.id)){
+    if(booleanRepresentations.has(op.id))binding.booleanRepresentation=booleanRepresentations.get(op.id);
+    if(op.action==='globals.ready'||op.action==='function.address'||op.action==='stack.save'||compilerSlots.has(op.id)||compilerSlotUses.has(op.id)||unusedBooleanExtension||addressIndexAdaptations.has(op.id)||booleanRepresentations.has(op.id)){
       binding.administrative=true;binding.hiddenStorage=compilerSlots.has(op.id);plan.bindings[op.id]=binding;continue;
     }
     if(op.action==='function.enter'){
@@ -372,7 +379,9 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
       put('SPACE:frame.end','SPACE','frame.end',owner);
     }else if(op.action==='call'){
       const callee=op.callee.slice(1).replace(/^"|"$/g,'');
-      const callNode=nearest(op,n=>n.kind==='CallExpr'),owner=callNode??nearest(op,n=>n.kind==='VarDecl'||n.kind==='ReturnStmt'||mutation(n));
+      const resolvedCall=semanticNodes.get(op.semanticNodeId),callNode=aggregates.memoryCalls.has(op.id)?aggregates.memoryCalls.get(op.id):
+        resolvedCall?.kind==='CallExpr'?resolvedCall:nearest(op,n=>n.kind==='CallExpr'),
+        owner=callNode??nearest(op,n=>n.kind==='VarDecl'||n.kind==='ReturnStmt'||mutation(n));
       let target=callNode?.children[0];while(target&&target.children.length===1)target=target.children[0];
       const sourceName=/\bFunction 0x[0-9a-f]+ '([^']+)'/.exec(target?.details??'')?.[1];
       const callInfo={callee:sourceName?`@${sourceName}`:op.callee,backendCallee:op.callee};
@@ -398,10 +407,17 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
       }
     }else if(op.kind==='CALC'){
       const owner=expressionOwner(op);
-      const point=op.source&&{...op.source,file:op.source.file===filename?'/main.c':op.source.file};
-      const pointerOperation=nearest(op,n=>(n.kind==='BinaryOperator'&&['+','-'].includes(operator(n))&&isPointer(n)||n.kind==='UnaryOperator'&&(operator(n)==='&'||['++','--'].includes(operator(n))&&isPointer(n)))&&
-        !n.children.some(c=>contains(c.source,point)));
-      if(op.action==='address'&&!pointerOperation||
+      // Classification and expression ownership must use the same AST node.
+      // A macro expansion point alone can cover unrelated pointer READs.
+      const semantic=semanticNodes.get(op.semanticNodeId),pointerOperation=op.addressBinding?
+        semanticNodes.get(op.addressBinding.operatorNodeId):semantic&&
+          (semantic.kind==='BinaryOperator'&&['+','-'].includes(operator(semantic))&&isPointer(semantic)||
+           semantic.kind==='UnaryOperator'&&(operator(semantic)==='&'||['++','--'].includes(operator(semantic))&&isPointer(semantic)))?semantic:null;
+      const point=op.source&&{...op.source,file:op.source.file===filename?'/main.c':op.source.file},
+        explicitAddress=pointerOperation&&!pointerOperation.children.some(c=>contains(c.source,point));
+      // A GEP located in the lvalue child is storage selection, not another
+      // source operator step. The verified binding still describes its target.
+      if(op.action==='address'&&!explicitAddress||
         ['bitcast','addrspacecast','ptrtoint','inttoptr'].includes(op.opcode)&&!nearest(op,n=>n.kind==='CStyleCastExpr'&&
           !/<(?:NoOp|LValueToRValue)>/.test(n.details)&&types.spelling(n.type,n.canonical)?.kind==='pointer'===op.type.endsWith('*')&&
           (op.opcode!=='bitcast'||types.spelling(n.children[0]?.type,n.children[0]?.canonical)?.kind==='pointer'))||
@@ -630,6 +646,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
   bindArrayWork(plan);
   bindIndexRelations(plan);
   bindLinkedStructures(plan);
+  bindLinkedRootCollections(plan);
   buildControlFlow(plan,observations,{nodes,nearest,readSource:raw=>sourceMap.range(raw),filename});
   const evaluationResults=new Set(Object.values(plan.bindings).filter(b=>['result','selection','folded'].includes(b.evaluation?.role)).map(b=>b.evaluation.nodeId));
   const guardResults=n=>{if(n.operator)evaluationResults.add(n.nodeId);for(const c of n.children??[])guardResults(c);};
@@ -650,5 +667,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
   plan.sourceMap=sourceMap.report();
   plan.sourceMap.unmappedInstructions=plan.instructions.filter(i=>i.sourceStatus==='unmapped')
     .map(i=>({instructionId:i.id,sourceNodeId:i.sourceNodeId,reason:'compiler source range unavailable'}));
+  bindConversionConsumers(plan,{nodes:localNodes,types,tree,declarationByAST});
+  Object.assign(plan.coverage,resolvedCoverage(plan));
   return validateIRPlan(plan);
 }

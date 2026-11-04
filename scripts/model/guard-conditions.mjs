@@ -1,4 +1,5 @@
 // Reconstruct condition completion from observed CFG edges, not C execution.
+import {createExpressionOwnership} from './expression-ownership.mjs';
 const transparent=n=>['ParenExpr','ImplicitCastExpr'].includes(n?.kind);
 const unwrap=n=>{while(transparent(n))n=n.children[0];return n;};
 const operator=n=>n?.kind==='BinaryOperator'?/ '(\&\&|\|\|)'\s*$/.exec(n.details)?.[1]:null;
@@ -17,7 +18,7 @@ export function createAddressBoundaryTest(plan,nodes){
   };
 }
 export function bindGuardConditions(plan,observations,{nodes,nearest,types,sourceMap,tree,add}){
-  const needsAddress=createAddressBoundaryTest(plan,nodes);
+  const needsAddress=createAddressBoundaryTest(plan,nodes),ownership=createExpressionOwnership(observations,nearest,nodes);
   const materialized=new Set(Object.values(plan.bindings).filter(b=>['result','folded'].includes(b.evaluation?.role)).map(b=>b.evaluation.nodeId)),
     producers=new Map(observations.instructions.filter(o=>o.result).map(o=>[`${o.functionId}:${o.result}`,o]));
   plan.conditionGuards=[];plan.conditionConsumers=[];
@@ -51,9 +52,7 @@ export function bindGuardConditions(plan,observations,{nodes,nearest,types,sourc
     plan.conditionConsumers.push({nodeId:root.id,consumerNodeId:owner.id,controlKind:owner.kind,invert,
       source:sourceMap.range(condition.source),materialized:materialized.has(root.id)});
     if(materialized.has(root.id))continue;
-    const ops=observations.instructions.filter(o=>nearest(o,n=>n===root)),blocks=new Set(ops.map(o=>o.block)),
-      branches=observations.instructions.filter(o=>o.action==='branch'&&o.inputs.length&&o.destinations.length===2&&
-        (nearest(o,n=>n===root)||nearest(producers.get(`${o.functionId}:${o.inputs[0].value}`)??o,n=>n===root)));
+    const {ops,blocks,branches}=ownership.conditionRegion(root,plan.bindings);
     if(!branches.length)continue; // Existing folded-consumer handling remains separate.
     const shape=n=>{n=unwrap(n);return operator(n)?{nodeId:n.id,operator:operator(n),children:n.children.map(shape)}:
       {nodeId:n.id,...(n.kind==='IntegerLiteral'?{literalTruth:/ (-?\d+)\s*$/.exec(n.details)?.[1]!=='0'}:{})};};

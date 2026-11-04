@@ -37,7 +37,7 @@ s.q=&b;b.z=&s;return 0;}`,'3 3\n');
   assert.ok(changes.some(s=>s.detachedMembers.length===1&&!s.inconsistencies.length&&s.orders.every(o=>o.nodeIds.length===1)));
   assert.equal(r.linked.length,1);
 });
-test('an interior pointer field gets its own bounded range while a large heap array keeps its complete range',async()=>{
+test('a scalar pointer field stays a subobject while a large heap array keeps its complete range',async()=>{
   const r=await inspect(`#include <stdlib.h>
 #include <stdio.h>
 typedef struct N {int x;struct N*q;} N;
@@ -45,7 +45,7 @@ int main(void){N*a=malloc(sizeof*a);int*v=calloc(10000,sizeof*v);if(!a||!v)retur
 N**s=&a->q;*s=0;v[9999]=9;printf("%d %d\\n",a->x,v[9999]);free(a);free(v);return 0;}`,'4 9\n');
   const arrays=r.trace.structures.filter(s=>s.kind==='array'),n=r.trace.objects.find(o=>o.storage==='heap'&&o.size===8),v=r.trace.objects.find(o=>o.storage==='heap'&&o.size===40000);
   const field=arrays.find(a=>a.objectId===n.id&&a.elementType.kind==='pointer');
-  assert.deepEqual(field.range,{objectId:n.id,offset:4,size:4});assert.equal(field.capacity,1);
+  assert.equal(field,undefined);assert.ok(!arrays.some(a=>a.objectId===n.id));
   assert.ok(arrays.some(a=>a.objectId===v.id&&a.capacity===10000&&a.range.offset===0));
 });
 test('inconsistent length/capacity metadata does not erase a candidate supported by actual indexed writes',async()=>{

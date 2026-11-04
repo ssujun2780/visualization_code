@@ -65,8 +65,24 @@ export function aggregateSources(types,nodes){
 }
 
 export function aggregateBindings(observations,{types,nearest,abi,nodes,source=aggregateSources(types,nodes)}){
-  const paths=new Map(),accesses=new Map(),argumentsByCall=new Map(),returns=new Map(),returnWrites=new Map();
+  const paths=new Map(),accesses=new Map(),argumentsByCall=new Map(),returns=new Map(),returnWrites=new Map(),memoryCalls=new Map();
   const key=(op,value)=>`${op.functionId}:${value}`;
+  const byNodeId=new Map(nodes.map(n=>[n.id,n]));
+  for(const op of observations.instructions){
+    const intrinsic=op.action==='call'&&/^@llvm\.(memcpy|memmove|memset)\./.exec(op.callee);
+    if(!intrinsic)continue;
+    // A record assignment/return can share its debug location with the call
+    // that produced its value. Only a matching source memory call exposes a
+    // call boundary; a compiler-inserted copy still exposes its memory effect.
+    const matches=n=>{
+      if(n?.kind!=='CallExpr')return false;
+      let target=n.children[0];while(target?.children.length===1)target=target.children[0];
+      const name=/\bFunction 0x[0-9a-f]+ '([^']+)'/.exec(target?.details??'')?.[1];
+      return name?.replace(/^__builtin_/,'')===intrinsic[1];
+    };
+    const resolved=byNodeId.get(op.semanticNodeId);
+    memoryCalls.set(op.id,matches(resolved)?resolved:nearest(op,matches)??null);
+  }
   // Anonymous C objects have no dbg.declare variable. Bind their actual
   // allocation through address-producing SSA uses at CompoundLiteralExpr
   // locations; LLVM temporary names and user identifiers are not classifiers.
@@ -193,5 +209,5 @@ export function aggregateBindings(observations,{types,nearest,abi,nodes,source=a
     info.cType??=info.sites.map(s=>s.node.children[0]).map(n=>n&&types.spelling(n.type,n.canonical)).find(Boolean)??null;
     op.aggregateReturn={pointer:info.pointer,type:info.backendType,cType:info.cType};
   }
-  return {accesses,returns,argumentsByCall,source,temporaries,temporaryGaps};
+  return {accesses,returns,argumentsByCall,source,temporaries,temporaryGaps,memoryCalls};
 }

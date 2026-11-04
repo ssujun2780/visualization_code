@@ -61,6 +61,8 @@ export function cTypes(meta) {
   function resolve(name,canonical=name) {
     const normalize=s=>s.replace(/\s+/g," ").trim();
     name=normalize(name??"");canonical=normalize(canonical??name);
+    // Clang's AST may print bool while DWARF names the same C type _Bool.
+    if(canonical==='bool')canonical='_Bool';
     if(canonical==='void')return voidType;
     const alias=meta.types.find(t=>t.name===name&&t.tag==='DW_TAG_typedef');if(alias)return describe(alias);
     const rowPointer=/^(.+?)\s*\(\s*((?:\*\s*(?:(?:const|volatile|restrict)\s*)*)+)\)\s*((?:\[\d*\]\s*)+)$/.exec(canonical);
@@ -93,6 +95,8 @@ export function cTypes(meta) {
     const known=t=>t.signedness||['DW_ATE_float','DW_ATE_boolean'].includes(t.encoding)||['array','record'].includes(describe(t)?.kind);
     const found=meta.types.find(t=>t.name===name&&known(t));if(found)return describe(found);
     const base=meta.types.find(t=>t.name===canonical&&known(t));if(base)return {...describe(base),name};
+    if(canonical==='_Bool')return {id:'c:_Bool',name:name||canonical,sizeBits:8,signedness:null,
+      encoding:'DW_ATE_boolean',display:{label:name||canonical,badges:[]},evidence:'compiler AST and target ABI'};
     if(['float','double'].includes(canonical))return {id:`c:${canonical}`,name:name||canonical,sizeBits:canonical==='float'?32:64,
       signedness:null,encoding:'DW_ATE_float',display:{label:name||canonical,badges:[]},evidence:'compiler AST and target ABI'};
     // These are builtin type spellings from Clang for the pinned wasm32 ABI.
@@ -140,7 +144,8 @@ export function compoundTypes(node,types){
     calculationType:types.spelling(/ComputeResultTy='([^']+)'/.exec(node.details)?.[1])};
 }
 const integral=n=>["ImplicitCastExpr","CStyleCastExpr"].includes(n.kind)&&n.details.includes("<IntegralCast>");
-const numericCast=n=>["ImplicitCastExpr","CStyleCastExpr"].includes(n.kind)&&/<(?:IntegralCast|FloatingToIntegral|IntegralToFloating|FloatingCast)>/.test(n.details);
+const toBoolean=n=>/<(?:IntegralToBoolean|FloatingToBoolean|PointerToBoolean)>/.test(n?.details??'');
+const numericCast=n=>["ImplicitCastExpr","CStyleCastExpr"].includes(n.kind)&&(/<(?:IntegralCast|FloatingToIntegral|IntegralToFloating|FloatingCast)>/.test(n.details)||toBoolean(n));
 function producer(n,types) {
   while(n?.kind==="ParenExpr"||integral(n)&&(()=>{const a=types.spelling(n.children[0]?.type,n.children[0]?.canonical),b=types.spelling(n.type,n.canonical);return a&&b&&a.sizeBits===b.sizeBits;})())n=n.children[0];
   return n;
@@ -149,6 +154,10 @@ function matches(node,site,allowTargetAccess=false) {
   if(!node||!inside(site.source,node.source))return false;
   if(node.kind==="ImplicitCastExpr"&&node.details.includes("<LValueToRValue>"))return site.opcode==="load";
   if(node.kind==="CallExpr")return site.opcode==="call";
+  if(integral(node)&&site.opcode==='trunc'&&site.type==='i1'&&
+    /^(?:const |volatile )*(?:_Bool|bool)$/.test(node.children[0]?.canonical??node.children[0]?.type??''))return false;
+  if(toBoolean(node))return (node.details.includes('<FloatingToBoolean>')?site.opcode==='fcmp':site.opcode==='icmp')&&
+    (!site.predicate||['ne','une'].includes(site.predicate));
   if(numericCast(node))return (node.details.includes('<IntegralCast>')?['zext','sext','trunc']:
     node.details.includes('<FloatingToIntegral>')?['fptosi','fptoui']:node.details.includes('<IntegralToFloating>')?['sitofp','uitofp']:['fpext','fptrunc']).includes(site.opcode);
   if(node.kind==="CompoundAssignOperator"){
@@ -231,7 +240,7 @@ export function semanticModel(ast,ir,meta,source="",filename="main.c",options={}
     const accessType=n=>types.spelling((n.kind==='CompoundAssignOperator'||n.kind==='BinaryOperator'&&/ '='\s*$/.test(n.details))?n.children[0]?.type:n.type,
       (n.kind==='CompoundAssignOperator'||n.kind==='BinaryOperator'&&/ '='\s*$/.test(n.details))?n.children[0]?.canonical:n.canonical);
     const llvmType=t=>!t?null:t.kind==='pointer'?`${llvmType(t.pointee)??'?'}*`:t.kind==='array'?`[${t.count} x ${llvmType(t.elementType)??'?'}]`:
-      t.encoding==='DW_ATE_float'?(t.sizeBits===32?'float':t.sizeBits===64?'double':null):t.signedness?`i${t.sizeBits}`:null;
+      t.encoding==='DW_ATE_float'?(t.sizeBits===32?'float':t.sizeBits===64?'double':null):t.signedness||t.encoding==='DW_ATE_boolean'?`i${t.sizeBits}`:null;
     const compatible=n=>{const type=accessType(n),expected=llvmType(type);
       if(expected&&!expected.includes('?'))return operation.type===expected;
       if(/\*/.test(n.canonical??n.type??''))return operation.type.endsWith('*');
@@ -244,8 +253,10 @@ export function semanticModel(ast,ir,meta,source="",filename="main.c",options={}
     // within those candidates. Both passes must agree on the same READ node.
     const storage=readAccess.resolve(operation,functionName,locationCandidates,null),
       macroNode=macroBindings.resolve(operation,storage?.candidates??locationCandidates,{storageMatched:!!storage}),
-      storageRead=readAccess.resolve(operation,functionName,locationCandidates,macroNode);
-    const node=storageRead?.node??macroNode??candidates[0]??(operation.kind==='CALC'?locationCandidates.find(n=>n.builtin?.pure):null);
+      storageRead=readAccess.resolve(operation,functionName,locationCandidates,macroNode),
+      address=readAccess.resolveAddress(operation,functionName,locationCandidates);
+    const node=address?.node??storageRead?.node??macroNode??candidates[0]??(operation.kind==='CALC'?locationCandidates.find(n=>n.builtin?.pure):null);
+    if(address)operation.addressBinding=address.binding;
     if(storageRead)for(const cast of noOps){
       // An enclosing same-width conversion consumes the member load, not an
       // index load that happens to have the same LLVM integer width/location.
@@ -257,7 +268,7 @@ export function semanticModel(ast,ir,meta,source="",filename="main.c",options={}
         types.spelling(node.children[0]?.type,node.children[0]?.canonical):compoundTypes(node,types).calculationType):types.spelling(node.type,node.canonical);
       // An access uses the stored type, not the promoted computation type.
       // Do not label a wider container load (e.g. a bit-field) as the target.
-      if(!access||compatible(node))operation.cType=storageRead?.cType??type??operation.cType;
+      if(!access||compatible(node))operation.cType=address?(address.cType??operation.cType):storageRead?.cType??type??operation.cType;
     }
     if(!access&&node?.kind==='UnaryOperator'&&/(?:prefix|postfix) '(?:\+\+|--)'/.test(node.details)&&
       operation.type==='i32'&&operation.cType?.sizeBits<32)operation.cType=types.spelling('int');
@@ -277,7 +288,7 @@ export function semanticModel(ast,ir,meta,source="",filename="main.c",options={}
         const expression=node.children[index++];arg.cType=expression?types.spelling(expression.type,expression.canonical):null;
       }
     }
-    if(node&&numericCast(node)&&operation.action==="convert"){
+    if(node&&numericCast(node)&&(operation.action==="convert"||toBoolean(node)&&['icmp','fcmp'].includes(operation.opcode))){
       const c=conversions.find(c=>c.node===node);if(c){operation.conversion={fromType:c.fromType,toType:c.toType,explicit:c.explicit,sameWidth:c.sameWidth,bitsUnchanged:false,evidence:"compiler AST"};converted.add(c.id);}
     }
     if(operation.action==="calculate"&&operation.predicate)operation.cBoolean=true;
@@ -288,5 +299,5 @@ export function semanticModel(ast,ir,meta,source="",filename="main.c",options={}
     after(result,functionName){return result?noOps.filter(c=>c.site&&c.site.result===result&&c.site.functionName===functionName).sort((a,b)=>b.node.depth-a.node.depth):[];},
     report(){return {source:"Clang AST + DWARF encoding",sameWidthSignednessCasts:noOps.length,
       inserted:noOps.filter(c=>converted.has(c.id)).length,
-      unobserved:noOps.filter(c=>!converted.has(c.id)).map(c=>({source:c.source,fromType:c.fromType,toType:c.toType,reason:c.reason}))};}};
+      unobserved:noOps.filter(c=>!converted.has(c.id)).map(c=>({nodeId:c.node.id,source:c.source,fromType:c.fromType,toType:c.toType,reason:c.reason}))};}};
 }

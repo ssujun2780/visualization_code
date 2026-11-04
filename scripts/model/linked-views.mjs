@@ -2,6 +2,8 @@
 // here, and a failed structural invariant never repairs or discards a link.
 import {rootedConnectivity} from './rooted-connectivity.mjs';
 import {observeScalarBytes} from './observed-scalar-bytes.mjs';
+import {bindLinkedRootCollections,linkedRootRanges} from './linked-root-collections.mjs';
+import {reciprocalIssues,annotateReciprocalEpisodes} from './linked-reciprocity.mjs';
 const walk=n=>n?[n,...(n.children??[]).flatMap(walk)]:[];
 const unwrap=n=>{while(n&&['ImplicitCastExpr','CStyleCastExpr','ParenExpr'].includes(n.kind))n=n.children[0];return n;};
 const position=s=>`${s?.file}:${s?.start?.byte??`${s?.line}:${s?.column}`}`;
@@ -21,6 +23,7 @@ export function bindLinkedStructures(plan){
     n=unwrap(n);if(!n)return [];
     if(n.kind==='DeclRefExpr')return [{declarationId:n.declarationId,fieldNodeIds:[]}];
     if(n.kind==='UnaryOperator'&&['&','*'].includes(n.operator))return origins(n.children[0]);
+    if(n.kind==='ArraySubscriptExpr')return origins(n.children[0]).map(o=>({...o,indexedRootCollection:true}));
     const f=linkField(n);if(f)return origins(n.children[0]).map(o=>({...o,fieldNodeIds:[...o.fieldNodeIds,f.fieldNodeId]}));
     if(n.kind==='ConditionalOperator')return n.children.slice(1).flatMap(origins);
     return [];
@@ -66,11 +69,14 @@ export function bindLinkedStructures(plan){
       for(const origin of assignments.get(path.id)??[]){
         const id=origin.declarationId;if(origin.fieldNodeIds.length||!id||seen.has(id))continue;seen.add(id);
         const next={id,viaDeclarationIds:[...path.viaDeclarationIds,id],
-          callInstructionIds:[...path.callInstructionIds,...(origin.callInstructionId?[origin.callInstructionId]:[])]};
+          callInstructionIds:[...path.callInstructionIds,...(origin.callInstructionId?[origin.callInstructionId]:[])],
+          indexedRootCollection:!!(path.indexedRootCollection||origin.indexedRootCollection)};
         if(!cursorIds.has(id)){
           rootDeclarations.add(id);rootOrigins.push({rootDeclarationId:id,cursorDeclarationId:cursor,
             viaDeclarationIds:next.viaDeclarationIds,callInstructionIds:next.callInstructionIds,
-            evidence:'compiler declaration aliases and direct-call argument slots; runtime root identity remains separate'});
+            indexedRootCollection:next.indexedRootCollection,
+            evidence:next.indexedRootCollection?'compiler indexed root collection and argument slots; each runtime root slot remains separate':
+              'compiler declaration aliases and direct-call argument slots; runtime root identity remains separate'});
         }
         queue.push(next);
       }
@@ -83,20 +89,59 @@ export function bindLinkedStructures(plan){
       anchors.push({cursorDeclarationId:cursor.declarationId,anchorDeclarationId:anchor.declarationId,nodeId:n.nodeId,source:n.source});
   }
   const roles=[...fields.values()].filter(f=>recurrences.some(r=>r.fieldNodeId===f.fieldNodeId));
+  const roleGroups=new Map();
+  for(const cursor of cursorIds){
+    const traversed=recurrences.filter(r=>r.cursorDeclarationId===cursor);
+    for(const family of new Set(traversed.map(r=>fields.get(r.fieldNodeId)?.recordTypeId))){
+      const matching=traversed.filter(r=>fields.get(r.fieldNodeId)?.recordTypeId===family),fieldNodeIds=[...new Set(matching.map(r=>r.fieldNodeId))].sort();
+      if(fieldNodeIds.length<2)continue;
+      const id=`link-roles:${family}:${fieldNodeIds.join(':')}`;
+      if(!roleGroups.has(id))roleGroups.set(id,{id,recordTypeId:family,fieldNodeIds,cursorDeclarationIds:[],callInstructionIds:[],evidence:'compiler traversal recurrence groups, independent of field names'});
+      const group=roleGroups.get(id);group.cursorDeclarationIds.push(cursor);
+      group.callInstructionIds=[...new Set([...group.callInstructionIds,...matching.flatMap(r=>r.callInstructionIds)])];
+    }
+  }
+  function location(input){
+    const n=unwrap(input);if(!n)return null;
+    if(n.kind==='DeclRefExpr'&&n.declarationId)return {baseDeclarationId:n.declarationId,baseKind:n.cType?.kind==='pointer'?'pointer':'object',offset:0};
+    if(n.kind==='MemberExpr'){
+      const base=unwrap(n.children[0]),part=n.targetPath?.at(-1);
+      if(n.memberAccess==='->'&&base?.kind!=='DeclRefExpr')return null;
+      const parent=location(base);return parent&&Number.isInteger(part?.offsetBits)?{...parent,offset:parent.offset+part.offsetBits/8}:null;
+    }
+    if(n.kind==='ArraySubscriptExpr'){
+      const base=location(n.children[0]),index=unwrap(n.children[1]),stride=n.cType?.sizeBits/8;
+      return base&&index?.kind==='IntegerLiteral'&&/^\d+$/.test(index.literal)&&stride>0?{...base,offset:base.offset+Number(index.literal)*stride}:null;
+    }
+    return null;
+  }
+  const boundarySpecs=[];
+  for(const n of nodes.values())if(n.kind==='BinaryOperator'&&['==','!='].includes(n.operator))for(const [at,other]of [[0,1],[1,0]]){
+    const anchor=unwrap(n.children[at]),pointee=anchor?.cType?.pointee;
+    if(pointee?.kind!=='record'||!roles.some(r=>r.recordTypeId===pointee.recordTypeId)||
+      !origins(n.children[other]).some(o=>cursorIds.has(o.declarationId)))continue;
+    const located=anchor.kind==='UnaryOperator'&&anchor.operator==='&'?location(anchor.children[0]):
+      anchor.kind==='DeclRefExpr'&&!cursorIds.has(anchor.declarationId)?location(anchor):null;
+    if(located)boundarySpecs.push({id:`link-boundary:${n.nodeId}:${at}`,comparisonNodeId:n.nodeId,anchorNodeId:anchor.nodeId,
+      recordTypeId:pointee.recordTypeId,cType:pointee,...located,source:anchor.source,evidence:'compiler cursor comparison to a record address'});
+  }
   plan.structureBindings??={};plan.structureBindings.linkRoles=roles;plan.structureBindings.linkRecurrences=recurrences;plan.structureBindings.linkAnchors=anchors;
+  plan.structureBindings.linkRoleGroups=[...roleGroups.values()];plan.structureBindings.linkBoundarySpecs=boundarySpecs;
   plan.structureBindings.linkRootDeclarations=[...rootDeclarations];
   plan.structureBindings.linkRootOrigins=rootOrigins;
+  bindLinkedRootCollections(plan);
   plan.coverage.structureInference??={};Object.assign(plan.coverage.structureInference,{linkRoleCandidates:roles.length,
     linkedStorageSupport:'record ranges, pointer slots and direct-call argument recurrence; indirect calls, return-value aliases/recurrence and arbitrary index links unresolved',
     linkRootAliasPolicy:'transitive field-free declaration and direct-call argument dependencies nominate roots; actual object/offset/lifetime determines each root state',
     relationPolicy:'candidate roles are separate from actual connectivity and lifetime'});
 }
 
-export function linkedStructures(plan,{events,objects,views}){
+export function linkedStructures(plan,{events,objects,views,arrays=[]}){
   const roles=plan.structureBindings?.linkRoles??[];if(!roles.length)return [];
   const defs=new Map(plan.instructions.map(d=>[d.id,d])),byEvent=new Map(events.map(e=>[e.eventId,e])),byObject=new Map(objects.map(o=>[o.id,o])),
     decls=new Map(plan.declarations.map(d=>[d.id,d])),families=new Map(),nodes=new Map(),nodeAt=new Map(),objectDecl=new Map(),slotHistory=new Map(),roots=new Map();
   const slot=(id,offset)=>`${id}:${offset}`,recordId=t=>t?.recordTypeId;
+  const boundarySpecs=plan.structureBindings.linkBoundarySpecs??[],boundaryRecords=new Map();
   for(const r of roles){if(!families.has(r.recordTypeId))families.set(r.recordTypeId,[]);families.get(r.recordTypeId).push(r);}
   function addNode(objectId,offset,type){
     if(!families.has(recordId(type)))return null;const o=byObject.get(objectId),size=type.sizeBits/8;
@@ -118,12 +163,14 @@ export function linkedStructures(plan,{events,objects,views}){
     if(!families.has(recordId(type)))return;
     const id=`linked:${kind}:${objectId}:${offset}:${type.recordTypeId}`;
     if(!roots.has(id))roots.set(id,{id,kind:'linked-structure',root:{kind,objectId,offset,recordTypeId:type.recordTypeId},
-      roles:families.get(type.recordTypeId),evidence:[evidence],states:[],members:new Set(),inversePairs:new Map(),observedRoles:new Set()});
+      roles:families.get(type.recordTypeId),evidence:[evidence],states:[],members:new Set(),inversePairs:new Map(),observedRoles:new Set(),
+      roleGroups:(plan.structureBindings.linkRoleGroups??[]).filter(g=>g.recordTypeId===type.recordTypeId).map(g=>({...g,auxiliaryFieldNodeIds:[]}))});
   }
   for(const e of events){
     if(['READ','WRITE'].includes(e.kind)&&e.target?.objectId&&e.value?.cType?.pointee?.kind==='record'){
       const id=slot(e.target.objectId,e.target.offset);if(!slotHistory.has(id))slotHistory.set(id,{objectId:e.target.objectId,offset:e.target.offset,type:e.value.cType.pointee,size:e.value.cType.sizeBits/8,targets:new Set()});
       slotHistory.get(id).targets.add(`${e.value.reference?.targetObjectId??'null'}:${e.value.reference?.targetOffset??0}`);
+      if(e.value.reference?.status==='null')slotHistory.get(id).observedNull=true;
     }
     const ref=e.value?.reference,type=e.value?.cType;
     if(ref?.targetObjectId&&type?.pointee?.kind==='pointer'&&type.pointee.pointee?.kind==='record'){
@@ -145,7 +192,44 @@ export function linkedStructures(plan,{events,objects,views}){
     if((ordinary||parameter)&&!embedded)
       addRoot('pointer-slot',h.objectId,h.offset,h.type,parameter?'observed non-cursor parameter root in its activation':'observed non-cursor root pointer slot');
   }
+  // Typed allocation ranges and actual indexed accesses also establish heap
+  // root collections. Only observed slots are expanded; unobserved capacity
+  // remains unknown, and record fields do not become sibling array roots.
+  const ranges=linkedRootRanges(plan,{events,objects,arrays});
+  const rootCollections=new Set([...roots.values()].filter(c=>c.root.kind==='pointer-slot')
+    .map(c=>`${c.root.objectId}:${c.root.recordTypeId}`));
+  for(const h of slotHistory.values()){
+    const o=byObject.get(h.objectId),type=o?.cType,element=type?.elementType,size=element?.sizeBits/8;
+    const range=ranges.find(a=>a.objectId===h.objectId&&a.recordTypeId===h.type.recordTypeId&&
+      h.offset>=a.range.offset&&h.offset+h.size<=a.range.offset+a.range.size&&(h.offset-a.range.offset)%a.elementBytes===0);
+    const embedded=[...nodes.values()].some(n=>n.objectId===h.objectId&&h.offset>=n.offset&&h.offset<n.offset+n.size);
+    if(embedded)continue;
+    if(!range&&(type?.kind!=='array'||element?.kind!=='pointer'||element.pointee?.recordTypeId!==h.type.recordTypeId||
+        !size||h.offset<0||h.offset%size||h.offset+size>o.size||!h.observedNull||
+        !rootCollections.has(`${h.objectId}:${h.type.recordTypeId}`)))continue;
+    addRoot('pointer-slot',h.objectId,h.offset,h.type,range?'observed pointer slot in compiler-indexed typed allocation range':'observed null entry in compiler-bounded linked-root collection');
+    const root=roots.get(`linked:pointer-slot:${h.objectId}:${h.offset}:${h.type.recordTypeId}`);
+    if(h.observedNull)root.observedEmptyArraySlot=true;
+    if(range)root.rootCollection={id:range.id,arrayId:range.arrayId,range:range.range,index:(h.offset-range.range.offset)/range.elementBytes};
+  }
   const alive=new Set(),slots=new Map(),slotBytes=new Map(),ended=new Map();
+  function observeBoundaries(e){
+    let changed=false;
+    for(const spec of boundarySpecs){
+      let objectId,offset;
+      if(spec.baseKind==='object'&&e.action==='object.begin'&&objectDecl.get(e.objectId)===spec.baseDeclarationId){objectId=e.objectId;offset=spec.offset;}
+      if(spec.baseKind==='pointer'&&['READ','WRITE'].includes(e.kind)&&e.target?.offset===0&&
+        objectDecl.get(e.target.objectId)===spec.baseDeclarationId&&e.value?.reference?.targetObjectId){
+        objectId=e.value.reference.targetObjectId;offset=(e.value.reference.targetOffset??0)+spec.offset;
+      }
+      if(!objectId)continue;const node=addNode(objectId,offset,spec.cType);if(!node)continue;
+      if(!boundaryRecords.has(node.id)){
+        boundaryRecords.set(node.id,{nodeId:node.id,objectId,offset,size:node.size,recordTypeId:node.recordTypeId,
+          evidenceExecutionIds:[e.eventId],sourceNodeIds:[spec.comparisonNodeId],evidence:'compiler termination comparison and observed base storage plus member byte offset'});changed=true;
+      }
+    }
+    return changed;
+  }
   function target(ref,family){return ref?.targetObjectId?nodeAt.get(`${slot(ref.targetObjectId,ref.targetOffset??0)}:${family}`)??null:null;}
   const snapshotRef=(address)=>{
     if(address===0)return {targetObjectId:null,targetOffset:0,status:'null'};
@@ -161,8 +245,17 @@ export function linkedStructures(plan,{events,objects,views}){
     const family=c.root.recordTypeId,rootAlive=alive.has(c.root.objectId),anchor=c.root.kind==='anchor'?nodeAt.get(`${slot(c.root.objectId,c.root.offset)}:${family}`):null,
       rootReference=slots.get(slot(c.root.objectId,c.root.offset))?.reference,
       start=rootAlive?(anchor??target(rootReference,family)):null,connected=new Set(start?[start]:[]),
-      topology=rootedConnectivity(start,{nodes,roles:c.roles,relation,isAlive:n=>alive.has(n.objectId),
-        rootStatus:!rootAlive?'ended-root':anchor?'in-bounds':rootReference?.status??'unknown'});
+      storageTopology=rootedConnectivity(start,{nodes,roles:c.roles,relation,isAlive:n=>alive.has(n.objectId),
+        rootStatus:!rootAlive?'ended-root':anchor?'in-bounds':rootReference?.status??'unknown'}),
+      options={nodes,relation,isAlive:n=>!!n&&alive.has(n.objectId),isTerminal:n=>!!n&&boundaryRecords.has(n.id)&&alive.has(n.objectId),
+        includeRootBoundary:!!anchor,rootStatus:!rootAlive?'ended-root':anchor?'in-bounds':rootReference?.status??'unknown'},
+      hasBoundary=[...boundaryRecords.values()].some(b=>b.recordTypeId===family&&alive.has(b.objectId)),
+      fullTopology=hasBoundary?rootedConnectivity(start,{...options,roles:c.roles}):storageTopology,
+      properGroups=c.roleGroups.filter(g=>g.fieldNodeIds.length<c.roles.length),
+      selectedGroup=properGroups.length===1?properGroups[0]:null,
+      roleTopologies=c.roleGroups.map(g=>({roleGroupId:g.id,fieldNodeIds:g.fieldNodeIds.slice(),auxiliaryFieldNodeIds:g.auxiliaryFieldNodeIds.slice(),
+        topology:g.fieldNodeIds.length===c.roles.length?fullTopology:rootedConnectivity(start,{...options,roles:c.roles.filter(r=>g.fieldNodeIds.includes(r.fieldNodeId))})})),
+      topology=selectedGroup?roleTopologies.find(g=>g.roleGroupId===selectedGroup.id).topology:fullTopology;
     // Weak connectivity only associates participating nodes with this root;
     // ordered membership below follows each actual directed role separately.
     const familyNodes=[...nodes.values()].filter(n=>n.recordTypeId===family&&alive.has(n.objectId));
@@ -173,7 +266,7 @@ export function linkedStructures(plan,{events,objects,views}){
       const ids=[],seen=new Set();let at=start,termination='unknown';
       if(anchor&&rootAlive){const edge=relation(nodes.get(anchor),r);at=edge?.to;termination=edge?.status==='null'?'null':'unknown';if(at===anchor)return {fieldNodeId:r.fieldNodeId,nodeIds:[],termination:'anchor'};}
       else if(!at){const ref=slots.get(slot(c.root.objectId,c.root.offset))?.reference;termination=!rootAlive?'ended-root':ref?.status==='null'?'null':ref?.status??'unknown';}
-      while(at){if(at===anchor){termination='anchor';break;}if(seen.has(at)){termination='cycle';break;}seen.add(at);ids.push(at);
+      while(at){if(at===anchor){termination='anchor';break;}if(boundaryRecords.has(at)){termination='sentinel';break;}if(seen.has(at)){termination='cycle';break;}seen.add(at);ids.push(at);
         const n=nodes.get(at);if(!n||!alive.has(n.objectId)){termination='ended-target';break;}const edge=relation(n,r);
         if(!edge){termination='unknown';break;}if(!edge.to){termination=edge.status;break;}at=edge.to;
       }
@@ -181,20 +274,30 @@ export function linkedStructures(plan,{events,objects,views}){
     });
     // A mixed path (first field, then second field) is as reachable as a
     // repeated single-field chain. Incoming aliases are not root members.
-    for(const id of [...topology.reachableNodeIds,...topology.endedTargetNodeIds])c.members.add(id);
+    for(const id of [...storageTopology.reachableNodeIds,...storageTopology.endedTargetNodeIds,...topology.terminalNodeIds])c.members.add(id);
     const edges=[...c.members].flatMap(id=>{const n=nodes.get(id);return c.roles.map(r=>relation(n,r)).filter(Boolean);});
     for(const a of c.roles)for(const b of c.roles)if(a.fieldNodeId<b.fieldNodeId){
       const key=`${a.fieldNodeId}:${b.fieldNodeId}`;
-      if(edges.some(l=>l.fieldNodeId===a.fieldNodeId&&l.to&&l.to!==l.from&&edges.some(m=>m.from===l.to&&m.to===l.from&&m.fieldNodeId===b.fieldNodeId)))
+      if(edges.some(l=>l.fieldNodeId===a.fieldNodeId&&l.to&&l.to!==l.from&&
+        (!boundaryRecords.has(l.from)||l.from===anchor)&&(!boundaryRecords.has(l.to)||l.to===anchor)&&
+        edges.some(m=>m.from===l.to&&m.to===l.from&&m.fieldNodeId===b.fieldNodeId)))
         c.inversePairs.set(key,{fields:[a.fieldNodeId,b.fieldNodeId],evidence:'observed reciprocal references across distinct nodes'});
     }
-    const reached=new Set(topology.reachableNodeIds),inconsistencies=[];
-    for(const pair of c.inversePairs.values())for(const edge of edges.filter(x=>pair.fields.includes(x.fieldNodeId)&&x.to&&reached.has(x.from)&&reached.has(x.to)&&alive.has(nodes.get(x.from)?.objectId)&&alive.has(nodes.get(x.to)?.objectId))){
-      const opposite=pair.fields.find(id=>id!==edge.fieldNodeId),back=edges.find(x=>x.from===edge.to&&x.fieldNodeId===opposite);
-      if(back&&back.to!==edge.from)inconsistencies.push({kind:'reciprocal-mismatch',from:edge.from,to:edge.to,fieldNodeId:edge.fieldNodeId,oppositeFieldNodeId:opposite});
+    for(const group of c.roleGroups){
+      group.auxiliaryFieldNodeIds=c.roles.map(r=>r.fieldNodeId).filter(id=>!group.fieldNodeIds.includes(id)&&
+        [...c.inversePairs.values()].some(p=>p.fields.includes(id)&&p.fields.some(f=>group.fieldNodeIds.includes(f))));
+      const projection=roleTopologies.find(p=>p.roleGroupId===group.id);projection.auxiliaryFieldNodeIds=group.auxiliaryFieldNodeIds.slice();
     }
+    const reciprocalRelations=selectedGroup?.auxiliaryFieldNodeIds.length?selectedGroup.auxiliaryFieldNodeIds.map(id=>({
+      forwardFieldNodeIds:selectedGroup.fieldNodeIds,backwardFieldNodeIds:[id]})):
+      [...c.inversePairs.values()].map(p=>({forwardFieldNodeIds:[p.fields[0]],backwardFieldNodeIds:[p.fields[1]]}));
+    const reached=new Set(topology.reachableNodeIds),inconsistencies=reciprocalIssues(edges,reciprocalRelations,{
+      reached,isAlive:id=>alive.has(nodes.get(id)?.objectId),isTerminal:id=>boundaryRecords.has(id)&&id!==anchor}),
+      boundaries=[...new Set([...topology.terminalNodeIds,...storageTopology.reachableNodeIds.filter(id=>boundaryRecords.has(id))])]
+        .map(id=>boundaryRecords.get(id)).filter(Boolean).map(b=>({...b,evidenceExecutionIds:b.evidenceExecutionIds.slice(),sourceNodeIds:b.sourceNodeIds.slice()}));
     const activeMembers=[...c.members].filter(id=>alive.has(nodes.get(id).objectId)),
-      row={afterExecutionId:e.eventId,rootAlive,orders,edges,activeMembers,reachableMembers:[...reached],topology,
+      row={afterExecutionId:e.eventId,rootAlive,orders,edges,activeMembers,reachableMembers:[...reached],topology,storageTopology,roleTopologies,boundaries,
+        selectedRoleGroupId:selectedGroup?.id??null,reciprocalRelations,
         detachedMembers:activeMembers.filter(id=>!reached.has(id)),endedMembers:[...c.members].filter(id=>ended.has(nodes.get(id).objectId)),
         associatedStorage:[...connected].filter(id=>!c.members.has(id)).map(id=>{const n=nodes.get(id);return {nodeId:id,objectId:n.objectId,offset:n.offset,size:n.size,sourceTemporary:n.sourceTemporary,evidence:'incoming relation without observed root reachability'};}),
         unrelatedStorage:familyNodes.filter(n=>!c.members.has(n.id)&&!connected.has(n.id)).map(n=>({nodeId:n.id,objectId:n.objectId,offset:n.offset,size:n.size,sourceTemporary:n.sourceTemporary,
@@ -206,7 +309,7 @@ export function linkedStructures(plan,{events,objects,views}){
     const prev=c.states.at(-1);if(!prev||JSON.stringify({...prev,afterExecutionId:null})!==JSON.stringify({...row,afterExecutionId:null}))c.states.push(row);
   }
   for(const e of events){
-    let changed=false;
+    let changed=observeBoundaries(e);
     if(e.action==='object.begin'){alive.add(e.objectId);changed=true;}
     if(e.action==='object.end'){alive.delete(e.objectId);ended.set(e.objectId,{eventId:e.eventId,reason:e.reason});changed=true;}
     if(e.action==='frame.end')for(const id of e.endedObjects??[]){alive.delete(id);ended.set(id,{eventId:e.eventId,reason:'frame-end'});changed=true;}
@@ -238,22 +341,26 @@ export function linkedStructures(plan,{events,objects,views}){
     if(changed)for(const c of roots.values())state(c,e);
   }
   const viewIds=new Map();for(const v of views){if(!viewIds.has(v.objectId))viewIds.set(v.objectId,[]);viewIds.get(v.objectId).push(v.id);}
-  return [...roots.values()].filter(c=>c.members.size&&c.observedRoles.size).map(c=>{
+  return [...roots.values()].filter(c=>(c.members.size||c.observedEmptyArraySlot)&&(c.observedRoles.size||c.rootCollection)).map(c=>{
     const {members,inversePairs,observedRoles,...base}=c,
       referenced=new Set([...members,...c.states.flatMap(s=>s.edges.map(e=>e.to).filter(Boolean))]),
       logicalNodes=[...referenced].map(id=>({...nodes.get(id),membershipEvidence:members.has(id)?'observed root reachability':'external reference target',ended:ended.get(nodes.get(id).objectId)??null}));
     const supported=c.roles.filter(r=>observedRoles.has(r.fieldNodeId)),paired=[...inversePairs.values()].filter(p=>p.fields.every(id=>observedRoles.has(id)));
+    const warningEpisodes=annotateReciprocalEpisodes(c.states,events),hasChildSubset=c.roleGroups.some(g=>g.fieldNodeIds.length<c.roles.length);
     return {...base,nodes:[...new Set(logicalNodes.flatMap(n=>viewIds.get(n.objectId)??[]))],edges:[],logicalNodes,
+      warningEpisodes,
       storageNodes:[...nodes.values()].filter(n=>n.recordTypeId===c.root.recordTypeId).map(n=>({...n,ended:ended.get(n.objectId)??null})),
-      roles:supported,inversePairs:paired,views:[...(supported.length===1&&c.roles.length===1?['singly-linked-candidate']:[]),...(paired.length?['doubly-linked-candidate']:[]),
+      roles:supported,inversePairs:paired,views:[...(supported.length===1&&c.roles.length===1?['singly-linked-candidate']:[]),...(paired.length&&!hasChildSubset?['doubly-linked-candidate']:[]),
         ...new Set(c.states.flatMap(s=>s.topology.views)),
+        ...(c.states.some(s=>s.boundaries.length)?['sentinel-candidate']:[]),
         ...(c.root.kind==='anchor'&&c.states.some(s=>s.orders.some(o=>o.termination==='anchor'))?['circular-linked-candidate','sentinel-candidate']:[])],
       snapshot:'event-indexed observed connectivity; candidate roles survive incomplete states',
       viewScope:'views summarize observed states; use states[].topology for a specific execution',
       membershipPolicy:'reachableMembers are current directed root members; activeMembers are live historical members and include detachedMembers',
-      confidence:'compiler recurrence and observed field traversal; representation candidate, not algorithm proof',
+      confidence:observedRoles.size?'compiler recurrence and observed field traversal; representation candidate, not algorithm proof':
+        'compiler recurrence and observed indexed root slot; field traversal remains unobserved',
       limitations:['direct calls and declaration/field dependencies only; indirect calls and return aliases may be unresolved',
-        'roles are grouped by record family; alternative subsets such as child links versus parent links are not assigned semantic names',
+        'traversal role subsets and reciprocal auxiliary roles are candidates; ambiguous subsets remain separate alternatives',
         'tree candidates describe complete observed topology at individual states; cycles, sharing and unknown slots remain explicit',
         'ordering roles and search-tree invariants are unknown without comparison/branch and complete subtree evidence']};
   });

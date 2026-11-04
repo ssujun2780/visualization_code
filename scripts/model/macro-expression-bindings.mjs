@@ -27,7 +27,16 @@ export function macroExpressionBindings({types}){
     const n=producers.get(key(op,input.value))?.node;
     if(n)return contains(expected,n)||contains(n,expected)?4:-1;
     const value=literal(expected);
-    if(value!==null&&/^-?\d+$/.test(input.value))return BigInt(value)===BigInt(input.value)?2:-1;
+    if(value!==null&&/^-?\d+$/.test(input.value)){
+      // LLVM integers are bit patterns and may print an unsigned C literal
+      // using signed notation (UINT_MAX as i32 -1). Compare at the proven
+      // operand width, retaining the AST's C signedness for presentation.
+      const type=types.spelling(expected.type,expected.canonical),width=/^i(\d+)$/.exec(input.type);
+      const same=width&&type?.signedness&&type.sizeBits===Number(width[1])?
+        BigInt.asUintN(type.sizeBits,BigInt(value))===BigInt.asUintN(type.sizeBits,BigInt(input.value)):
+        BigInt(value)===BigInt(input.value);
+      return same?2:-1;
+    }
     return 0;
   }
   function resolve(op,candidates,{storageMatched=false}={}){

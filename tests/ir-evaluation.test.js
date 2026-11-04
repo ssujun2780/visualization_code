@@ -32,7 +32,10 @@ test('No5 uses logical CALCs, skipped-operand help stubs and selected-value forw
     assert.ok(update.controlInputs.includes(decision.eventId));
     const write=trace.events.filter(e=>e.action==='write'&&line(e)===l).at(-1),selection=write.inputEvaluations.find(e=>e.kind==='conditional');
     assert.equal(selection.selected,l===19?'true':'false');
-    assert.ok(write.dataInputs.includes(update.eventId));assert.ok(write.dataInputs.includes(decision.eventId));
+    assert.deepEqual(write.dataInputs,[update.eventId]);
+    assert.ok(!write.dataInputs.includes(decision.eventId));
+    assert.ok(write.controlInputs.includes(decision.eventId));
+    assert.ok(selection.decisionExecutionIds.includes(decision.eventId));
     assert.ok(!plan.bindings[observations.plan.instructions.find(o=>o.opcode==='phi'&&o.source?.line===l).id].roles.CALC);
   }
 });

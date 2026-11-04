@@ -8,10 +8,20 @@ import {bitfieldValue} from './bitfields.mjs';
 import {createGuardTracker} from './guard-conditions.mjs';
 import {arrayStructures} from './array-views.mjs';
 import {linkedStructures} from './linked-views.mjs';
+import {linkedRootCollections} from './linked-root-collections.mjs';
 import {arrayWorkStructures} from './array-work.mjs';
+import {arrayCursorPathStructures} from './array-cursor-paths.mjs';
 import {indexRelationStructures} from './index-relations.mjs';
 import {assertionObservation} from './assertions.mjs';
 import {buildResultDeliveries} from './result-delivery.mjs';
+import {resolvedCoverage} from './coverage-resolution.mjs';
+import {indexedGraphStructures} from './indexed-graph-views.mjs';
+import {recordIndexStructures} from './record-index-views.mjs';
+import {queueStructures} from './queue-views.mjs';
+import {attachConversionConsumers} from './conversion-consumers.mjs';
+import {valueIndexStructures} from './value-index-views.mjs';
+import {parallelArrayStructures} from './parallel-array-views.mjs';
+import {createValueFlow} from './observed-value-flow.mjs';
 const unique=list=>[...new Set(list.filter(Boolean))];
 const sourceBoolean=(value,spec)=>{const bit=BigInt(value.bits)!==0n,source=spec.invert?!bit:bit;
   return cResult({...value,bits:source?'0x1':'0x0',evidence:'AST truth mapped from observed LLVM boolean',
@@ -27,7 +37,7 @@ const copyFields=['target','value','memoryState','previousMemoryState','sourceAd
 
 export function recordIR(plan,observations,raw) {
   const instructions=new Map(plan.instructions.map(i=>[i.id,i])),ops=new Map(observations.instructions.map(o=>[o.id,o])),rawEvents=new Map(raw.events.map(e=>[e.eventId,e])),
-    definitions=new Map(),rawToExecution=new Map(),aliases=new Map(),events=[],executions=new Map(),attempts=new Map(),gaps=new Set(),
+    definitions=new Map(),rawToExecution=new Map(),aliases=new Map(),aliasRoles=new Map(),events=[],executions=new Map(),attempts=new Map(),gaps=new Set(),
     pendingArguments=new Map(),cleanup=new Map(),calls=new Map(),callBySite=new Map(),activeCalls=[],frameCalls=new Map(),
     pendingStorage=new Map(),storageEvents=new Map(),hiddenObjects=new Set(),declarationReentries=[],returnSources=new Map(),foldedResults=new Map(),
     valueForwardings=new Map(),observedValues=new Map();
@@ -100,7 +110,8 @@ export function recordIR(plan,observations,raw) {
   function finishHeldCalls(phase){
     for(const id of [...callCalculations.keys()].reverse()){restoreCall(id);flushPending(phase);}
   }
-  const runtimeInputs=(e,op)=>binding(e)?.sourceOperands??(e.selectedInput?(op.action==='select'?[op.inputs[0],e.selectedInput]:[e.selectedInput]):op?.inputs??[]);
+  const runtimeInputs=(e,op)=>binding(e)?.sourceOperands??(e.selectedInput?
+    (op.action==='select'?(binding(e)?.evaluation?.role==='selection'?[op.inputs[0]]:[op.inputs[0],e.selectedInput]):[e.selectedInput]):op?.inputs??[]);
   const inputValue=(input,e,op,index)=>{
     const result=operandValue(input,e.activationId),spec=plan.bindings[op?.id]?.inputTypes?.[index];
     if(result?.value&&spec&&(!result.observationId||!result.value.cType)){
@@ -120,6 +131,14 @@ export function recordIR(plan,observations,raw) {
     if(!input?.observationId||seen.has(input.observationId)||!valueForwardings.has(input.observationId))return input?[input]:[];
     seen.add(input.observationId);
     return valueForwardings.get(input.observationId).flatMap(next=>expandValueInput(next,new Set(seen)));
+  }
+  function callValueInput(input,seen=new Set()){
+    if(!input?.observationId||seen.has(input.observationId))return input;
+    const producer=ops.get(rawEvents.get(input.observationId)?.instructionId),forwarded=valueForwardings.get(input.observationId);
+    // One source argument carries one observed value. A private GEP computes
+    // that address; its base and indices are causes, not additional arguments.
+    if(producer?.action==='address'||forwarded?.length!==1)return input;
+    seen.add(input.observationId);return callValueInput(forwarded[0],seen);
   }
   const observationInputs=id=>expandValueInput({observationId:id,value:observedValues.get(id)?.value??rawEvents.get(id)?.value});
   function calculationInputs(e,op){
@@ -209,6 +228,10 @@ export function recordIR(plan,observations,raw) {
     const inside=new Set(p.events.map(e=>e.eventId));
     command.inputs=command.steps.flatMap(s=>(s.inputs??[]).filter(input=>!(s.builtin&&!s.builtin.hasLiteralArguments&&input.observationId===null)))
       .filter(input=>!inside.has(input.observationId));
+    // A short-circuit PHI can select a constant even though its decision used
+    // an observed operand. Keep those actual inputs as value dependencies too.
+    if([...evaluated.values()].some(e=>e.kind==='logical'))
+      command.dataInputs.push(...command.inputs.map(input=>input.observationId).filter(Boolean));
     if(phase!=='complete')delete command.value;
   }
   function flushPending(phase='complete'){
@@ -237,9 +260,18 @@ export function recordIR(plan,observations,raw) {
         const operand=op?.args?.[abiParameterIndex];if(operand?.sret)return [];
         const projection=binding(e)?.callProjection,slot=projection?.arguments.find(a=>a.abiIndex===abiParameterIndex);
         if(projection&&!slot)return [];
-        return [{...(operand?operandValue(operand,e.activationId):{}),value,parameterIndex:slot?.sourceIndex??index++,abiParameterIndex}];
+        const parameterIndex=slot?.sourceIndex??index++,input={...(operand?operandValue(operand,e.activationId):{}),value};
+        const forwarded=callValueInput(input),producer=ops.get(rawEvents.get(forwarded?.observationId)?.instructionId);
+        if(producer?.action==='address'&&plan.bindings[producer.id]?.administrative){
+          command.addressInputs.push(input.observationId);
+          command.dataInputs=command.dataInputs.filter(id=>id!==input.observationId);
+        }
+        return [{...forwarded,value:{...forwarded?.value,...value},parameterIndex,abiParameterIndex}];
       });
-    }else command.inputs=e.kind==='CALC'||command.kind==='CALC'?calculationInputs(e,op):runtimeInputs(e,op).map((input,index)=>inputValue(input,e,op,index));
+    }else command.inputs=e.kind==='CALC'||command.kind==='CALC'?calculationInputs(e,op):
+      runtimeInputs(e,op).flatMap((input,index)=>expandValueInput(inputValue(input,e,op,index)));
+    if(command.action==='return.value')command.inputs=command.inputs.map(input=>input.value&&!input.value.cType&&op?.cType?
+      {...input,value:input.value.bits?cResult(input.value,op.cType):{...input.value,cType:op.cType}}:input);
     if(binding(e)?.bitfield&&e.kind==='WRITE')for(const input of command.inputs){
       if(!input.observationId&&!input.nodeId){input.backendValue=input.value;input.value=e.value;input.kind='stored-field-value';}
     }
@@ -415,6 +447,25 @@ export function recordIR(plan,observations,raw) {
         e.selectedInput?[e.selectedInput]:runtimeInputs(e,op);
       valueForwardings.set(e.eventId,operands.map((input,index)=>inputValue(input,e,op,index)));
     }
+    if(op?.opcode==='select'&&b?.evaluation?.role==='selection'&&e.selectedInput){
+      // A public selection FLOW records the decision, while the same LLVM
+      // observation forwards an arm value. Consumers must not use FLOW as data.
+      const index=e.evaluation?.conditionTruth?1:2;
+      valueForwardings.set(e.eventId,[inputValue(e.selectedInput,e,op,index)]);
+    }
+    if(b?.administrative&&e.phase==='commit'&&op?.action==='store'){
+      const sourceNodeId=b.sourceMapping?.astNodeIds?.[0]??null;
+      valueForwardings.set(e.eventId,runtimeInputs(e,op).map((input,index)=>({
+        ...inputValue(input,e,op,index),sourceNodeId,source:op.source,evidence:'compiler-private store operand'})));
+    }
+    if(b?.administrative&&e.phase==='commit'&&op?.action==='load'&&e.dataInputs?.length===1){
+      const writer=observedValues.get(e.dataInputs[0]);
+      // Only forward a complete scalar write to the same hidden range. Partial
+      // or mixed-writer loads keep their observed value and separate causes.
+      if(writer?.kind==='WRITE'&&valueForwardings.has(writer.eventId)&&writer.target?.objectId===e.target?.objectId&&
+        writer.target?.offset===e.target?.offset&&writer.target?.size===e.target?.size)
+        valueForwardings.set(e.eventId,[{observationId:writer.eventId,value:e.value}]);
+    }
     const guardResult=guardTracker.observe(e,b);
     if(b?.bitfield&&['READ','WRITE'].includes(e.kind)){
       const spec=b.bitfield;
@@ -514,7 +565,10 @@ export function recordIR(plan,observations,raw) {
       attempts.delete(key);
       // Selected PHI inputs and no-op casts retain their dependencies, not a
       // fictitious independent calculation animation.
-      aliases.set(e.eventId,unique([...(e.dataInputs??[]),...(e.addressInputs??[]),...(e.controlInputs??[]),...runtimeInputs(e,op).map(input=>definitions.get(definitionKey(e.activationId,input.value))?.eventId)]));remember(e,op);continue;
+      const values=unique([...(e.dataInputs??[]),...runtimeInputs(e,op).map(input=>definitions.get(definitionKey(e.activationId,input.value))?.eventId)]);
+      aliases.set(e.eventId,values);
+      aliasRoles.set(e.eventId,{dataInputs:values,addressInputs:e.addressInputs??[],controlInputs:e.controlInputs??[],calleeInputs:e.calleeInputs??[]});
+      remember(e,op);continue;
     }
     if(e.kind==='CALC'&&b?.group){
       activateGroup(b.group,e.activationId);
@@ -585,13 +639,31 @@ export function recordIR(plan,observations,raw) {
     return (aliases.get(id)??[]).flatMap(next=>resolve(next,new Set(seen)));
   }
   const eventOrder=new Map(events.map((e,index)=>[e.eventId,index]));
-  function dependency(id,command,role,seen=new Set()){
+  function dependency(id,command,role,seen=new Set(),related={}){
     if(!id||id==='unobserved'||seen.has(id))return [];seen.add(id);
     const executionId=rawToExecution.get(id),producer=executions.get(executionId);
+    if(producer?.kind==='FLOW'&&producer.action==='conditional'&&valueForwardings.has(id)&&
+      role!=='controlInputs'&&executionId!==command.eventId){
+      (related.controlInputs??=[]).push(executionId);
+      return valueForwardings.get(id).flatMap(input=>input.observationId?
+        dependency(input.observationId,command,role,new Set(seen),related):[]);
+    }
     if(!producer){
+      if(aliasRoles.has(id)){
+        const result=[];
+        for(const [inputRole,ids]of Object.entries(aliasRoles.get(id))){
+          // Crossing a hidden operation does not turn a controlling branch or
+          // an address into a value producer. Preserve those causes by role.
+          const nextRole=inputRole==='controlInputs'||role==='controlInputs'?'controlInputs':
+            role==='dataInputs'?inputRole:role;
+          const resolved=ids.flatMap(next=>dependency(next,command,nextRole,new Set(seen),related));
+          if(nextRole===role)result.push(...resolved);else (related[nextRole]??=[]).push(...resolved);
+        }
+        return result;
+      }
       const forwarded=command.kind==='CALC'&&role==='dataInputs'&&valueForwardings.has(id)?
         valueForwardings.get(id).map(input=>input.observationId).filter(Boolean):aliases.get(id)??[];
-      return forwarded.flatMap(next=>dependency(next,command,role,new Set(seen)));
+      return forwarded.flatMap(next=>dependency(next,command,role,new Set(seen),related));
     }
     if(executionId===command.eventId)return [];
     if(producer.kind!=='CALC'||eventOrder.get(executionId)<eventOrder.get(command.eventId))return [executionId];
@@ -601,7 +673,7 @@ export function recordIR(plan,observations,raw) {
     // flat dependencies stay on the already available inputs of that step.
     const sample=rawEvents.get(id),step=producer.steps?.find(s=>s.observationIds.includes(id));
     const inputs=unique([...(sample?.dataInputs??[]),...(sample?.addressInputs??[])]
-      .flatMap(next=>dependency(next,command,role,new Set(seen))));
+      .flatMap(next=>dependency(next,command,role,new Set(seen),related)));
     const partial={role,executionId,observationId:id,sourceNodeId:step?.nodeId??null,
       value:step?.value??sample?.value,inputExecutionIds:inputs,evidence:'observed subcalculation before expression completion'};
     const list=command.partialCalculationInputs??=[];
@@ -610,7 +682,9 @@ export function recordIR(plan,observations,raw) {
   }
   const boundary=(id,actions)=>{const direct=rawToExecution.get(id),e=executions.get(direct);return e?.kind==='FLOW'&&actions.includes(e.action)?direct:null;};
   for(const command of events){
-    for(const key of references)command[key]=unique(command[key].flatMap(id=>dependency(id,command,key))).filter(id=>id!==command.eventId);
+    const related={};
+    for(const key of references)command[key]=unique(command[key].flatMap(id=>dependency(id,command,key,new Set(),related))).filter(id=>id!==command.eventId);
+    for(const key of references)command[key]=unique([...command[key],...related[key]??[]]).filter(id=>id!==command.eventId);
     if(command.storageDataInputs)command.storageDataInputs=unique(command.storageDataInputs.flatMap(id=>resolve(id))).filter(id=>id!==command.eventId);
     if(command.callObservationId)command.callExecutionId=boundary(command.callObservationId,['call']);
     if(command.returnObservationId)command.returnExecutionId=boundary(command.returnObservationId,['return','resume']);
@@ -624,6 +698,13 @@ export function recordIR(plan,observations,raw) {
     }
     for(const input of command.inputs??[])if(input.observationId){input.executionId=resolve(input.observationId)[0]??null;
       const privateOp=ops.get(rawEvents.get(input.observationId)?.instructionId),producer=executions.get(input.executionId);
+      if(privateOp?.action==='address'&&plan.bindings[privateOp.id]?.administrative){
+        // The hidden address has no public value-producing event. Do not name
+        // its first base/index dependency as if it had produced this address.
+        input.executionId=null;const related={};
+        command.addressInputs=unique([...command.addressInputs,...dependency(input.observationId,command,'addressInputs',new Set(),related)]);
+        command.controlInputs=unique([...command.controlInputs,...related.controlInputs??[]]);
+      }
       if(command.kind==='CALC'&&!rawToExecution.has(input.observationId)&&privateOp?.opcode==='bitcast'&&(producer?.value?.bits||producer?.value?.address)){
         input.backendValue=input.value;input.value=producer.value;
       }
@@ -634,7 +715,8 @@ export function recordIR(plan,observations,raw) {
     for(const item of [command.evaluation,...command.inputEvaluations??[],...command.nestedEvaluations??[]].filter(Boolean)){
       if(item.decisionObservationId)item.decisionExecutionIds=resolve(item.decisionObservationId);
       if(item.decisionObservationIds)item.decisionExecutionIds=unique(item.decisionObservationIds.flatMap(id=>resolve(id)));
-      if(item.resultObservationId)item.resultExecutionIds=resolve(item.resultObservationId);
+      if(item.resultObservationId)item.resultExecutionIds=unique(observationInputs(item.resultObservationId)
+        .flatMap(input=>input.observationId?resolve(input.observationId):[]));
     }
     for(const step of command.steps??[])for(const input of step.inputs??[])if(input.observationId)input.executionId=resolve(input.observationId)[0]??null;
     for(const region of command.readRegions??[])if(region.dataInputs)region.dataInputs=unique(region.dataInputs.flatMap(id=>resolve(id))).filter(id=>id!==command.eventId);
@@ -657,22 +739,30 @@ export function recordIR(plan,observations,raw) {
     bitInitializationRanges:o.bitInitializationRanges?.map(r=>({...r,writer:r.writer==='unobserved'?r.writer:ref(r.writer)}))}));
   const implementationObjects=new Set(objects.filter(o=>instructions.get(executions.get(o.createdBy)?.instructionId)?.visibility==='implementation').map(o=>o.id)),
     sourceViews=new Set(views.filter(v=>!implementationObjects.has(v.objectId)).map(v=>v.id));
+  const resultDeliveries=buildResultDeliveries(plan,{events}),valueFlow=createValueFlow(plan,{events,resultDeliveries});
   const structures=(raw.structures??[]).map(s=>{
     const nodes=s.nodes.filter(id=>sourceViews.has(id)),edges=s.edges.filter(e=>sourceViews.has(e.from)&&sourceViews.has(e.to));
     return {...s,kind:'record-graph-candidate',nodes,edges,...topology(nodes.map(id=>({id})),edges),
       temporalScope:'historical-union',classification:'storage-association-only',views:edges.length?['storage-reference-graph']:[],
       snapshot:'last observed source references; historical ended objects are retained'};
   }).filter(s=>s.nodes.length);
-  structures.push(...arrayStructures(plan,{events,objects,views}));
-  structures.push(...linkedStructures(plan,{events,objects,views}));
-  structures.push(...arrayWorkStructures(plan,{events,objects,views,frames:raw.frames??[],structures}));
+  const arrays=arrayStructures(plan,{events,objects,views}),linked=linkedStructures(plan,{events,objects,views,arrays});
+  structures.push(...arrays,...linked,...linkedRootCollections(plan,{events,objects,views,arrays,linked}));
+  structures.push(...indexedGraphStructures(plan,{events,objects,structures,resultDeliveries,valueFlow}));
+  structures.push(...recordIndexStructures(plan,{events,objects,structures,resultDeliveries,valueFlow}));
+  structures.push(...arrayWorkStructures(plan,{events,objects,views,frames:raw.frames??[],structures,resultDeliveries,valueFlow}));
+  structures.push(...arrayCursorPathStructures(plan,{events,objects,structures}));
+  structures.push(...valueIndexStructures(plan,{events,objects,structures,frames:raw.frames??[],resultDeliveries,valueFlow}));
+  structures.push(...parallelArrayStructures(plan,{events,objects,structures,frames:raw.frames??[],resultDeliveries,valueFlow}));
+  structures.push(...queueStructures(plan,{events,objects,structures}));
   structures.push(...indexRelationStructures(plan,{events,objects,views,frames:raw.frames??[],structures}));
+  attachConversionConsumers(plan,events);
   return validateIRTrace(plan,{schemaVersion:3,programId:plan.programId,runId:raw.runId,backend:raw.backend,status:raw.status,exitCode:raw.exitCode,
-    events,flowTransitions,objects,resultDeliveries:buildResultDeliveries(plan,{events}),
+    events,flowTransitions,objects,resultDeliveries,
     frames:raw.frames??[],views,references:(raw.references??[]).filter(r=>!excluded.has(r.objectId)&&!excluded.has(r.targetObjectId)).map(r=>({...r,eventId:ref(r.eventId)})),
     structures,
     diagnostics:(raw.diagnostics??[]).map(d=>({...d,eventId:ref(d.eventId)})),
-    coverage:{...plan.coverage,...raw.coverage,irEvents:events.length,observationEvents:raw.events.length,irGaps:[...gaps],
+    coverage:{...plan.coverage,...raw.coverage,...resolvedCoverage(plan,{events}),irEvents:events.length,observationEvents:raw.events.length,irGaps:[...gaps],
       observationAccounting:accounting,pendingCleanup:[...cleanup.values()].flat().map(e=>e.objectId),
       sourceOrder:{automaticBoxes:'observed declaration entry; no sorting by source line',
         hiddenCompilerObjects:hiddenObjects.size,unreachedDeclarations:pendingStorage.size,

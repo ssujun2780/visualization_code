@@ -383,7 +383,8 @@ export class ModelRecorder {
       e.conversion={...op.conversion,fromValue:bits!==null&&bits!==undefined?this.semanticValue(this.scalar(op.inputs[0].type,BigInt(bits)),op.conversion.fromType):{cType:op.conversion.fromType,evidence:"unobserved"}};}
     if(op.result)frame.definitions.set(op.result,e);
     if(op.type?.endsWith("*")){
-      const n=this.address(x),origin=isFunctionPointer(op.type)?null:this.origin(op.pointer??op.inputs?.[0])??this.lookup(n,0);
+      const source=['merge','select'].includes(op.action)?e.selectedInput:op.pointer??op.inputs?.[0],
+        n=this.address(x),origin=isFunctionPointer(op.type)?null:this.origin(source)??this.lookup(n,0);
       if(!isFunctionPointer(op.type))frame.origins.set(op.result,origin);
       e.value.reference=this.pointerTarget(n,op.type,origin);
       if(origin)this.view(origin,n,op.type.slice(0,-1));
@@ -468,8 +469,8 @@ export class ModelRecorder {
     const e=this.event("FLOW",op,{action:"call.end",callee:op.callee,value:this.semanticValue(this.scalar(op.returnType,x),op.cType),callEventId:call.event.eventId,
       dataInputs:[call.returnEventId,...(call.callbackReturnEventIds??[]),...this.nativeReadInputs(call)].filter(Boolean),readRegions:this.nativeReadRegions(call)});
     if(op.result)frame.definitions.set(op.result,e);
-    const a=i=>this.address(call.args[i]??0n),returned=this.address(x);
-    if(name==="malloc"||name==="calloc"||name==="realloc") {
+    const a=i=>this.address(call.args[i]??0n),returned=this.address(x),allocates=["malloc","calloc","realloc"].includes(name);
+    if(allocates) {
       const amount=name==="calloc"?a(0)*a(1):name==="realloc"?a(1):a(0);
       if(returned){if(call.old)this.end(call.old,op,"realloc-replaced");const n=call.old?Math.min(amount,call.old.size):0,
         initialRanges=call.oldWrites?.filter(r=>r.start<n).map(r=>({...r,end:Math.min(r.end,n)}))??null;
@@ -507,7 +508,11 @@ export class ModelRecorder {
       this.coverageGaps.add(`external-effects:${name}`);e.uncertainRegions=[];
       for(const [index,arg]of op.args.entries())if(arg.type.endsWith("*")){const address=a(index),object=this.lookup(address);if(object&&!object.constant){const size=object.address+object.size-address;this.mark(object,address,size,"unobserved");e.uncertainRegions.push({objectId:object.id,address:hex(address),size});}}
     }
-    if(op.returnType.endsWith("*")&&!isFunctionPointer(op.returnType)&&!frame.origins.has(op.result))frame.origins.set(op.result,call.returnOrigin??this.lookup(returned,0));
+    // A call-site SSA name is reused on each loop iteration. Its current
+    // return must replace the prior invocation's origin, including null and
+    // one-past pointers. Allocation contracts above already set a fresh origin.
+    if(op.returnType.endsWith("*")&&!isFunctionPointer(op.returnType)&&(!allocates||!returned))
+      frame.origins.set(op.result,call.returnOrigin??this.lookup(returned,0));
     if(op.returnType.endsWith('*'))e.value.reference=this.pointerTarget(returned,op.returnType,frame.origins.get(op.result));
     frame.calls.delete(op.id);if(frame.activeCall===call)frame.activeCall=null;
   }

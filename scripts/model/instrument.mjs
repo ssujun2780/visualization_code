@@ -215,7 +215,10 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast="",parsedNodes,m
       emit(marker,1,{x:pack(input.type,input.value,sourceFlow)},sourceFlow);
     }
     for(const cast of semantics.after(result,fn.name)) {
+      // A nested member/index access shares its start location with base reads.
+      // Preserve the compiler cast identity instead of resolving that point again.
       const conversion=add("CALC",{...common,opcode:"c.integral-cast",action:"convert",type:`i${cast.toType.sizeBits}`,result,
+        semanticNodeId:cast.node.id,
         source:{file:filename,line:cast.source.start.line,column:cast.source.start.column,range:cast.source},
         inputs:[{type:`i${cast.fromType.sizeBits}`,value:result}],cType:cast.toType,
         conversion:{fromType:cast.fromType,toType:cast.toType,explicit:cast.explicit,sameWidth:true,bitsUnchanged:true,evidence:"compiler AST"},
