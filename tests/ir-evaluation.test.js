@@ -26,11 +26,13 @@ test('No5 uses logical CALCs, skipped-operand help stubs and selected-value forw
   for(const l of [19,22]){
     const comparisons=trace.events.filter(e=>e.kind==='CALC'&&line(e)===l&&e.steps?.some(s=>s.operator==='=='));
     assert.equal(comparisons.length,1);
+    const decision=trace.events.find(e=>e.action==='conditional'&&line(e)===l);
+    assert.ok(decision.dataInputs.includes(comparisons[0].eventId));
     const update=trace.events.find(e=>e.kind==='CALC'&&line(e)===l&&['++','--'].includes(e.operator));
-    assert.ok(update.controlInputs.includes(comparisons[0].eventId));
+    assert.ok(update.controlInputs.includes(decision.eventId));
     const write=trace.events.filter(e=>e.action==='write'&&line(e)===l).at(-1),selection=write.inputEvaluations.find(e=>e.kind==='conditional');
     assert.equal(selection.selected,l===19?'true':'false');
-    assert.ok(write.dataInputs.includes(update.eventId));assert.ok(write.dataInputs.includes(comparisons[0].eventId));
+    assert.ok(write.dataInputs.includes(update.eventId));assert.ok(write.dataInputs.includes(decision.eventId));
     assert.ok(!plan.bindings[observations.plan.instructions.find(o=>o.opcode==='phi'&&o.source?.line===l).id].roles.CALC);
   }
 });

@@ -61,7 +61,10 @@ test('No2 keeps each expression and printf output at its source statement',async
   assert.equal(trace.status,'completed');assert.equal(trace.exitCode,0);assert.deepEqual(trace.coverage.irGaps,[]);
   const definitions=new Map(plan.instructions.map(i=>[i.id,i])),line=e=>definitions.get(e.instructionId)?.source?.line;
   const calcs=trace.events.filter(e=>e.kind==='CALC');
-  assert.deepEqual(calcs.map(e=>[line(e),e.value.decimal]),[[7,'260'],[8,'4'],[12,'4294967295'],[13,'0'],[16,'4'],[19,'1']]);
+  // Constant-folded C conversions and unary minus are source calculations too
+  // (the common folded-calculation path added with the type-query work).
+  assert.deepEqual(calcs.map(e=>[line(e),e.value.decimal]),[[5,'250'],[6,'10'],[7,'260'],[8,'4'],[10,'-3'],[12,'4294967295'],[13,'0'],[16,'4'],[19,'1']]);
+  for(const at of [5,6,10])assert.equal(definitions.get(calcs.find(e=>line(e)===at).instructionId).evidence,'compiler-folded source calculation');
   for(const at of [13,19]){
     const calc=calcs.find(e=>line(e)===at),comparison=calc.steps.filter(s=>s.operator==='<');
     assert.equal(comparison.length,1);assert.equal(comparison[0].value.cType.name,'int');

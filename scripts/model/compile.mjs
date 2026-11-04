@@ -1,5 +1,7 @@
-import {emitLLVM} from '../instrumentation/toolchain.mjs';
+import {emitLLVM,macroTokenLocations} from '../instrumentation/toolchain.mjs';
 import {instrumentLLVM} from './instrument.mjs';
+import {astNodes} from './ast.mjs';
+import {needsMacroLocations} from './macro-locations.mjs';
 
 export function validateSource(source){
   if(typeof source!=='string'||Buffer.byteLength(source)>512*1024||source.includes('\0'))
@@ -9,7 +11,8 @@ export function validateSource(source){
 export async function prepareCModel(source,options={}){
   validateSource(source);
   const analysis=await emitLLVM(source);
-  try{return {analysis,generated:instrumentLLVM(analysis.llvm,source,{...options,ast:analysis.ast})};}
+  const parsedNodes=analysis.parsedNodes??astNodes(analysis.ast),macroTokens=needsMacroLocations(parsedNodes)?await macroTokenLocations(source):null;
+  try{return {analysis,generated:instrumentLLVM(analysis.llvm,source,{...options,ast:analysis.ast,parsedNodes,macroTokens,recordLayouts:analysis.recordLayouts})};}
   catch(error){error.stage='ir-conversion';throw error;}
 }
 

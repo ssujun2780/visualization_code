@@ -1,6 +1,7 @@
 import {Worker} from "node:worker_threads";
 import {recordIR} from "./ir-record.mjs";
 import {validateSource} from "./compile.mjs";
+export {describeLogicalWork} from './presentation-contract.mjs';
 
 export function traceModel(source,options={}){return runWorker(source,options,"trace");}
 export function compileCToIR(source,options={}){return runWorker(source,options,"compile");}

@@ -2,6 +2,8 @@ import {randomUUID} from "node:crypto";
 import {topology} from "./structure.mjs";
 import {MemorySnapshots,filledMemory,initializationOf} from "./memory-state.mjs";
 import {RangeOrigins} from './ranges.mjs';
+import {bitSegments,markBits} from './bitfields.mjs';
+import {FunctionReferences,isFunctionPointer} from './function-references.mjs';
 
 export class TraceStopped extends Error {}
 const unsigned=(value,bits=64)=>BigInt.asUintN(bits,BigInt(value));
@@ -14,6 +16,7 @@ export class ModelRecorder {
     this.coverageGaps=new Set();this.globalsBySymbol=new Map();this.captureErrors=true;
     this.memorySnapshots=new MemorySnapshots();this.streamOffsets={stdout:0,stderr:0};this.stdioOffsets={stdout:0,stderr:0};
     this.nativeOrigins=new RangeOrigins();
+    this.functionReferences=new FunctionReferences();
   }
   setMemory=memory=>{this.memory=memory;};
   output=(channel,text)=>{
@@ -97,6 +100,7 @@ export class ModelRecorder {
   scalar(type,bits) {
     bits=unsigned(bits);const width=/^i(\d+)$/.exec(type)?.[1];
     if(width){const n=Number(width),v=unsigned(bits,n);return {type,bits:hex(v,Math.ceil(n/4)),unsigned:v.toString(),signed:BigInt.asIntN(n,v).toString()};}
+    if(isFunctionPointer(type)){const tableIndex=this.address(bits);return {type,bits:hex(bits),tableIndex,reference:this.functionReferences.target(tableIndex)};}
     if(type?.endsWith("*"))return {type,address:hex(unsigned(bits,32)),bits:hex(unsigned(bits,32))};
     if(type==="float"||type==="double"){const b=new ArrayBuffer(8),d=new DataView(b);d.setBigUint64(0,bits,true);const n=type==="float"?d.getFloat32(0,true):d.getFloat64(0,true);return {type,bits:hex(bits,type==="float"?8:16),number:Number.isFinite(n)?(Object.is(n,-0)?"-0":String(n)):String(n)};}
     return {type:type??null,evidence:"unobserved"};
@@ -139,10 +143,11 @@ export class ModelRecorder {
     for(const r of object.writes){if(r.end<=at)continue;if(r.start>=end)break;if(r.start>at)result.push({start:at,end:Math.min(r.start,end),writer:null});const a=Math.max(at,r.start),b=Math.min(end,r.end);if(b>a)result.push({start:a,end:b,writer:r.writer});at=Math.max(at,b);if(at>=end)break;}
     if(at<end)result.push({start:at,end,writer:null});return result;
   }
-  mark(object,address,size,writer) {
+  mark(object,address,size,writer,bitfield=null) {
     if(!object||!size)return;const start=address-object.address,end=start+size,result=[];
     for(const r of object.writes){if(r.end<=start||r.start>=end)result.push(r);else {if(r.start<start)result.push({...r,end:start});if(r.end>end)result.push({...r,start:end});}}
     result.push({start,end,writer});object.writes=result.sort((a,b)=>a.start-b.start);
+    object.bitWrites=markBits(object.bitWrites,start*8+(bitfield?.shift??0),bitfield?.width??size*8,writer);
     for(const [key,r]of this.references)if(r.objectId===object.id&&r.offset<end&&r.offset+4>start)this.references.delete(key);
   }
   bytes(address,size){return [...new Uint8Array(this.memory.buffer,address,Math.min(size,64))].map(b=>b.toString(16).padStart(2,"0")).join("");}
@@ -161,7 +166,8 @@ export class ModelRecorder {
     if(!address&&storage==="heap")return null;
     if(size<0||size>134217728||address+size>this.memory.buffer.byteLength)this.fault("allocation-size","할당 범위를 기록할 수 없습니다.",op);
     const object={id:`o${this.objects.length+1}`,address,size,storage,name:name??null,type:type??null,cType:cType??null,debugTypeId:debugTypeId??null,
-      frameId:frameId??(storage==="automatic"?this.frame()?.id:null),lifecycle:"alive",constant,writes:initialRanges?.map(r=>({...r}))??[],createdBy:null};
+      frameId:frameId??(storage==="automatic"?this.frame()?.id:null),lifecycle:"alive",constant,writes:initialRanges?.map(r=>({...r}))??[],
+      bitWrites:initialRanges?.map(r=>({...r,start:r.start*8,end:r.end*8}))??[],createdBy:null};
     const memoryState=initialized?(initialByte!==null?filledMemory(size,initialByte):this.captureMemory(address,size)):
       initialRanges?this.captureMemory(address,size,this.segments(object,0,size)):null;
     this.objects.push(object);const e=this.event("SPACE",op,{action:"object.begin",objectId:object.id,address:hex(address),size,storage,
@@ -182,6 +188,7 @@ export class ModelRecorder {
     object.lifecycle="ended";const e=this.event("SPACE",op,{action:"object.end",objectId:object.id,reason});object.endedBy=e.eventId;
   }
   pointerTarget(value,type,origin=null) {
+    if(isFunctionPointer(type))return this.functionReferences.target(value);
     const destination=value?(origin??this.lookup(value,0)):null,offset=destination?value-destination.address:null;
     const onePast=!!destination&&offset===destination.size;let width=0;
     try{width=this.abi.layout(type.slice(0,-1)).size;}catch{}
@@ -194,18 +201,27 @@ export class ModelRecorder {
     if(!object||!type.endsWith("*"))return;
     const target=this.pointerTarget(value,type,origin),destination=this.objects.find(o=>o.id===target.targetObjectId),base=type.slice(0,-1);
     if(destination)this.view(destination,value,base);
-    this.references.set(`${object.id}:${address-object.address}`,{objectId:object.id,offset:address-object.address,address:value,
+    this.references.set(`${object.id}:${address-object.address}`,{objectId:object.id,offset:address-object.address,...(isFunctionPointer(type)?{}:{address:value}),
       ...target,type,eventId:event.eventId});
-    if(event.value?.address&&event.target?.objectId===object.id&&event.target.address===hex(address))event.value.reference=target;
+    if(event.value&&event.target?.objectId===object.id&&event.target.address===hex(address))event.value.reference=target;
   }
-  refreshPointers(object,address,size,event) {
+  copyPointerOrigins(objectId,offset,size,destination){
+    const origins=new Map();
+    for(const r of this.references.values())if(r.objectId===objectId&&r.offset>=offset&&r.offset+4<=offset+size)
+      origins.set(destination+r.offset-offset,{address:r.address,targetObjectId:r.targetObjectId});
+    return origins;
+  }
+  refreshPointers(object,address,size,event,origins=null) {
     if(!object)return;
     const contains=(type,seen=new Set())=>{if(seen.has(type))return false;seen.add(type);const l=this.abi.layout(type);return l.kind==="pointer"||l.kind==="array"&&contains(l.elementType,seen)||l.kind==="record"&&l.fields.some(f=>contains(f.type,new Set(seen)));};
     let count=0;
     const walk=(type,at)=>{
       if(count>4096){this.coverageGaps.add("pointer-view-truncated");return;}
       const l=this.abi.layout(type);if(!contains(type))return;
-      if(l.kind==="pointer") {count++;if(at>=address&&at+4<=address+size&&!this.segments(object,at-object.address,4).some(s=>!s.writer||s.writer==="unobserved"))this.pointerWrite(object,at,type,new DataView(this.memory.buffer).getUint32(at,true),event);}
+      if(l.kind==="pointer") {count++;if(at>=address&&at+4<=address+size&&!this.segments(object,at-object.address,4).some(s=>!s.writer||s.writer==="unobserved")){
+        const value=new DataView(this.memory.buffer).getUint32(at,true),copied=origins?.get(at),origin=copied?.address===value?this.objects.find(o=>o.id===copied.targetObjectId):null;
+        this.pointerWrite(object,at,type,value,event,origin);
+      }}
       else if(l.kind==="array") {const stride=this.abi.layout(l.elementType).size;for(let i=0;i<l.count&&count<=4096;i++)walk(l.elementType,at+i*stride);}
       else if(l.kind==="record")for(const f of l.fields)walk(f.type,at+f.offset);
     };
@@ -226,10 +242,17 @@ export class ModelRecorder {
     if(index===-1){this.nativeMemory(phase,address,size);return;}
     const op=this.plan.instructions[index-1];if(!op)throw new Error(`알 수 없는 명령 ${index}`);
     x=unsigned(x);y=unsigned(y);address>>>=0;size>>>=0;
+    if(op.action==='function.address'){this.functionReferences.register(this.address(x),op);return;}
     if(op.action==="function.enter"){
       // A source callback can read changes made by an opaque caller before that
       // caller returns. Commit pending observations at the callback boundary.
       const pending=this.frame()?.activeCall;
+      if(pending&&!pending.operation.external){
+        pending.event.resolvedFunctionId=op.functionId;pending.event.resolvedFunctionName=op.functionName;
+        pending.event.resolvedFunctionEvidence='observed function entry';
+        if(pending.event.functionTarget)pending.event.functionTarget={...pending.event.functionTarget,status:'resolved',
+          functionId:op.functionId,functionName:op.functionName,evidence:'observed function pointer and function entry'};
+      }
       if(pending?.nativeWrites?.size)this.recordNativeWrites(pending.operation,pending,null);
       const parent=this.frame(),frame={id:`f${this.frames.length+1}`,functionId:op.functionId,functionName:op.functionName,parent:parent?.id??null,
         ended:false,definitions:new Map(),origins:new Map(),allocations:new Map(),selects:new Map(),calls:new Map(),sourceDecisions:new Map(),block:op.block??"entry"};
@@ -237,6 +260,16 @@ export class ModelRecorder {
       this.frames.push(frame);this.stack.push(frame);this.event("SPACE",op,{action:"frame.begin",frameId:frame.id,callbackOfCallEventId:frame.callbackOfCallEventId});this.event("FLOW",op,{action:"enter",frameId:frame.id});return;
     }
     const frame=this.frame();
+    if(op.action==='stack.save'){
+      (frame.stackSaves??=[]).push({token:this.address(x),objectIndex:this.objects.length});return;
+    }
+    if(op.action==='stack.restore'){
+      const saves=frame.stackSaves??[],at=saves.findLastIndex(s=>s.token===this.address(x));
+      if(at<0)this.fault('stack-lifetime-binding','스택 복원의 수명 시작 관찰을 찾지 못했습니다.',op);
+      const saved=saves[at];
+      for(const o of this.objects.slice(saved.objectIndex))if(o.frameId===frame.id&&o.storage==='automatic'&&o.lifecycle==='alive')this.end(o,op,'stack-restore');
+      saves.splice(at);return;
+    }
     if(op.action==="short-circuit") {
       const e=this.event("FLOW",op,{action:"short-circuit",phase:"decision",operator:op.shortCircuit.operator,
         left:op.shortCircuit.left,right:op.shortCircuit.right,reason:op.shortCircuit.reason,
@@ -251,12 +284,15 @@ export class ModelRecorder {
       frame.definitions.set(p.value,e);
       if(p.byval){const address=this.address(x),type=p.type.slice(0,-1),size=this.abi.layout(type).size,sourceAddress=call?this.address(call.args[p.index]):null,source=call&&this.lookup(sourceAddress,size),offset=source?sourceAddress-source.address:0;
         const initialRanges=source?this.segments(source,offset,size).map(r=>({...r,start:r.start-offset,end:r.end-offset})):[{start:0,end:size,writer:"unobserved"}];
-        const object=this.create(address,size,op,{storage:"automatic",name:op.local?.name,type,initialRanges,copiedFrom:source?{objectId:source.id,offset,size}:null});
+        const origins=source?this.copyPointerOrigins(source.id,offset,size,address):null;
+        const object=this.create(address,size,op,{storage:"automatic",name:op.local?.name,type,cType:op.cType,debugTypeId:op.local?.debugTypeId,
+          initialRanges,copiedFrom:source?{objectId:source.id,offset,size}:null});
+        this.refreshPointers(object,address,size,e,origins);
         if(!source)this.coverageGaps.add("byval-initialization-source-unobserved");
         frame.origins.set(p.value,object);
       }else if(p.type.endsWith("*")){
         const origin=call&&(parent.origins.get(argument?.value)??this.globalsBySymbol.get(argument?.value));
-        frame.origins.set(p.value,origin??this.lookup(this.address(x),0));
+        if(!isFunctionPointer(p.type))frame.origins.set(p.value,origin??this.lookup(this.address(x),0));
         e.value.reference=this.pointerTarget(this.address(x),p.type,origin);
       }
       return;
@@ -290,24 +326,42 @@ export class ModelRecorder {
     if(op.action==="call"){this.call(op,phase,x);return;}
     if(op.action==="load"||op.action==="store") {
       const isStore=op.action==="store",origin=this.origin(op.pointer);
-      const object=this.check(address,size,op,{write:isStore,initialized:!isStore,origin});
+      const object=this.check(address,size,op,{write:isStore,initialized:!isStore&&!op.bitfield,origin});
+      const bitWriters=op.bitfield&&object?bitSegments(object.bitWrites,(address-object.address)*8+op.bitfield.shift,op.bitfield.width):null;
+      if(!isStore&&op.bitfield?.role==='read'&&bitWriters?.some(r=>!r.writer))
+        this.fault('uninitialized-read','초기화되지 않은 비트필드를 읽었습니다.',op);
       if(phase===0){this.event(op.kind,op,{phase:"attempt",target:{objectId:object?.id??null,address:hex(address),size},controlInputs:frame.sourceDecisions.get(op.id)??[]});return;}
       const inputs=this.inputs(op),previous=object?this.segments(object,address-object.address,size).map(s=>s.writer).filter(Boolean):[];
       const e=this.event(op.kind,op,{phase:"commit",target:{objectId:object?.id??null,address:hex(address),offset:object?address-object.address:null,size},
         value:this.semanticValue(this.snapshot(address,size,op.type),op.cType??(object?.type===op.type?object.cType:null)),dataInputs:isStore?inputs:[...new Set(previous.filter(id=>id!=="unobserved"))],addressInputs:[this.inputEvent(op.pointer)?.eventId].filter(Boolean),
+        ...(bitWriters?{bitfieldDataInputs:[...new Set(bitWriters.map(r=>r.writer).filter(id=>id&&id!=='unobserved'))]}:{}),
         initializationEvidence:object&&!previous.includes("unobserved")?"tracked":"unobserved",controlInputs:frame.sourceDecisions.get(op.id)??[]});
       frame.sourceDecisions.delete(op.id);
-      if(isStore){this.mark(object,address,size,e.eventId);if(op.type.endsWith("*"))this.pointerWrite(object,address,op.type,new DataView(this.memory.buffer).getUint32(address,true),e,this.origin(op.inputs[0]));else this.refreshPointers(object,address,size,e);}
+      if(isStore){this.mark(object,address,size,e.eventId,op.bitfield);if(op.type.endsWith("*"))this.pointerWrite(object,address,op.type,new DataView(this.memory.buffer).getUint32(address,true),e,this.origin(op.inputs[0]));else this.refreshPointers(object,address,size,e);}
       else if(op.result){frame.definitions.set(op.result,e);if(op.type.endsWith("*")){
         const n=new DataView(this.memory.buffer).getUint32(address,true),reference=object&&this.references.get(`${object.id}:${address-object.address}`);
         const target=reference?.address===n?this.objects.find(o=>o.id===reference.targetObjectId):null;
-        frame.origins.set(op.result,target??this.lookup(n,0)??this.objects.findLast(o=>n>=o.address&&n<o.address+o.size));
+        if(!isFunctionPointer(op.type))frame.origins.set(op.result,target??this.lookup(n,0)??this.objects.findLast(o=>n>=o.address&&n<o.address+o.size));
         e.value.reference=this.pointerTarget(n,op.type,target);
       }}
       return;
     }
     if(op.action==="function.return") {
-      const returned=op.type==="void"?null:this.event("WRITE",op,{action:"return.value",value:this.semanticValue(this.scalar(op.type,x),op.cType??this.inputEvent(op.inputs?.[0])?.value?.cType),dataInputs:this.inputs(op),controlInputs:frame.sourceDecisions.get(op.id)??[]});
+      let aggregate=null;
+      if(op.aggregateReturn){
+        const info=op.aggregateReturn,address=this.address(this.inputEvent({value:info.pointer})?.value?.address??0),size=this.abi.layout(info.type).size,object=this.lookup(address,size);
+        if(object){const offset=address-object.address,segments=this.segments(object,offset,size),writers=[...new Set(segments.map(s=>s.writer).filter(id=>id&&id!=="unobserved"))];
+          const previous=writers.length===1?this.events[Number(writers[0].slice(1))-1]:null;
+          const memoryState=previous?.target?.address===hex(address)&&previous.target.size===size&&previous.memoryState||
+            this.captureMemory(address,size,segments.map(s=>({...s,start:s.start-offset,end:s.end-offset})));
+          aggregate={value:{kind:'aggregate',type:info.type,cType:info.cType,byteLength:size,evidence:'observed return storage'},memoryState,
+            sourceObjectId:object.id,sourceAddress:hex(address),sourceOffset:offset,sourceSize:size,dataInputs:writers};
+        }else this.coverageGaps.add('aggregate-return-storage-unobserved');
+      }
+      const returned=aggregate||op.type!=="void"?this.event("WRITE",op,{action:"return.value",
+        value:this.semanticValue(this.scalar(op.type,x),op.cType??this.inputEvent(op.inputs?.[0])?.value?.cType),dataInputs:this.inputs(op),
+        ...aggregate,controlInputs:frame.sourceDecisions.get(op.id)??[]}):null;
+      if(returned&&op.type.endsWith('*'))returned.value.reference=this.pointerTarget(this.address(x),op.type,this.origin(op.inputs[0]));
       const parent=this.stack.at(-2);if(parent?.activeCall&&returned){
         if(frame.callbackOfCallEventId)(parent.activeCall.callbackReturnEventIds??=[]).push(returned.eventId);
         else {parent.activeCall.returnEventId=returned.eventId;if(op.type.endsWith('*'))parent.activeCall.returnOrigin=this.origin(op.inputs[0]);}
@@ -329,7 +383,8 @@ export class ModelRecorder {
       e.conversion={...op.conversion,fromValue:bits!==null&&bits!==undefined?this.semanticValue(this.scalar(op.inputs[0].type,BigInt(bits)),op.conversion.fromType):{cType:op.conversion.fromType,evidence:"unobserved"}};}
     if(op.result)frame.definitions.set(op.result,e);
     if(op.type?.endsWith("*")){
-      const n=this.address(x),origin=this.origin(op.pointer??op.inputs?.[0])??this.lookup(n,0);frame.origins.set(op.result,origin);
+      const n=this.address(x),origin=isFunctionPointer(op.type)?null:this.origin(op.pointer??op.inputs?.[0])??this.lookup(n,0);
+      if(!isFunctionPointer(op.type))frame.origins.set(op.result,origin);
       e.value.reference=this.pointerTarget(n,op.type,origin);
       if(origin)this.view(origin,n,op.type.slice(0,-1));
     }
@@ -383,11 +438,18 @@ export class ModelRecorder {
     const frame=this.frame();let call=frame.calls.get(op.id);
     if(phase>=10){if(!call){call={args:[]};frame.calls.set(op.id,call);}call.args[phase-10]=x;return;}
     if(!call){call={args:[]};frame.calls.set(op.id,call);}
-    const name=op.callee.slice(1).replace(/^"|"$/g,"");
+    // Compiler-resolved source definitions are user functions even if their
+    // spelling matches libc. Only unresolved external symbols use adapters.
+    const name=op.external?op.callee.slice(1).replace(/^"|"$/g,""):"";
     if(phase===0) {
       call.operation=op;
+      const indirect=op.callee[0]==='%',calleeInputs=indirect?[this.inputEvent({value:op.callee})?.eventId].filter(Boolean):[],
+        functionTarget=indirect?this.functionReferences.target(this.address(x)):null;
       call.event=this.event("FLOW",op,{action:"call.begin",callee:op.callee,indirectAddress:op.callee[0]==="%"?hex(x):null,
-        arguments:op.args.map((a,i)=>this.semanticValue(this.scalar(a.type,call.args[i]??0n),a.cType??this.inputEvent(a)?.value?.cType)),dataInputs:this.inputs(op),controlInputs:frame.sourceDecisions.get(op.id)??[],external:op.external});
+        ...(indirect?{indirectTableIndex:this.address(x),functionTarget,calleeInputs,
+          resolvedFunctionId:functionTarget.functionId,resolvedFunctionName:functionTarget.functionName}:{}),
+        arguments:op.args.map((a,i)=>this.semanticValue(this.scalar(a.type,call.args[i]??0n),a.cType??this.inputEvent(a)?.value?.cType)),
+        dataInputs:[...new Set([...this.inputs(op),...calleeInputs])],controlInputs:frame.sourceDecisions.get(op.id)??[],external:op.external});
       frame.sourceDecisions.delete(op.id);
       frame.activeCall=call;
       if(name==="realloc"&&call.args[0]){const old=this.lookup(this.address(call.args[0]),0);if(!old||old.storage!=="heap"||old.address!==this.address(call.args[0]))this.fault("invalid-realloc","할당 시작 주소가 아닌 곳을 재할당하려고 했습니다.",op);call.old=old;call.oldWrites=old.writes.map(r=>({...r}));}
@@ -395,7 +457,9 @@ export class ModelRecorder {
       if(name.startsWith("llvm.memcpy")||name.startsWith("llvm.memmove")||["memcpy","memmove"].includes(name)) {
         const destination=this.address(call.args[0]),source=this.address(call.args[1]),size=this.address(call.args[2]);
         this.check(destination,size,op,{write:true,origin:this.origin(op.args[0])});const object=this.check(source,size,op,{origin:this.origin(op.args[1])});
-        call.copy={destination,source,size,sourceObjectId:object?.id??null,sourceOffset:object?source-object.address:null,segments:object?this.segments(object,source-object.address,size).map(r=>({...r,start:r.start+object.address-source,end:r.end+object.address-source})):null};
+        call.copy={destination,source,size,sourceObjectId:object?.id??null,sourceOffset:object?source-object.address:null,
+          pointerOrigins:object?this.copyPointerOrigins(object.id,source-object.address,size,destination):null,
+          segments:object?this.segments(object,source-object.address,size).map(r=>({...r,start:r.start+object.address-source,end:r.end+object.address-source})):null};
       }
       if(name.startsWith("llvm.memset")||name==="memset")this.check(this.address(call.args[0]),this.address(call.args[2]),op,{write:true,origin:this.origin(op.args[0])});
       if(op.external&&["strcpy","strncpy","strcat"].includes(name))call.stringEffect=this.prepareStringEffect(op,call,name);
@@ -422,7 +486,7 @@ export class ModelRecorder {
         memoryState:this.captureMemory(destination,size,segments??[{start:0,end:size,writer:"unobserved"}]),
         dataInputs:[...new Set(segments?.map(s=>s.writer).filter(id=>id&&id!=="unobserved"))],evidence:"library API effect"});
       this.mark(object,destination,size,segments?null:"unobserved");for(const r of segments??[])this.mark(object,destination+r.start,r.end-r.start,r.writer==="unobserved"?"unobserved":r.writer?event.eventId:null);
-      this.refreshPointers(object,destination,size,event);
+      this.refreshPointers(object,destination,size,event,call.copy.pointerOrigins);
     } else if(name==="memset"||name.startsWith("llvm.memset")) {
       const object=this.lookup(a(0),a(2)),event=this.event("WRITE",op,{action:"fill",target:{objectId:object?.id??null,address:hex(a(0)),offset:object?a(0)-object.address:null,size:a(2)},
         byte:a(1)&255,memoryState:filledMemory(a(2),a(1)&255),evidence:"library API effect"});this.mark(object,a(0),a(2),event.eventId);
@@ -435,7 +499,7 @@ export class ModelRecorder {
     }
     else if(this.nativeMemoryCoverage){
       this.recordNativeWrites(op,call,e);
-      if(op.returnType.endsWith('*')&&returned&&!call.returnOrigin&&!this.lookup(returned,0)){
+      if(op.returnType.endsWith('*')&&!isFunctionPointer(op.returnType)&&returned&&!call.returnOrigin&&!this.lookup(returned,0)){
         this.coverageGaps.add('external-return-storage-untracked');e.uncertainRegions=[{address:hex(returned),reason:'returned storage has no observed allocation contract'}];
       }
     }
@@ -443,7 +507,7 @@ export class ModelRecorder {
       this.coverageGaps.add(`external-effects:${name}`);e.uncertainRegions=[];
       for(const [index,arg]of op.args.entries())if(arg.type.endsWith("*")){const address=a(index),object=this.lookup(address);if(object&&!object.constant){const size=object.address+object.size-address;this.mark(object,address,size,"unobserved");e.uncertainRegions.push({objectId:object.id,address:hex(address),size});}}
     }
-    if(op.returnType.endsWith("*")&&!frame.origins.has(op.result))frame.origins.set(op.result,call.returnOrigin??this.lookup(returned,0));
+    if(op.returnType.endsWith("*")&&!isFunctionPointer(op.returnType)&&!frame.origins.has(op.result))frame.origins.set(op.result,call.returnOrigin??this.lookup(returned,0));
     if(op.returnType.endsWith('*'))e.value.reference=this.pointerTarget(returned,op.returnType,frame.origins.get(op.result));
     frame.calls.delete(op.id);if(frame.activeCall===call)frame.activeCall=null;
   }
@@ -463,7 +527,10 @@ export class ModelRecorder {
   }
   finish(execution) {
     if(execution.runtimeError&&!this.diagnostics.length){try{this.fault("runtime-trap",execution.runtimeError.message,null);}catch{}}
-    if(!this.status)try{for(const frame of [...this.stack].reverse()){for(const o of this.objects.filter(o=>o.frameId===frame.id))this.end(o,null,"process-exit");frame.ended=true;this.event("SPACE",null,{action:"frame.end",frameId:frame.id,reason:"process-exit"});}}catch(error){if(!(error instanceof TraceStopped))throw error;}
+    if(!this.status)try{while(this.stack.length){const frame=this.frame();
+      for(const o of this.objects.filter(o=>o.frameId===frame.id))this.end(o,null,"process-exit");
+      frame.ended=true;this.event("SPACE",null,{action:"frame.end",frameId:frame.id,reason:"process-exit"});this.stack.pop();
+    }}catch(error){if(!(error instanceof TraceStopped))throw error;}
     const status=this.status??"completed";
     this.flush();
     const edges=[...this.references.values()],groups=[];
@@ -471,8 +538,8 @@ export class ModelRecorder {
       for(const edge of edges){const from=nodes.find(v=>v.objectId===edge.objectId&&edge.offset>=v.offset&&edge.offset+4<=v.offset+v.size),to=nodes.find(v=>v.objectId===edge.targetObjectId&&v.address===edge.address);if(from&&to)links.push({from:from.id,to:to.id,offset:edge.offset});}
       groups.push({type,nodes:nodes.map(v=>v.id),edges:links,...topology(nodes,links),snapshot:"last observed references, including ended objects"});}
     return {schemaVersion:2,programId:this.plan.programId,runId:this.runId,backend:this.plan.backend,status,exitCode:execution.exitCode,
-      events:this.events,objects:this.objects.map(({writes,...o})=>({...o,initializationRanges:writes})),
-      frames:this.frames.map(({definitions,origins,allocations,selects,calls,activeCall,sourceDecisions,...f})=>f),views:this.views,references:edges,structures:groups,
+      events:this.events,objects:this.objects.map(({writes,bitWrites,...o})=>({...o,initializationRanges:writes,bitInitializationRanges:bitWrites})),
+      frames:this.frames.map(({definitions,origins,allocations,selects,calls,activeCall,sourceDecisions,stackSaves,...f})=>f),views:this.views,references:edges,structures:groups,
       diagnostics:this.diagnostics,coverage:{...this.plan.coverage,
         ...(this.nativeMemoryCoverage?{linkedMemory:this.nativeMemoryCoverage,memory:'user LLVM accesses and linked WASM scalar accesses to tracked objects; allocation contracts remain explicit',libraryInternals:'linked scalar memory reads/stores observed; library arithmetic and source frames are not instrumented'}:{}),
         memorySnapshots:this.memorySnapshots.summary(),gaps:[...this.coverageGaps]}};

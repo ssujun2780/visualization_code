@@ -33,15 +33,63 @@ function tokenEnd(bytes,start){
   return i+(op?.length??1);
 }
 
-export function createSourceMap({source,filename,nodes,llvm,metadata}){
+export function createSourceMap({source,filename,nodes,llvm,metadata,macroTokenPasses=0}){
   const bytes=Buffer.from(source,'utf8'),starts=[0];
   for(let i=0;i<bytes.length;i++)if(bytes[i]===10)starts.push(i+1);
   const snapshot={file:filename,sha256:createHash('sha256').update(bytes).digest('hex'),text:source,byteLength:bytes.length};
   const gaps=new Map(),queries=new Map(),ranges=new Map(),ends=new Map(),points=new Map(),matches=new Map(),functions=new Map(),sites=[];
-  const stats={compilerLocationQueries:0,compilerLocationCacheHits:0,rangeQueries:0,rangeCacheHits:0,tokenBoundaryScans:0,textExtractions:0,semanticSourceScans:0};
+  const stats={compilerLocationQueries:0,compilerLocationCacheHits:0,rangeQueries:0,rangeCacheHits:0,tokenBoundaryScans:0,textExtractions:0,semanticSourceScans:0,macroRangeScans:0,
+    compilerTokenMappings:nodes.filter(n=>n.expansionSource).length,compilerMacroTokenPasses:macroTokenPasses,macroInvocationScans:0};
   const internal=p=>p&&({...p,file:p.file===filename?'/main.c':p.file});
   const gap=(reason,data)=>gaps.set(JSON.stringify([reason,data]),{reason,...data});
   const query=(reason,start,end)=>{const key=`${reason}:${start}:${end}`;if(!queries.has(key))queries.set(key,{reason,startByte:start,endByte:end});};
+  // Mixed macro spelling ranges have an AST start in the user's statement and
+  // an end in the macro definition. Complete only that display boundary. This
+  // bounded token walk supplies no expression values or language semantics.
+  const macroEnds=new Map();
+  for(const node of nodes)if(node.macroLocationGap)gap('compiler-macro-location-unresolved',{nodeId:node.id,detail:node.macroLocationGap});
+  function invocationEnd(start){
+    const key=`invocation:${start}`;if(macroEnds.has(key))return macroEnds.get(key);
+    stats.macroInvocationScans++;const limit=Math.min(bytes.length,start+4096);let at=tokenEnd(bytes,start),last=start,depth=0,opened=false;
+    while(at!==null&&at<limit){
+      if(bytes[at]<=32){at++;continue;}
+      if(bytes[at]===47&&bytes[at+1]===47){while(at<limit&&bytes[at]!==10)at++;continue;}
+      if(bytes[at]===47&&bytes[at+1]===42){const end=bytes.indexOf('*/',at+2);if(end<0||end+2>limit)break;at=end+2;continue;}
+      if(!opened&&bytes[at]!==40)break;
+      if(bytes[at]===40){depth++;opened=true;}else if(bytes[at]===41&&--depth===0){last=at;break;}
+      const end=tokenEnd(bytes,at);if(end===null||end>limit)break;at=end;
+    }
+    if(opened&&depth!==0){gap('macro-invocation-range-unresolved',{startByte:start});last=start;}
+    query('macro-invocation-end-not-in-compiler-dump',start,Math.min(at??start,limit));macroEnds.set(key,last);return last;
+  }
+  for(const node of nodes)for(const r of [node.source,node.expansionSource])if(r?.macroInvocation){
+    const start=offset(r.start);if(start!==null){const end=point(invocationEnd(start));r.end={file:'/main.c',line:end.line,column:end.column};}
+  }
+  function macroEnd(start,commaExpression){
+    const cacheKey=`${start}:${commaExpression}`;if(macroEnds.has(cacheKey))return macroEnds.get(cacheKey);
+    stats.macroRangeScans++;const stack=[],limit=Math.min(bytes.length,start+4096);let at=start,last=null,stopped=false;
+    while(at<limit){
+      if(bytes[at]<=32){at++;continue;}
+      if(bytes[at]===47&&bytes[at+1]===47){while(at<limit&&bytes[at]!==10)at++;continue;}
+      if(bytes[at]===47&&bytes[at+1]===42){const end=bytes.indexOf('*/',at+2);if(end<0||end+2>limit)break;at=end+2;continue;}
+      const c=bytes[at];
+      if(!stack.length&&(c===59||c===44&&!commaExpression||[41,93,125].includes(c))){stopped=true;break;}
+      if([40,91,123].includes(c))stack.push(c);
+      else if([41,93,125].includes(c)){if(stack.at(-1)!==({41:40,93:91,125:123})[c])break;stack.pop();}
+      const end=tokenEnd(bytes,at);if(end===null||end>limit)break;last=at;at=end;
+    }
+    const result=stopped&&!stack.length?last:null;macroEnds.set(cacheKey,result);
+    query('macro-range-not-in-compiler-dump',start,at);return result;
+  }
+  for(const node of nodes){
+    const r=node.spellingRange;
+    if(!node.functionName||!['BinaryOperator','CompoundAssignOperator','VarDecl','ReturnStmt'].includes(node.kind)||r?.start.file!=='/main.c'||
+      r.end.file==='/main.c'&&order(r.start,r.end)<=0)continue;
+    const start=offset(r.start),end=start===null?null:macroEnd(start,node.kind==='BinaryOperator'&&/ ','(?:\s|$)/.test(node.details));
+    if(end===null){gap('macro-range-unresolved',{nodeId:node.id,start:r.start,end:r.end});continue;}
+    const finish=point(end);node.source={file:'/main.c',start:r.start,end:{file:'/main.c',line:finish.line,column:finish.column},
+      evidence:'compiler AST start with bounded macro display boundary'};
+  }
   for(const node of nodes)if(node.source?.file==='/main.c'){
     const key=node.functionName??'';if(!functions.has(key))functions.set(key,[]);functions.get(key).push(node);
   }
@@ -49,7 +97,7 @@ export function createSourceMap({source,filename,nodes,llvm,metadata}){
     if(!where)return [];stats.compilerLocationQueries++;
     const p=internal(where),key=`${functionName??''}:${p.file}:${p.line}:${p.column}`;
     if(matches.has(key)){stats.compilerLocationCacheHits++;return matches.get(key);}
-    const found=(functions.get(functionName??'')??[]).filter(n=>encloses(n.source,p)).sort((a,b)=>b.depth-a.depth);
+    const found=(functions.get(functionName??'')??[]).filter(n=>!n.executionState&&(encloses(n.source,p)||encloses(n.expansionSource,p))).sort((a,b)=>b.depth-a.depth);
     matches.set(key,found);return found;
   }
   // Establish compiler-to-source links before asking for any original tokens.
@@ -88,7 +136,7 @@ export function createSourceMap({source,filename,nodes,llvm,metadata}){
       const a=point(start),b=point(end);
       base={file:filename,line:a.line,column:a.column,start:a,end:b,endExclusive:true,
         editorRange:{startLineNumber:a.line,startColumn:a.editorColumn,endLineNumber:b.line,endColumn:b.editorColumn},
-        evidence:'compiler location with bounded token-end lookup'};ranges.set(key,base);
+        evidence:r.evidence??'compiler location with bounded token-end lookup'};ranges.set(key,base);
     }
     if(text&&base.expression===undefined){
       stats.textExtractions++;query('display-source-text',base.start.byte,base.end.byte);
@@ -99,7 +147,9 @@ export function createSourceMap({source,filename,nodes,llvm,metadata}){
   }
   const locate=(where,options)=>where?range({file:where.file,start:where,end:where},options):null;
   return {snapshot,candidates,range,locate,sites,
-    report(){return {version:1,analysisOrder:['compiler-source-links','compiler-semantics','bounded-source-fallback'],
+    report(){const macroExpansions=nodes.filter(n=>n.expansionSource).map(n=>({nodeId:n.id,astId:n.astId,
+      spelling:n.spellingRange,expansion:range(n.expansionSource),tokenRange:n.macroTokenRange}));
+      return {version:1,analysisOrder:['compiler-source-links','compiler-semantics','bounded-source-fallback'],macroExpansions,
       coordinateSystem:{compiler:'one-based UTF-8 byte columns',editor:'one-based UTF-16 columns',end:'exclusive'},snapshot,
       compilerSites:sites,sourceQueries:[...queries.values()],stats:{...stats},gaps:[...gaps.values()]};}};
 }

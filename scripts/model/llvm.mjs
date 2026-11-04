@@ -52,15 +52,23 @@ export function metadata(ir) {
   const types=[...nodes].filter(([,n])=>/!DI(?:Basic|Derived|Composite|Subroutine)Type\(/.test(n)).map(([id,n])=>({
     id:`debug:${id}`,kind:/!DI(\w+)Type/.exec(n)[1],name:clean(field(id,"name")),tag:field(id,"tag"),
     sizeBits:Number(field(id,"size")??0),offsetBits:Number(field(id,"offset")??0),encoding:field(id,"encoding")??null,
-    baseType:field(id,"baseType")?`debug:${clean(field(id,"baseType"))}`:null,
+    baseType:/^!\d+$/.test(field(id,"baseType")??'')?`debug:${clean(field(id,"baseType"))}`:null,
     elements:field(id,"elements")? [...(nodes.get(clean(field(id,"elements")))??"").matchAll(/!(\d+)/g)].map(m=>`debug:${m[1]}`):[],
+    flags:field(id,'flags')??null,
+    ...(field(id,'flags')?.includes('DIFlagBitField')?{bitField:true,storageOffsetBits:Number(/i\d+ (-?\d+)/.exec(field(id,'extraData')??'')?.[1]??0)}:{}),
     evidence:"compiler"}));
+  for(const t of types.filter(t=>t.tag==='DW_TAG_enumeration_type')){
+    t.source=location(t.id.slice(6));
+    t.enumerators=t.elements.filter(id=>nodes.get(id.slice(6))?.startsWith('!DIEnumerator(')).map(id=>({
+      id,name:clean(field(id.slice(6),'name')),value:field(id.slice(6),'value'),
+      isUnsigned:field(id.slice(6),'isUnsigned')==='true',evidence:'compiler DIEnumerator'}));
+  }
   const byId=new Map(types.map(t=>[t.id,t]));
   function decorate(t,seen=new Set()) {
     if(!t||seen.has(t.id))return;seen.add(t.id);
     const base=byId.get(t.baseType);if(base)decorate(base,seen);
     const inherits=t.kind==="Derived"&&["DW_TAG_typedef","DW_TAG_const_type","DW_TAG_volatile_type","DW_TAG_restrict_type"].includes(t.tag);
-    if(inherits){t.encoding??=base?.encoding??null;t.sizeBits||=base?.sizeBits??0;}
+    if(inherits||t.tag==='DW_TAG_enumeration_type'){t.encoding??=base?.encoding??null;t.sizeBits||=base?.sizeBits??0;}
     if(t.tag==='DW_TAG_array_type')t.dimensions=t.elements.map(id=>{
       const count=field(id.slice(6),'count');return /^\d+$/.test(count??'')?Number(count):null;
     });

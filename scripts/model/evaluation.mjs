@@ -42,6 +42,14 @@ export function evaluationBindings(observations,nearest){
     });
     if(candidates.length===1)mark(o,candidates[0],'result');
   }
+  // Macro expansion locations can collapse onto an operand. Once CFG evidence
+  // identifies the logical PHI, its implicit C int materialization has the same
+  // expression identity even if the initial source-location lookup missed it.
+  for(const o of observations.instructions){
+    const source=result.get(producer(o)?.id);
+    if(o.opcode==='zext'&&o.type==='i32'&&o.inputs?.[0]?.type==='i1'&&!o.conversion&&!result.has(o.id)&&
+      source?.role==='result'&&evaluationKind(source.node)==='logical')mark(o,source.node,'result');
+  }
   for(const [id,entry]of result){
     const o=ops.get(id);
     if(entry.role==='result'&&o.opcode==='phi')for(const i of o.incoming){
@@ -68,9 +76,22 @@ export function cResult(value,cType,boolean=false){
 }
 
 const truth=value=>value?.bits?BigInt(value.bits)!==0n:null;
+const conditionalEvaluation=(spec,state)=>{
+  const selected=state?.truth==null?null:state.truth?'true':'false';
+  return {nodeId:spec.nodeId,kind:'conditional',conditionTruth:state?.truth??null,selected,
+    skipped:selected==='true'?'false':selected==='false'?'true':null,decisionObservationId:state?.decisionId??null};
+};
 export function createEvaluationTracker(plan,operandValue){
   const states=new Map(),specs=new Map((plan.evaluations??[]).map(s=>[s.nodeId,s]));
+  function completeConditional(e,nodeId,conditionTruth=truth(e.condition)){
+    const spec=specs.get(nodeId),state={truth:conditionTruth,decisionId:e.eventId};
+    states.set(`${e.activationId}:${nodeId}`,state);
+    return {...e,backendCondition:e.backendCondition??e.condition,
+      condition:conditionTruth==null?e.condition:cResult({type:'i1',bits:conditionTruth?'0x1':'0x0'},spec.truthType,true),
+      selectedOutcome:conditionTruth==null?null:conditionTruth?'true':'false',evaluation:conditionalEvaluation(spec,state)};
+  }
   return {
+    completeConditional,
     decorate(e,op,b){
       if(e.action==='frame.end'){for(const k of states.keys())if(k.startsWith(`${e.activationId}:`))states.delete(k);}
       if(!b?.evaluation)return e;
@@ -78,23 +99,25 @@ export function createEvaluationTracker(plan,operandValue){
       const key=`${e.activationId}:${nodeId}`;
       if(role==='decision'){
         const state={truth:truth(e.condition),decisionId:e.eventId};states.set(key,state);
+        if(spec.kind==='conditional')return completeConditional(e,nodeId,state.truth);
         return {...e,evaluation:{...state,nodeId,kind:spec.kind}};
       }
       if(role==='truth-test')return e;
       let state=states.get(key),leftTruth=state?.truth??spec.leftTruth??null;
       if(role==='folded')leftTruth=e.left?.truth??leftTruth;
-      if(op.opcode==='select')state={truth:truth(operandValue(op.inputs[0],e.activationId)?.value),decisionId:null};
-      const selected=spec.kind==='conditional'?(state?.truth===null||state?.truth===undefined?null:state.truth?'true':'false'):null;
+      const selectCondition=op.opcode==='select'?operandValue(op.inputs[0],e.activationId)?.value:null;
+      if(op.opcode==='select')state={truth:truth(selectCondition),decisionId:e.eventId};
       const skip=spec.kind==='logical'&&leftTruth!==null?(spec.operator==='&&'?!leftTruth:leftTruth):null;
       const reason=skip?(spec.operator==='&&'?'and-left-false':'or-left-true'):null;
-      const evaluation={nodeId,kind:spec.kind,...(spec.kind==='logical'?{leftTruth,right:skip===null?'unknown':skip?'skipped':'evaluated',reason}:
-        {conditionTruth:state?.truth??null,selected,skipped:selected==='true'?'false':selected==='false'?'true':null}),
-        decisionObservationId:state?.decisionId??null};
+      const evaluation=spec.kind==='conditional'?conditionalEvaluation(spec,state):{nodeId,kind:spec.kind,
+        leftTruth,right:skip===null?'unknown':skip?'skipped':'evaluated',reason,decisionObservationId:state?.decisionId??null};
       const helpMarker=skip?{kind:'logical-short-circuit',status:'stub',reason,evaluationNodeId:nodeId,
         highlight:spec.source,skippedSource:spec.right.source}:undefined;
       const value=role==='folded'?e.observedConsumerValue:e.value;
       return {...e,value:spec.kind==='logical'?cResult(value,spec.cType,true):value,evaluation,
-        ...(helpMarker?{helpMarker}:{}),controlInputs:[...new Set([...(e.controlInputs??[]),state?.decisionId].filter(Boolean))]};
+        ...(op.opcode==='select'&&spec.kind==='conditional'?{backendCondition:selectCondition,
+          condition:cResult(selectCondition,spec.truthType,true),selectedOutcome:evaluation.selected}:{}),
+        ...(helpMarker?{helpMarker}:{}),controlInputs:[...new Set([...(e.controlInputs??[]),state?.decisionId].filter(id=>id&&id!==e.eventId))]};
     }
   };
 }

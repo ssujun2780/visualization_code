@@ -3,6 +3,7 @@ import { WASI } from "@runno/wasi";
 import { gunzipSync } from "fflate";
 import {stdioObserverSource,stdioRuntimeObject} from './stdio-observer.mjs';
 import {observeWasmMemory} from './wasm-memory.mjs';
+import {astNodes} from '../model/ast.mjs';
 
 const root = new URL("../../public/toolchain/", import.meta.url);
 let cached;
@@ -110,15 +111,17 @@ export async function execute(module, args, fs, traceImport, stdin = "") {
 
 export async function emitLLVM(source) {
   const tools = await getToolchain();
+  const syntax=await analyze(source),parsedNodes=astNodes(syntax.ast),userFunctions=new Set(parsedNodes.filter(n=>n.kind==='FunctionDecl'&&n.source?.file==='/main.c'&&n.children.some(c=>c.kind==='CompoundStmt')).map(n=>n.functionName)),
+    recordLayoutsNeeded=parsedNodes.some(n=>n.kind==='UnaryExprOrTypeTraitExpr'&&/\balignof\b/.test(n.details)&&(n.source?.file==='/main.c'||userFunctions.has(n.functionName)));
   // Clang emits lexical lifetime intrinsics at O1. Disable LLVM passes so
   // source work/loads/stores remain observable instead of being optimized away.
   const result = await execute(tools.clang, ["clang", ...flags, "-O1", "-disable-llvm-passes", "-emit-llvm", "-debug-info-kind=standalone",
-    "-dwarf-version=4", "-dwarf-column-info", "-o", "/main.ll", "/main.c"],
+    "-dwarf-version=4", "-dwarf-column-info",...(recordLayoutsNeeded?['-fdump-record-layouts']:[]), "-o", "/main.ll", "/main.c"],
     { ...tools.fs, "/main.c": file("/main.c", source) });
   if (result.exitCode !== 0) throw new Error(`C 분석 실패:\n${result.stderr}`);
   const entry = result.fs["/main.ll"];
-  const syntax = await analyze(source);
-  return { llvm: typeof entry.content === "string" ? entry.content : new TextDecoder().decode(entry.content), ast: syntax.ast, diagnostics: result.stderr };
+  return { llvm: typeof entry.content === "string" ? entry.content : new TextDecoder().decode(entry.content), ast: syntax.ast,parsedNodes,
+    recordLayouts:recordLayoutsNeeded?result.stdout:null,diagnostics:result.stderr };
 }
 
 export async function runLLVM(llvm, observer, { stdin = "" } = {}) {
@@ -158,6 +161,13 @@ export async function analyze(source) {
     { ...tools.fs, "/main.c": file("/main.c", source) });
   if (result.exitCode !== 0) throw new Error(`C 분석 실패:\n${result.stderr}`);
   return { ast: result.stdout, diagnostics: result.stderr };
+}
+
+export async function macroTokenLocations(source){
+  const tools=await getToolchain(),r=await execute(tools.clang,['clang',...flags,'-dump-tokens','/main.c'],
+    {...tools.fs,'/main.c':file('/main.c',source)});
+  if(r.exitCode!==0)throw new Error(`매크로 위치 분석 실패:\n${r.stderr}`);
+  return r.stderr.split('\n').filter(line=>line.includes('Loc=</main.c:')).join('\n');
 }
 
 export async function compileAndRun(source, traceImport, { stdin = "" } = {}) {

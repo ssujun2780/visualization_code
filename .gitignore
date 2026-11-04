@@ -3,3 +3,4 @@ dist/
 .sites-runtime/
 .sites-*.json
 test-results/
+.tmp/
