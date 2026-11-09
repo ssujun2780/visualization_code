@@ -1,13 +1,14 @@
 // Validate source calculations against separately recorded data/step evidence.
 // This checks provenance and operand presence; it never re-evaluates C.
-const fail=(id,reason)=>{throw new Error(`CALC 계약 위반 (${id}): ${reason}`);};
+const fail=(id,reason,context)=>{const error=new Error(`CALC 계약 위반 (${id}): ${reason}`);
+  error.code='ir-calc-contract';error.eventId=id;if(context)error.context=context;throw error;};
 const operandKey=i=>i?.executionId?`execution:${i.executionId}`:i?.nodeId?`node:${i.nodeId}`:
   `literal:${JSON.stringify(i?.value??null)}`;
 const valueBoundary=e=>e?.kind==='READ'||e?.kind==='CALC'||e?.kind==='FLOW'&&e.action==='resume';
 
 export function validateCalcPlan(plan){
   for(const d of plan.instructions)if(d.kind==='CALC'&&!(typeof d.operator==='string'&&d.operator.length))
-    fail(d.id,`소스 연산자가 없습니다: ${d.expression?.kind??d.action} ${d.source?.expression??''}`);
+    fail(d.id,`소스 연산자가 없습니다: ${d.expression?.kind??d.action} ${d.source?.expression??''}`,{instructionId:d.id,source:d.source??null});
   return plan;
 }
 
@@ -48,7 +49,8 @@ export function validateCalcTrace(plan,trace){
     for(const input of e.inputs){
       if(!input?.value)fail(e.eventId,'평가 입력의 값이 없습니다.');
       if(input.executionId&&(!executions.has(input.executionId)||positions.get(input.executionId)>=index))
-        fail(e.eventId,'아직 얻지 않은 값을 입력으로 사용했습니다.');
+        fail(e.eventId,'아직 얻지 않은 값을 입력으로 사용했습니다.',{instructionId:e.instructionId,source:d?.source,
+          eventIndex:index,input,producer:executions.get(input.executionId)??null,producerIndex:positions.get(input.executionId)??null});
       const producer=executions.get(input.executionId);
       if(producer?.kind==='READ'&&producer.value?.bits&&input.value.bits!==producer.value.bits)
         fail(e.eventId,'READ에서 얻은 값과 입력 값이 다릅니다.');

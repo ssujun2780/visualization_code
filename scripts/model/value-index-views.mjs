@@ -14,6 +14,16 @@ const fullSlot=(a,t)=>t?.objectId===a.objectId&&t.size===a.elementBytes&&Number.
   t.offset>=a.range.offset&&t.offset+t.size<=a.range.offset+a.range.size&&(t.offset-a.range.offset)%a.elementBytes===0;
 const slotIndex=(a,t)=>(t.offset-a.range.offset)/a.elementBytes;
 const overlap=(a,t)=>t?.objectId===a.objectId&&t.offset<a.range.offset+a.range.size&&t.offset+t.size>a.range.offset;
+const reverseComparison={'<':'>','<=':'>=','>':'<','>=':'<=','==':'==','!=':'!='};
+function terminalMatches(predicate,value,index,capacity){
+  if(value===null||value===undefined)return false;
+  if(predicate?.kind==='self-index')return value===index;
+  // A stored non-index may be a terminator only with an executed exit proof.
+  // In-range constants remain ambiguous node IDs, not implicit sentinels.
+  if(predicate?.kind!=='stored-boundary'||value>=0&&value<capacity)return false;
+  const k=predicate.constant,result={'<':value<k,'<=':value<=k,'>':value>k,'>=':value>=k,'==':value===k,'!=':value!==k}[predicate.operator];
+  return result===predicate.result;
+}
 
 function graphState(a,nodes,rootIndices,discovered,alive){
   const roots=new Set(rootIndices),byIndex=new Map(nodes.map(n=>[n.index,n]));
@@ -25,15 +35,15 @@ function graphState(a,nodes,rootIndices,discovered,alive){
   const edges=nodes.map(n=>{
     const valid=n.value!==null&&n.value>=0&&n.value<a.capacity;
     return {from:n.id,to:valid?byIndex.get(n.value).id:null,fromIndex:n.index,toIndex:valid?n.value:null,value:n.value,
-      status:!alive?'ended':n.value===null?n.status:!valid?'out-of-bounds':roots.has(n.index)&&n.value===n.index?'root-termination':'observed'};
+      status:!alive?'ended':n.value===null?n.status:roots.has(n.index)?'root-termination':!valid?'out-of-bounds':'observed'};
   }),adj=new Map(nodes.map(n=>[n.index,[]]));
   for(const e of edges)if(e.toIndex!==null){adj.get(e.fromIndex).push(e.toIndex);adj.get(e.toIndex).push(e.fromIndex);}
   const seen=new Set(),components=[],representatives=[];
   const resolve=index=>{const path=new Set();let current=index;
     while(true){if(path.has(current))return {rootIndex:null,status:'cycle'};path.add(current);
       const n=byIndex.get(current);if(!n||n.value===null)return {rootIndex:null,status:'unknown'};
+      if(roots.has(current))return {rootIndex:current,status:alive&&discovered?'supported':'partial'};
       if(n.value<0||n.value>=a.capacity)return {rootIndex:null,status:'out-of-bounds'};
-      if(n.value===current&&roots.has(current))return {rootIndex:current,status:alive&&discovered?'supported':'partial'};
       current=n.value;
     }
   };
@@ -46,10 +56,10 @@ function graphState(a,nodes,rootIndices,discovered,alive){
     components.push({nodeIds:indices.map(i=>byIndex.get(i).id),indices,rootIndices:rootList,cyclic,
       status:!alive?'ended':cyclic?'cyclic':complete&&discovered?'rooted-tree-candidate':'partial'});
   }
-  const complete=alive&&nodes.length===a.capacity&&nodes.every(n=>n.value!==null&&n.value>=0&&n.value<a.capacity),cyclic=components.some(c=>c.cyclic)?true:complete?false:null,
+  const complete=alive&&nodes.length===a.capacity&&nodes.every(n=>n.value!==null&&(roots.has(n.index)||n.value>=0&&n.value<a.capacity)),cyclic=components.some(c=>c.cyclic)?true:complete?false:null,
     forest=complete&&discovered&&components.every(c=>c.status==='rooted-tree-candidate');
   return {edges,representatives,unknownSlotCount:a.capacity-nodes.filter(n=>n.value!==null).length,topology:{direction:'child-to-successor',singleSuccessor:true,complete,cyclic,
-    rawCyclic:cyclic||edges.some(e=>e.fromIndex===e.toIndex),roots:[...roots].filter(i=>byIndex.get(i)?.value===i),components,
+    rawCyclic:cyclic||edges.some(e=>e.fromIndex===e.toIndex),roots:[...roots].filter(i=>byIndex.has(i)),components,
     views:['directed-index-graph',...(forest?['parent-forest-candidate']:[])],
     status:!alive?'ended':forest?'rooted-forest-candidate':cyclic?'cyclic':complete?'observed':'partial'}};
 }
@@ -86,39 +96,56 @@ export function valueIndexStructures(plan,{events,objects,structures=[],resultDe
     }
   }
   if(!candidates.size)return [];
-  // Self equality is a terminal convention only when the executed branch exits
-  // a compiler loop or reaches a controlled return/break before another access.
+  // A terminal convention requires the executed branch to exit a compiler
+  // loop or reach a controlled return/break before another traversal access.
   for(const compare of events)if(compare.kind==='CALC')for(const step of compare.steps??[]){
-    if(!['==','!='].includes(step.operator)||step.inputs?.length!==2||numeric(step.value)!==(step.operator==='=='?1:0))continue;
-    const ast=walk(defs.get(compare.instructionId)?.expression).find(n=>n.nodeId===step.nodeId);if(!ast)continue;
+    if(!reverseComparison[step.operator]||step.inputs?.length!==2)continue;
+    const ast=unwrap(defs.get(compare.instructionId)?.expression);
+    // Do not attribute a compound condition's exit to one unrelated leaf.
+    if(ast?.nodeId!==step.nodeId)continue;
     for(let side=0;side<2;side++){
-      const read=flow.sourceRead(step.inputs[side].executionId),node=read&&accessNode(read),other=ast.children?.[1-side];
-      if(!node||signature(node.children?.[1])!==signature(other))continue;
+      const input=step.inputs[side],otherInput=step.inputs[1-side],operandRead=flow.sourceReadOperand(input,compare,step);
+      for(const read of operandRead?flow.reads(operandRead.eventId):[]){
+      const node=accessNode(read),other=ast.children?.[1-side];
+      if(!node||numeric(input.value)!==numeric(read.value))continue;
+      const self=['==','!='].includes(step.operator)&&numeric(step.value)===(step.operator==='=='?1:0)&&signature(node.children?.[1])===signature(other),
+        constant=otherInput.executionId?null:numeric(otherInput.value),
+        predicate=self?{kind:'self-index'}:constant!==null?{kind:'stored-boundary',
+          operator:side===0?step.operator:reverseComparison[step.operator],constant,result:numeric(step.value)!==0}:null;
+      if(!predicate)continue;
       for(const c of candidates.values()){
-        const a=c.array;if(!fullSlot(a,read.target)||numeric(read.value)!==slotIndex(a,read.target)||!aliveAt(a,compare.eventId))continue;
+        const a=c.array;if(!fullSlot(a,read.target)||!terminalMatches(predicate,numeric(read.value),slotIndex(a,read.target),a.capacity)||!aliveAt(a,compare.eventId))continue;
+        const guard=read.activationId!==compare.activationId;
+        // A callee guard is structural only if that compiler operand indexes
+        // this same array in observed nonterminal calls. A payload predicate
+        // helper is not automatically a traversal terminator.
+        if(guard&&!c.evidence.some(p=>{const access=byEvent.get(p.targetAccessExecutionId),d=defs.get(access?.instructionId);
+          return d?.functionId===defs.get(compare.instructionId)?.functionId&&signature(accessNode(access)?.children?.[1])===signature(ast.children?.[side]);}))continue;
         const index=slotIndex(a,read.target),branch=events.slice(positions.get(compare.eventId)+1).find(e=>
           e.activationId===compare.activationId&&e.action==='branch'&&e.dataInputs?.includes(compare.eventId));
         if(!branch)continue;const def=defs.get(branch.instructionId);
         let terminal=null,reason=null;
-        if(['WhileStmt','ForStmt','DoStmt'].includes(def?.controlKind)&&numeric(branch.condition)===0&&def.destinations?.[1]===branch.selected){terminal=branch;reason='observed compiler loop exit on self equality';}
+        if(['WhileStmt','ForStmt','DoStmt'].includes(def?.controlKind)&&numeric(branch.condition)===0&&def.destinations?.[1]===branch.selected){terminal=branch;reason='observed compiler loop exit on stored termination predicate';}
         else for(let p=positions.get(branch.eventId)+1;p<events.length;p++){
           const e=events[p];if(e.activationId!==branch.activationId)continue;
-          if(e.kind==='WRITE'&&overlap(a,e.target)||e.kind==='READ'&&fullSlot(a,e.target)&&slotIndex(a,e.target)!==index)break;
+          if(e.kind==='WRITE'&&overlap(a,e.target)||e.kind==='READ'&&fullSlot(a,e.target)&&(guard||slotIndex(a,e.target)!==index))break;
           if(['call','loop.next','branch'].includes(e.action))break;
           const returnedReads=e.action==='return.value'?flow.reads(e.eventId):[],
             returnsSameIndex=numeric(e.value)===index&&returnedReads.some(r=>
               fullSlot(a,r.target)&&slotIndex(a,r.target)===index||signature(defs.get(r.instructionId)?.expression)===signature(node.children?.[1]));
           if(['return.value','return','break'].includes(e.action)&&e.controlInputs?.includes(branch.eventId)){
-            terminal=e;reason='observed controlled termination after self equality';break;
+            terminal=e;reason='observed controlled termination after stored termination predicate';break;
           }
           const returnSource=defs.get(e.instructionId)?.source,afterStatement=def?.controlKind==='IfStmt'&&
             returnSource?.file===def.statementSource?.file&&returnSource?.start?.byte>=def.statementSource?.end?.byte;
-          if(e.action==='return.value'&&afterStatement&&returnsSameIndex){terminal=e;reason='observed return of current index after compiler branch merge without further traversal';break;}
+          if(e.action==='return.value'&&afterStatement&&(returnsSameIndex||guard)){terminal=e;reason='observed return after compiler branch merge without further traversal';break;}
           if(e.kind==='WRITE'&&e.action!=='return.value'&&flow.reads(e.eventId).some(r=>fullSlot(a,r.target)))break;
           if(e.action==='frame.end')break;
         }
         if(terminal)c.terminationEvidence.push({executionId:terminal.eventId,comparisonExecutionId:compare.eventId,branchExecutionId:branch.eventId,
-          readExecutionId:read.eventId,index,comparisonNodeId:step.nodeId,operator:step.operator,evidence:reason});
+          readExecutionId:read.eventId,operandReadExecutionId:operandRead.eventId,index,comparisonNodeId:step.nodeId,operator:step.operator,predicate,
+          mode:guard?'guard-before-access':'stored-value-check',evidence:reason});
+      }
       }
     }
   }
@@ -128,7 +155,7 @@ export function valueIndexStructures(plan,{events,objects,structures=[],resultDe
       values=new Map(observedIndices.map(index=>[index,{bytes:null,lastWrite:null,lastObservation:null,initialization:'unknown'}])),
       states=[],writes=[],rootProof=new Map(),discoveredAtExecutionId=c.evidence[0].targetAccessExecutionId,
       changes=new Set(c.evidence.map(e=>e.targetAccessExecutionId)),terminationByEvent=new Map();
-    let convention=null;
+    const conventions=[];
     for(const proof of c.terminationEvidence){if(!terminationByEvent.has(proof.executionId))terminationByEvent.set(proof.executionId,[]);terminationByEvent.get(proof.executionId).push(proof);}
     for(let p=0;p<events.length;p++){
       const e=events[p];if(p<(positions.get(o.createdBy)??0))continue;
@@ -147,13 +174,17 @@ export function valueIndexStructures(plan,{events,objects,structures=[],resultDe
           }
         }
       }
-      for(const proof of terminationByEvent.get(e.eventId)??[]){rootProof.set(proof.index,proof);convention??=proof;changed=true;}
+      for(const proof of terminationByEvent.get(e.eventId)??[]){
+        if(values.get(proof.index)?.bytes?.value===numeric(byEvent.get(proof.readExecutionId)?.value))rootProof.set(proof.index,proof);
+        if(!conventions.some(p=>JSON.stringify(p.predicate)===JSON.stringify(proof.predicate)))conventions.push(proof);changed=true;}
       if(!changed)continue;const alive=aliveAt(a,e.eventId),discovered=p>=positions.get(discoveredAtExecutionId),
         nodes=[...values].map(([index,v])=>({id:slotId(a,index),objectId:a.objectId,offset:a.range.offset+index*a.elementBytes,size:a.elementBytes,index,
           value:v.bytes?.value??null,status:!alive?'ended':v.bytes?.value!==null&&v.bytes?.value!==undefined?'observed':v.initialization,
           lastWriteExecutionId:v.lastWrite,lastObservationExecutionId:v.lastObservation})),
-        rootEvidence=convention?nodes.filter(n=>n.value===n.index).map(n=>({index:n.index,
-          kind:rootProof.has(n.index)?'observed-termination':'inferred-self-termination',executionId:rootProof.get(n.index)?.executionId??convention.executionId})):[],
+        rootEvidence=nodes.flatMap(n=>{const proof=rootProof.get(n.index)??conventions.find(p=>terminalMatches(p.predicate,n.value,n.index,a.capacity));
+          return proof&&terminalMatches(proof.predicate,n.value,n.index,a.capacity)?[{index:n.index,predicate:proof.predicate,
+            kind:rootProof.has(n.index)?'observed-termination':proof.predicate.kind==='self-index'?'inferred-self-termination':'inferred-boundary-termination',
+            executionId:proof.executionId}]:[];}),
         graph=graphState(a,nodes,rootEvidence.map(r=>r.index),discovered,alive);
       states.push({afterExecutionId:e.eventId,alive,status:!alive?'ended':!discovered?'partial':graph.edges.some(e=>e.status==='out-of-bounds')?'inconsistent':graph.topology.complete?'observed':'partial',
         discoveryStatus:discovered?'observed':'not-yet-observed',rootEvidence,nodes,...graph});
@@ -163,11 +194,12 @@ export function valueIndexStructures(plan,{events,objects,structures=[],resultDe
       arrayId:a.id,objectId:a.objectId,storageIdentity:a.storageIdentity??`storage:${a.objectId}:${a.range.offset}:${a.range.size}`,range:a.range,
       elementBytes:a.elementBytes,capacity:a.capacity,nodes:a.nodes??[],edges:[],isPointerStructure:false,views:['directed-index-graph'],
       discoveredAtExecutionId,evidence:c.evidence,terminationEvidence:c.terminationEvidence,
-      terminationConvention:{status:convention?'supported':'unknown',inferredAtExecutionId:convention?.executionId??null,
+      terminationConvention:{status:conventions.length?'supported':'unknown',inferredAtExecutionId:conventions[0]?.executionId??null,
+        predicates:conventions.map(p=>({predicate:p.predicate,inferredAtExecutionId:p.executionId})),
         scope:{arrayId:a.id,objectId:a.objectId,comparisonNodeIds:unique(c.terminationEvidence.map(e=>e.comparisonNodeId))},
-        semantics:'self-index termination is a representation candidate for this observed array relation; local proof and inferred roots remain distinct'},writes,states,
+        semantics:'executed termination predicates are representation candidates for this array relation; local proof and inferred roots remain distinct'},writes,states,
       limitations:['identity-preserving values into indices of the same observed integer array only; arithmetic indices remain unresolved',
-        'self links remain cycles until an observed self-equality branch terminates traversal; roots remain representation candidates',
+        'self links and non-index values remain unresolved until an observed predicate terminates traversal; roots remain representation candidates',
         'unobserved bytes and incomplete lifetimes remain unknown; sparse slots do not expand untouched array capacity',
         'local root proof is invalidated by every subsequent write; relation-wide inferred self roots are explicitly marked and do not prove termination of every caller']});
   }
@@ -194,7 +226,12 @@ export function validateValueIndexStructures({events,objects,structures}){
         if(n.lastWriteExecutionId)execution(n.lastWriteExecutionId);if(n.lastObservationExecutionId)execution(n.lastObservationExecutionId);}
       for(const e of s.edges){require(e.from===slotId(a,e.fromIndex)&&e.value===byIndex.get(e.fromIndex)?.value,'invalid source edge');
         require(e.toIndex===null?e.to===null:e.toIndex>=0&&e.toIndex<a.capacity&&e.to===slotId(a,e.toIndex)&&e.toIndex===e.value,'invalid destination edge');}
-      for(const r of s.representatives)require(r.rootIndex===null||byIndex.get(r.rootIndex)?.value===r.rootIndex,'invented root');
+      for(const proof of s.rootEvidence){execution(proof.executionId);
+        require(executions.get(proof.executionId)<=executions.get(s.afterExecutionId),'future termination proof');
+        require(c.terminationEvidence.some(p=>p.executionId===proof.executionId&&JSON.stringify(p.predicate)===JSON.stringify(proof.predicate)&&
+          (proof.kind!=='observed-termination'||p.index===proof.index)),'unbacked termination predicate');
+        require(terminalMatches(proof.predicate,byIndex.get(proof.index)?.value,proof.index,a.capacity),'invalid terminal predicate');}
+      for(const r of s.representatives)require(r.rootIndex===null||s.rootEvidence.some(p=>p.index===r.rootIndex),'invented root');
     }
   }
   return true;

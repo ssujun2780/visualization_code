@@ -178,12 +178,14 @@ export function recordIndexStructures(plan,{events,objects,structures=[],resultD
         if(edges.length>=maxEdges){omittedEdges++;continue;}
         if(slot.pointerSlot){const current=slot.pointerSlot.pointerReference;if(!current||!alive(current.objectId,index)||current.objectId!==slot.range.objectId||slot.range.offset<current.offset||slot.range.offset>=current.offset+slot.extent*slot.range.size)continue;}
         const value=slot.bytes?.value??null,destination=state.nodes.find(n=>n.index===value),within=value!==null&&value>=0&&value<state.capacity,
-          active=within&&state.length!==null&&value<state.length,proof=slot.relation.evidence.filter(p=>positions.get(p.targetAccessExecutionId)<=index&&
+          active=within&&(state.length===null||value<state.length),proof=slot.relation.evidence.filter(p=>positions.get(p.targetAccessExecutionId)<=index&&
             positions.get(p.sourceExecutionId)>=(positions.get(slot.lastWrite)??-1)&&
-            identity(p.source)===identity(slot.range)&&p.targetIndex===value),status=!state.active?'ended':value===null?'unknown':!within?'terminal-or-unresolved':!active?'inactive-target':!destination?.record?'unresolved-target':proof.length?'observed':'inferred';
+            identity(p.source)===identity(slot.range)&&p.targetIndex===value),status=!state.active?'ended':value===null?'unknown':!within?'terminal-or-unresolved':!active?'inactive-target':!destination?.record?'unresolved-target':proof.length?'observed':state.length===null?'active-membership-unknown':'inferred';
         edges.push({id:`${node.id}:${slot.relation.field.fieldNodeId}:${slot.slotIndex??'field'}`,from:node.id,to:active&&destination?.record?destination.id:null,
           fromIndex:node.index,toIndex:active&&destination?.record?value:null,value,source:slot.range,relationId:slot.relation.id,
-          slotIndex:slot.slotIndex??null,status,lastWriteExecutionId:slot.lastWrite,lastObservationExecutionId:slot.lastObservation,
+          slotIndex:slot.slotIndex??null,status,physicalBounds:within?'in-bounds':value===null?'unknown':'out-of-bounds',
+          activeMembership:state.length===null?'unknown':active?'active':'inactive',
+          lastWriteExecutionId:slot.lastWrite,lastObservationExecutionId:slot.lastObservation,
           ...(slot.pointerSlot?{pointerSource:slot.pointerSlot.range,pointerObservationExecutionId:slot.pointerSlot.lastObservation,
             pointerWriteExecutionId:slot.pointerSlot.lastWrite}:{}),
           evidenceExecutionIds:proof.map(p=>p.targetAccessExecutionId)});

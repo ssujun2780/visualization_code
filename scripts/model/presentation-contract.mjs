@@ -7,7 +7,8 @@ export function presentationContract(){
     rules:{blueprints:'static-type-description-without-storage',
       assignment:'visit-target-read-calculate-write',targetAvailability:'observed-address-only',compoundUpdate:'update-at-target-after-operands-are-observed',
       initialization:'create-at-declaration-before-initializer',returnDelivery:'direct-to-observed-next-consumer',
-      order:'preserve-observed-read-calculate-write-and-call-lifetime-order',
+      order:'preserve-observed-value-work; deliver-return-before-frame-cleanup',
+      returnCleanup:'after-recorded-receiver; raw-lifetimes-retained',
       skippedOperand:'explanation-only-never-execute',previewEvaluation:'not-implemented'}};
 }
 

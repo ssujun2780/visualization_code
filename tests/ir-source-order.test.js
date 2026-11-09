@@ -117,11 +117,11 @@ function fixture(){
   };
   const allocate=(name,id=name,activationId='f1')=>{
     const e=add('alloc-'+name,'SPACE','object.begin',{objectId:id,size:4,storage:'automatic',initialized:false},activationId);
-    raw.objects.push({id,name,storage:'automatic',createdBy:e.eventId});return e;
+    raw.objects.push({id,name,size:4,storage:'automatic',createdBy:e.eventId});return e;
   };
   const declare=(name,id=name,activationId='f1')=>add('decl-'+name,'SPACE','declaration',{objectId:id},activationId);
   const write=(name,id=name,activationId='f1')=>add('store-'+name,'WRITE',undefined,
-    {phase:'commit',target:{objectId:id,size:4},value:{type:'i32',signed:name==='a'?'10':'20'}},activationId);
+    {phase:'commit',target:{objectId:id,offset:0,size:4},value:{type:'i32',signed:name==='a'?'10':'20'}},activationId);
   return {plan,observations,raw,allocate,declare,write,record:()=>recordIR(plan,observations,raw)};
 }
 

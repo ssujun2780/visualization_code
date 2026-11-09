@@ -1,5 +1,5 @@
 // Source-language facts come from Clang, never from identifier meanings.
-import {operand,parseCall} from "./llvm.mjs";
+import {operand,parseCall,llvmLocal,llvmFunction,llvmName} from "./llvm.mjs";
 import {foldedShortCircuits} from "./short-circuit.mjs";
 import {createSourceMap} from './source-map.mjs';
 import {astNodes} from './ast.mjs';
@@ -7,9 +7,10 @@ import {applyMacroLocations} from './macro-locations.mjs';
 import {macroExpressionBindings} from './macro-expression-bindings.mjs';
 import {annotateAlignments} from './type-queries.mjs';
 import {readAccessBindings} from './read-access.mjs';
+import {callBindings} from './call-bindings.mjs';
 export {astNodes} from './ast.mjs';
 
-export function cTypes(meta) {
+export function cTypes(meta,nodes=[]) {
   const byId=new Map(meta.types.map(t=>[t.id,t]));
   const descriptions=new Map(),spellings=new Map();
   const voidType={id:'c:void',kind:'void',name:'void',sizeBits:0,signedness:null,encoding:null,
@@ -41,6 +42,8 @@ export function cTypes(meta) {
         members:t.elements.map(id=>byId.get(id)).filter(m=>m?.tag==='DW_TAG_member').map(m=>({
           name:m.name??null,typeId:m.baseType,offsetBits:m.offsetBits,sizeBits:m.sizeBits,
           ...(m.bitField?{bitField:true,storageOffsetBits:m.storageOffsetBits}:{})}))});
+      if(!t.sizeBits&&!nodes.some(n=>n.kind==='RecordDecl'&&/\bdefinition\b/.test(n.details)&&
+        /\b(?:struct|union) (\S+)/.exec(n.details)?.[1]===t.name))Object.assign(result,{incomplete:true,sizeBits:null});
     }else if(t.tag==='DW_TAG_enumeration_type'){
       Object.assign(result,{kind:'enum',enumTypeId:t.id,underlyingType:describe(byId.get(t.baseType)),enumerators:t.enumerators??[]});
     }else if(t.tag==='DW_TAG_array_type'){
@@ -65,7 +68,7 @@ export function cTypes(meta) {
     if(canonical==='bool')canonical='_Bool';
     if(canonical==='void')return voidType;
     const alias=meta.types.find(t=>t.name===name&&t.tag==='DW_TAG_typedef');if(alias)return describe(alias);
-    const rowPointer=/^(.+?)\s*\(\s*((?:\*\s*(?:(?:const|volatile|restrict)\s*)*)+)\)\s*((?:\[\d*\]\s*)+)$/.exec(canonical);
+    const rowPointer=/^(.+?)\s*\(\s*((?:\*\s*(?:(?:const|volatile|restrict)\s*)*)+)\)\s*((?:\[[^\]]*\]\s*)+)$/.exec(canonical);
     if(rowPointer){
       let result=spelling(`${rowPointer[1].trim()}${rowPointer[3].trim()}`);if(!result)return null;
       for(const part of rowPointer[2].matchAll(/\*\s*((?:(?:const|volatile|restrict)\s*)*)/g)){
@@ -74,21 +77,48 @@ export function cTypes(meta) {
       return result;
     }
     const ptr=/^(.+?)\s*\*\s*((?:(?:const|volatile|restrict)\s*)*)$/.exec(canonical);
-    if(ptr&&!/[()]/.test(ptr[1])){
+    if(ptr&&(!/[()]/.test(ptr[1])||/^(?:(?:const|volatile|restrict) )*(?:struct|union) .*\((?:anonymous|unnamed)/.test(ptr[1]))){
       const target=spelling(ptr[1].trim());if(!target&&ptr[1].trim()!=='void')return null;
       const result=pointer(target),q=ptr[2].trim().split(/\s+/).filter(Boolean);return q.length?qualified(result,q):result;
     }
     // Parse Clang's type spelling, never the original source expression.
-    const shape=/^([^()[\]]+?)\s*((?:\[\d*\]\s*)+)$/.exec(canonical);
+    const shape=/^([^()[\]]+?)\s*((?:\[[^\]]*\]\s*)+)$/.exec(canonical);
     if(shape){
       let element=spelling(shape[1].trim());if(!element)return null;
-      for(const m of [...shape[2].matchAll(/\[(\d*)\]/g)].reverse())element=array(element,m[1]===''?null:Number(m[1]));
+      for(const m of [...shape[2].matchAll(/\[([^\]]*)\]/g)].reverse()){
+        const bound=m[1].trim(),constant=/^\d+$/.test(bound);
+        element={...array(element,constant?Number(bound):null),...(!constant&&bound?{variableLength:true,boundSpelling:bound}: {})};
+      }
       return {...element,name:name.includes('[')?element.name:name};
     }
     const qualifiers=[...canonical.matchAll(/\b(const|volatile|restrict)\b/g)].map(m=>m[1]);
     if(qualifiers.length){const base=spelling(canonical.replace(/\b(?:const|volatile|restrict)\b/g,'').trim());return base?qualified(base,qualifiers):null;}
     const record=meta.types.find(t=>['DW_TAG_structure_type','DW_TAG_union_type'].includes(t.tag)&&t.name===canonical.replace(/^(?:struct|union)\s+/,''));
     if(record)return {...describe(record),name:name||canonical};
+    // Anonymous records still have declaration locations and field identities.
+    // Match the compiler spelling to its RecordDecl, then to the debug record;
+    // a display name is not a prerequisite for a structural type.
+    const anonymous=/^(struct|union) (?:[^()]+::)?\((?:anonymous|unnamed)(?: (?:struct|union))? at (.+):(\d+):(\d+)\)$/.exec(canonical);
+    if(anonymous){
+      const [,kind,file,line,column]=anonymous,decl=nodes.filter(n=>n.kind==='RecordDecl'&&n.source?.file===file&&
+        n.source.start.line===Number(line)&&n.source.start.column===Number(column));
+      const fields=decl.length===1?decl[0].children.filter(n=>n.kind==='FieldDecl').map(n=>/\s([^\s']+)\s+'/.exec(n.details)?.[1]??null):null;
+      const matches=fields?meta.types.filter(t=>t.tag===`DW_TAG_${kind==='struct'?'structure':'union'}_type`&&!t.name&&
+        t.source?.file===file&&t.source?.line===Number(line)&&JSON.stringify(describe(t).members.map(m=>m.name))===JSON.stringify(fields)):[];
+      if(matches.length===1)return {...describe(matches[0]),name:kind,display:{label:kind,badges:[]},declarationNodeId:decl[0].id};
+    }
+    // Incomplete records (including library handles) need a type, not an
+    // invented memory layout. Only accept a tag actually declared by Clang.
+    const tag=/^(struct|union) (\S+)$/.exec(canonical);
+    const tagDeclarations=tag?nodes.filter(n=>n.kind==='RecordDecl'&&
+      /\b(struct|union) (\S+)/.exec(n.details)?.slice(1).join(' ')===canonical):[];
+    if(tagDeclarations.length)
+      return {id:`c:opaque:${canonical}`,kind:'record',recordKind:tag[1],name:name||canonical,sizeBits:null,
+        incomplete:!tagDeclarations.some(n=>/\bdefinition\b/.test(n.details)),layoutKnown:false,members:[],signedness:null,encoding:null,
+        display:{label:name||canonical,badges:[]},evidence:'compiler record declaration; layout unavailable'};
+    const aliases=nodes.filter(n=>n.kind==='TypedefDecl'&&/\s([^\s']+)\s+'/.exec(n.details)?.[1]===canonical);
+    if(aliases.length===1&&aliases[0].canonical!==canonical){const base=spelling(aliases[0].type,aliases[0].canonical);
+      if(base)return {...base,name:name||canonical,display:{label:name||canonical,badges:base.display?.badges??[]}};}
     const enumerations=meta.types.filter(t=>t.tag==='DW_TAG_enumeration_type'&&t.name===canonical.replace(/^enum\s+/,''));
     if(enumerations.length===1)return {...describe(enumerations[0]),name:name||canonical};
     if(enumerations.length>1)return null; // A spelling alone cannot resolve a shadowed enum tag.
@@ -127,7 +157,15 @@ export function cTypes(meta) {
       result=entry?{...entry,enumTypeId:type.id,evidence:'compiler EnumConstantDecl and DIEnumerator'}:null;
     enumConstants.set(declaration,result);return result;
   }
-  return {byId,describe,spelling,debug:id=>describe(byId.get(id)),enumConstant};
+  const recordDeclarations=new Map();
+  function recordDeclaration(type){
+    const id=type?.recordTypeId;if(!id)return null;if(recordDeclarations.has(id))return recordDeclarations.get(id);
+    const debug=byId.get(id),members=describe(debug)?.members??[],matches=nodes.filter(n=>n.kind==='RecordDecl'&&
+      n.source?.file===debug?.source?.file&&n.source?.start.line===debug?.source?.line&&
+      JSON.stringify(n.children.filter(c=>c.kind==='FieldDecl').map(c=>/\s([^\s']+)\s+'/.exec(c.details)?.[1]??null))===JSON.stringify(members.map(m=>m.name)));
+    const result=matches.length===1?matches[0]:null;recordDeclarations.set(id,result);return result;
+  }
+  return {byId,describe,spelling,debug:id=>describe(byId.get(id)),enumConstant,recordDeclaration};
 }
 
 const inside=(where,range)=>where&&range&&where.file===range.file&&
@@ -150,16 +188,21 @@ function producer(n,types) {
   while(n?.kind==="ParenExpr"||integral(n)&&(()=>{const a=types.spelling(n.children[0]?.type,n.children[0]?.canonical),b=types.spelling(n.type,n.canonical);return a&&b&&a.sizeBits===b.sizeBits;})())n=n.children[0];
   return n;
 }
-function matches(node,site,allowTargetAccess=false) {
-  if(!node||!inside(site.source,node.source))return false;
-  if(node.kind==="ImplicitCastExpr"&&node.details.includes("<LValueToRValue>"))return site.opcode==="load";
-  if(node.kind==="CallExpr")return site.opcode==="call";
+// Shared by normal source positions and collapsed macro expansion positions.
+function matchesNumericCast(node,site){
+  if(!node||!numericCast(node))return false;
   if(integral(node)&&site.opcode==='trunc'&&site.type==='i1'&&
     /^(?:const |volatile )*(?:_Bool|bool)$/.test(node.children[0]?.canonical??node.children[0]?.type??''))return false;
   if(toBoolean(node))return (node.details.includes('<FloatingToBoolean>')?site.opcode==='fcmp':site.opcode==='icmp')&&
     (!site.predicate||['ne','une'].includes(site.predicate));
-  if(numericCast(node))return (node.details.includes('<IntegralCast>')?['zext','sext','trunc']:
+  return (node.details.includes('<IntegralCast>')?['zext','sext','trunc']:
     node.details.includes('<FloatingToIntegral>')?['fptosi','fptoui']:node.details.includes('<IntegralToFloating>')?['sitofp','uitofp']:['fpext','fptrunc']).includes(site.opcode);
+}
+function matches(node,site,allowTargetAccess=false) {
+  if(!node||!inside(site.source,node.source))return false;
+  if(node.kind==="ImplicitCastExpr"&&node.details.includes("<LValueToRValue>"))return site.opcode==="load";
+  if(node.kind==="CallExpr")return site.opcode==="call";
+  if(numericCast(node))return matchesNumericCast(node,site);
   if(node.kind==="CompoundAssignOperator"){
     const operator=/ '([^']+)' ComputeLHSTy=/.exec(node.details)?.[1]?.slice(0,-1);
     // Clang locates both target accesses at the compound operator. Exclude
@@ -177,13 +220,14 @@ function matches(node,site,allowTargetAccess=false) {
     return !node.children.some(c=>inside(site.source,c.source));
   }
   if(node.kind==="UnaryOperator")return /prefix '-'/.test(node.details)&&site.opcode==="sub"||/prefix '~'/.test(node.details)&&site.opcode==="xor"||
-    /(?:prefix|postfix) '(?:\+\+|--)'/.test(node.details)&&['add','sub','fadd','fsub','getelementptr'].includes(site.opcode)&&
+    /(?:prefix|postfix) '(?:\+\+|--)'/.test(node.details)&&
+      (allowTargetAccess&&['load','store'].includes(site.opcode)||['add','sub','fadd','fsub','getelementptr'].includes(site.opcode))&&
       !node.children.some(c=>inside(site.source,c.source));
   return false;
 }
 
 export function semanticModel(ast,ir,meta,source="",filename="main.c",options={}) {
-  const types=cTypes(meta),parsedNodes=options.parsedNodes??astNodes(ast),sites=[];
+  const parsedNodes=options.parsedNodes??astNodes(ast),types=cTypes(meta,parsedNodes),sites=[];
   applyMacroLocations(parsedNodes,options.macroTokens);
   const declarations=new Map(parsedNodes.map(n=>[n.astId,n]));
   for(const n of parsedNodes.filter(n=>n.kind==='CallExpr')){
@@ -191,6 +235,8 @@ export function semanticModel(ast,ir,meta,source="",filename="main.c",options={}
     const id=/\bFunction (0x[0-9a-f]+)/.exec(target?.details??'')?.[1],decl=declarations.get(id);
     if(target?.type==='<builtin fn type>'&&decl?.children.some(c=>['ConstAttr','PureAttr'].includes(c.kind)))
       n.builtin={name:/\bFunction 0x[0-9a-f]+ '([^']+)'/.exec(target.details)?.[1],pure:true,evidence:'compiler builtin declaration attributes'};
+    if(decl?.children.some(c=>['ConstAttr','PureAttr'].includes(c.kind)))
+      n.pureCall={name:/\bFunction 0x[0-9a-f]+ '([^']+)'/.exec(target.details)?.[1],evidence:'compiler function purity attribute'};
   }
   const sourceMap=createSourceMap({source,filename,nodes:parsedNodes,llvm:ir,metadata:meta,macroTokenPasses:options.macroTokens===null||options.macroTokens===undefined?0:1});
   const typeQueries=annotateAlignments(parsedNodes,types,options.abi,options.recordLayouts);
@@ -203,8 +249,8 @@ export function semanticModel(ast,ir,meta,source="",filename="main.c",options={}
   const shortCircuits=foldedShortCircuits(nodes,sourceMap,filename,types);
   let fn;
   for(const [lineIndex,line]of ir.split("\n").entries()) {
-    if(line.startsWith("define "))fn=/@([^ (]+)\(/.exec(line)?.[1];
-    const m=/^\s*(%[-\w.$]+) = (?:(?:tail|notail|musttail) )?(\w+) (.*)/.exec(line),dbg=/!dbg !(\d+)/.exec(line);
+    if(line.startsWith("define "))fn=llvmName(llvmFunction.exec(line)?.[1]);
+    const m=new RegExp(`^\\s*(${llvmLocal}) = (?:(?:tail|notail|musttail) )?(\\w+) (.*)`).exec(line),dbg=/!dbg !(\d+)/.exec(line);
     if(m&&dbg){const inputType=m[2]==="call"?parseCall(`call ${m[3]}`).returnType:scalarLLVM(`${m[2]} ${m[3]}`),castType=/\bto (i\d+)\b/.exec(m[3])?.[1];sites.push({lineIndex,result:m[1],opcode:m[2],type:castType??inputType,inputType,source:meta.location(dbg[1]),functionName:fn});}
   }
   const conversions=[];
@@ -232,7 +278,7 @@ export function semanticModel(ast,ir,meta,source="",filename="main.c",options={}
     cast.site=candidates.length===1?candidates[0]:null;
     cast.reason=candidates.length>1?"ambiguous backend position":"no distinct runtime producer (possibly folded)";
   }
-  const converted=new Set(),macroBindings=macroExpressionBindings({types}),
+  const converted=new Set(),macroBindings=macroExpressionBindings({types,matchesCast:matchesNumericCast}),calls=callBindings(parsedNodes),
     readAccess=readAccessBindings({ir,meta,nodes:parsedNodes,types,sourceMap,abi:options.abi});
   function annotate(operation,functionName,filename) {
     const site={...operation,functionName,inputType:operation.inputs?.[0]?.type,source:operation.source&&{...operation.source,file:operation.source.file===filename?"/main.c":operation.source.file}};
@@ -255,12 +301,12 @@ export function semanticModel(ast,ir,meta,source="",filename="main.c",options={}
       macroNode=macroBindings.resolve(operation,storage?.candidates??locationCandidates,{storageMatched:!!storage}),
       storageRead=readAccess.resolve(operation,functionName,locationCandidates,macroNode),
       address=readAccess.resolveAddress(operation,functionName,locationCandidates);
-    const node=address?.node??storageRead?.node??macroNode??candidates[0]??(operation.kind==='CALC'?locationCandidates.find(n=>n.builtin?.pure):null);
+    const node=calls.resolve(operation,functionName,locationCandidates,macroNode)??address?.node??storageRead?.node??macroNode??candidates[0]??(operation.kind==='CALC'?locationCandidates.find(n=>n.builtin?.pure):null);
     if(address)operation.addressBinding=address.binding;
-    if(storageRead)for(const cast of noOps){
-      // An enclosing same-width conversion consumes the member load, not an
-      // index load that happens to have the same LLVM integer width/location.
-      if(!cast.kind&&producer(cast.node.children[0],types)===node){cast.site=site;cast.reason=null;}
+    if(node&&operation.result)for(const cast of noOps){
+      // Bind any proven source producer, in macros or ordinary expressions.
+      // Require its C value width: an i1 comparison is not its later i32 value.
+      if(!cast.kind&&operation.type===`i${cast.fromType.sizeBits}`&&producer(cast.node.children[0],types)===node){cast.site=site;cast.reason=null;}
     }
     if(node){
       operation.semanticNodeId=node.id;
@@ -294,6 +340,7 @@ export function semanticModel(ast,ir,meta,source="",filename="main.c",options={}
     if(operation.action==="calculate"&&operation.predicate)operation.cBoolean=true;
     macroBindings.record(operation,node);
     readAccess.record(operation,functionName);
+    calls.record(operation,functionName);
   }
   return {types,nodes:parsedNodes,sourceMap,annotate,noOps,conversions,converted,shortCircuits,typeQueries,
     after(result,functionName){return result?noOps.filter(c=>c.site&&c.site.result===result&&c.site.functionName===functionName).sort((a,b)=>b.node.depth-a.node.depth):[];},

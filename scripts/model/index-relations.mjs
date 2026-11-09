@@ -47,6 +47,15 @@ export function bindIndexRelations(plan){
       group.accesses.set(n.nodeId,{nodeId:n.nodeId,functionId:d.functionId,index:n.children[1]});
     }
   }
+  // A child index passed to a recursive/helper parameter is still an index
+  // dependency. Static identities nominate it; actual frames validate it below.
+  const functions=new Map((plan.functions??[]).map(f=>[f.symbol,f]));
+  for(const d of plan.instructions)if(d.action==='call'){
+    const fn=functions.get(d.callee);if(!fn)continue;
+    for(const [i,arg]of (d.arguments??[]).entries())if(fn.parameters?.[i]){
+      const id=fn.parameters[i];if(!assignments.has(id))assignments.set(id,new Map());assignments.get(id).set(`${d.id}:${i}`,arg);
+    }
+  }
   function dependencies(n,seen=new Set()){
     const ids=refs(n),result=new Set(walk(n).map(x=>x.nodeId));
     for(const id of ids)if(!seen.has(id))for(const value of assignments.get(id)?.values()??[])
@@ -60,6 +69,15 @@ export function bindIndexRelations(plan){
       // Keep the largest affine expression: 2*i inside 2*i+1 is not another
       // child slot. Division numerators are not separate child relations.
       if([...relevant].some(other=>other!==id&&nodes.get(other)?.node.kind==='BinaryOperator'&&walk(nodes.get(other)?.node).slice(1).some(x=>x.nodeId===id)&&formula(nodes.get(other)?.node)))continue;
+      // A stride/cell expression is not a parent-child relation unless the
+      // source index domain itself is also used to access the array.
+      const baseAccess=accesses.some(a=>{const index=unwrap(a.index);return index?.kind==='DeclRefExpr'&&index.declarationId===f.declarationId;});
+      const inverseDomain=f.form==='parent'&&accesses.some(a=>refs(a.index).includes(f.declarationId));
+      const reciprocalDomain=f.form==='child'&&[...relevant].some(other=>{
+        const inverse=formula(nodes.get(other)?.node);return inverse?.form==='parent'&&inverse.degree===f.degree&&
+          accesses.some(a=>refs(a.index).includes(inverse.declarationId));
+      });
+      if(!baseAccess&&!inverseDomain&&!reciprocalDomain)continue;
       forms.push({id:`index-form:${id}`,nodeId:id,functionId:entry.functionId,...f});
     }
     const descriptors=new Map();
@@ -73,6 +91,7 @@ export function bindIndexRelations(plan){
     for(const descriptor of descriptors.values()){
       descriptor.forms=forms.filter(f=>f.degree===descriptor.degree&&(f.form==='parent'?-f.offset===descriptor.firstChildOffset:
         f.offset>=descriptor.firstChildOffset&&f.offset<descriptor.firstChildOffset+descriptor.degree));
+      if(forms.some(f=>f.degree===descriptor.degree&&!descriptor.forms.includes(f)))continue;
       if(forms.some(f=>f.form==='parent'&&f.degree===descriptor.degree)&&!descriptor.forms.some(f=>f.form==='parent'))continue;
       const siblingForms=[];
       for(const nodeId of relevant){
@@ -148,6 +167,10 @@ export function indexRelationStructures(plan,{events,objects,views=[],structures
     if(e.kind==='READ')return objectDeclarations.get(e.target?.objectId)===declarationId?[e]:[];
     return (e.dataInputs??[]).flatMap(id=>declarationReads(id,declarationId,seen));
   }
+  function dependsOn(id,producer,seen=new Set()){
+    if(id===producer)return true;if(seen.has(id))return false;seen.add(id);
+    return (byEvent.get(id)?.dataInputs??[]).some(input=>dependsOn(input,producer,seen));
+  }
   for(const context of contexts.values())for(const {candidate,activationIds} of context.candidates){
     for(const e of events){if(e.kind!=='CALC'||!activationIds.has(e.activationId))continue;
       for(const f of [...candidate.forms,...candidate.siblingForms??[]])for(const step of (e.steps??[]).filter(s=>s.nodeId===f.nodeId)){
@@ -155,21 +178,36 @@ export function indexRelationStructures(plan,{events,objects,views=[],structures
           input=inputs.length===1?inputs[0]:null,output=numeric(step.value),parentIndex=f.form==='parent'?output:f.form==='sibling'&&input!==null?parentOf(context,input):input,childIndex=f.form==='parent'?input:output,
           expected=input===null?null:f.form==='parent'?Math.trunc((input+f.offset)/f.degree):input*f.scale+f.offset,
           valid=output===expected&&integer(parentIndex)&&integer(childIndex)&&parentIndex>=context.base&&childIndex>context.base&&parentOf(context,childIndex)===parentIndex,
-          observed=accesses.filter(a=>a.target.arrayId===context.array.id&&a.activationId===e.activationId&&[parentIndex,childIndex].includes(a.target.index));
+          observed=accesses.filter(a=>a.target.arrayId===context.array.id&&
+            (a.target.index===parentIndex&&a.activationId===e.activationId||a.target.index===childIndex&&
+              (byEvent.get(a.executionId)?.addressInputs??[]).some(id=>dependsOn(id,e.eventId))));
         context.formulaEvidence.push({executionId:e.eventId,sourceNodeId:step.nodeId,formulaId:f.id,form:f.form,inputExecutionIds:reads,input,output,parentIndex,childIndex,
           siblingSourceIndex:f.form==='sibling'?input:null,observedAccessExecutionIds:observed.map(a=>a.executionId),
+          childAccessExecutionIds:observed.filter(a=>a.target.index===childIndex&&
+            (byEvent.get(a.executionId)?.addressInputs??[]).some(id=>dependsOn(id,e.eventId))).map(a=>a.executionId),
           status:input===null||output===null?'partial':valid?'supported':'contradicted'});
       }
     }
   }
   for(const context of contexts.values())for(const comparison of work?.comparisons??[]){
-    const endpoints=comparison.operands?.map(o=>o.storage);if(endpoints?.length!==2||endpoints.some(s=>s?.arrayId!==context.array.id||s.elementOffset!==0||s.size!==context.array.elementBytes))continue;
+    const endpoints=comparison.operands?.map(o=>o.storage?.arrayId===context.array.id?o.storage:o.copiedFrom);if(endpoints?.length!==2||endpoints.some(s=>s?.arrayId!==context.array.id||s.elementOffset!==0||s.size!==context.array.elementBytes))continue;
     const [left,right]=endpoints.map(s=>s.index),leftParent=right>context.base&&parentOf(context,right)===left,rightParent=left>context.base&&parentOf(context,left)===right;
     if(!leftParent&&!rightParent)continue;
-    const op=comparison.operator,normalized=leftParent?op:({'<':'>','<=':'>=','>':'<','>=':'<=','==':'==','!=':'!='})[op],direction=['>','>='].includes(normalized)?'max':['<','<='].includes(normalized)?'min':null;
+    const transported=comparison.operands.some(o=>o.storage?.arrayId!==context.array.id),
+      op=comparison.operator,normalized=leftParent?op:({'<':'>','<=':'>=','>':'<','>=':'<=','==':'==','!=':'!='})[op],direction=transported?null:['>','>='].includes(normalized)?'max':['<','<='].includes(normalized)?'min':null;
     context.comparisons.push({executionId:comparison.executionId,sourceNodeId:comparison.sourceNodeId,parentIndex:leftParent?left:right,childIndex:leftParent?right:left,
       operator:op,parentOperator:normalized,directionCandidate:direction,truth:numeric(byEvent.get(comparison.executionId)?.value),
-      readExecutionIds:comparison.operands.map(o=>o.executionId),evidence:'recorded parent/child array operands; comparison orientation alone is not an invariant'});
+      readExecutionIds:comparison.operands.map(o=>o.executionId),operands:comparison.operands,
+      relationScope:transported?'historical-copy-origin; current logical position unresolved':'observed-array-slots',
+      evidence:'recorded array operands and exact copied-value provenance; origin is not a current slot or an invariant'});
+  }
+  for(const context of contexts.values())for(const comparison of work?.comparisons??[]){
+    if(context.comparisons.some(c=>c.executionId===comparison.executionId&&c.sourceNodeId===comparison.sourceNodeId))continue;
+    if(comparison.operands?.length!==2||comparison.operands.some(o=>!byEvent.has(o.executionId)))continue;
+    if(!comparison.operands?.some(o=>o.storage?.arrayId===context.array.id||o.copiedFrom?.arrayId===context.array.id))continue;
+    context.comparisons.push({executionId:comparison.executionId,sourceNodeId:comparison.sourceNodeId,operator:comparison.operator,
+      parentIndex:null,childIndex:null,directionCandidate:null,operands:comparison.operands,readExecutionIds:comparison.operands.map(o=>o.executionId),
+      relationScope:'comparison uses this storage; parent-child operand roles unresolved',evidence:'observed comparison with array or transported value'});
   }
   const results=[];
   for(const context of contexts.values()){
@@ -207,6 +245,7 @@ export function indexRelationStructures(plan,{events,objects,views=[],structures
         parent:'floor((childIndex-firstChildOffset)/degree)',children:'degree*parentIndex+firstChildOffset+slot; 0<=slot<degree',
         address:'range.offset+index*elementBytes',representation:'lazy-index-relations'},
       candidateIds:context.candidates.map(x=>x.candidate.id),status:context.formulaEvidence.some(e=>e.status==='contradicted')?'contradicted':reciprocal&&!alternatives.length?'supported':'partial',
+      alternativeGroupId:`index-interpretation:${a.id}`,interpretationPolicy:'alternative descriptors of the same storage, not separate trees',
       formulaEvidence:context.formulaEvidence,comparisonEvidence:context.comparisons,
       direction:{candidate:directions.length===1?directions[0]:null,status:directions.length===1?'comparison-candidate':directions.length?'conflicting':'unknown',
         invariantProven:false},observations,states,

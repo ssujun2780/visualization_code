@@ -88,13 +88,16 @@ export function bindLinkedStructures(plan){
     for(const [cursor,anchor]of [[a,b],[b,a]])if(cursorIds.has(cursor.declarationId)&&!cursorIds.has(anchor.declarationId))
       anchors.push({cursorDeclarationId:cursor.declarationId,anchorDeclarationId:anchor.declarationId,nodeId:n.nodeId,source:n.source});
   }
-  const roles=[...fields.values()].filter(f=>recurrences.some(r=>r.fieldNodeId===f.fieldNodeId));
+  const traversedFamilies=new Set([...fields.values()].filter(f=>recurrences.some(r=>r.fieldNodeId===f.fieldNodeId)).map(f=>f.recordTypeId));
+  // Preserve all observed relations of the traversed family. Traversal roles
+  // and full storage connectivity are separate projections of these fields.
+  const roles=[...fields.values()].filter(f=>traversedFamilies.has(f.recordTypeId));
   const roleGroups=new Map();
   for(const cursor of cursorIds){
     const traversed=recurrences.filter(r=>r.cursorDeclarationId===cursor);
     for(const family of new Set(traversed.map(r=>fields.get(r.fieldNodeId)?.recordTypeId))){
       const matching=traversed.filter(r=>fields.get(r.fieldNodeId)?.recordTypeId===family),fieldNodeIds=[...new Set(matching.map(r=>r.fieldNodeId))].sort();
-      if(fieldNodeIds.length<2)continue;
+      if(!fieldNodeIds.length)continue;
       const id=`link-roles:${family}:${fieldNodeIds.join(':')}`;
       if(!roleGroups.has(id))roleGroups.set(id,{id,recordTypeId:family,fieldNodeIds,cursorDeclarationIds:[],callInstructionIds:[],evidence:'compiler traversal recurrence groups, independent of field names'});
       const group=roleGroups.get(id);group.cursorDeclarationIds.push(cursor);
@@ -141,7 +144,7 @@ export function linkedStructures(plan,{events,objects,views,arrays=[]}){
   const defs=new Map(plan.instructions.map(d=>[d.id,d])),byEvent=new Map(events.map(e=>[e.eventId,e])),byObject=new Map(objects.map(o=>[o.id,o])),
     decls=new Map(plan.declarations.map(d=>[d.id,d])),families=new Map(),nodes=new Map(),nodeAt=new Map(),objectDecl=new Map(),slotHistory=new Map(),roots=new Map();
   const slot=(id,offset)=>`${id}:${offset}`,recordId=t=>t?.recordTypeId;
-  const boundarySpecs=plan.structureBindings.linkBoundarySpecs??[],boundaryRecords=new Map();
+  const boundarySpecs=plan.structureBindings.linkBoundarySpecs??[],boundaryRecords=new Map(),payloadReads=new Set();
   for(const r of roles){if(!families.has(r.recordTypeId))families.set(r.recordTypeId,[]);families.get(r.recordTypeId).push(r);}
   function addNode(objectId,offset,type){
     if(!families.has(recordId(type)))return null;const o=byObject.get(objectId),size=type.sizeBits/8;
@@ -173,6 +176,14 @@ export function linkedStructures(plan,{events,objects,views,arrays=[]}){
       if(e.value.reference?.status==='null')slotHistory.get(id).observedNull=true;
     }
     const ref=e.value?.reference,type=e.value?.cType;
+    if(e.action==='argument'&&ref?.targetObjectId&&type?.pointee?.kind==='record'){
+      const call=byEvent.get(e.callExecutionId),argument=unwrap(defs.get(call?.instructionId)?.arguments?.[e.parameterIndex]);
+      const direct=argument?.kind==='DeclRefExpr'&&['array','record'].includes(argument.cType?.kind)||
+        argument?.kind==='UnaryOperator'&&argument.operator==='&';
+      const parameter=objectDecl.get(e.target?.objectId);
+      if(direct&&(rootDeclarations.has(parameter)||cursors.has(parameter))){addNode(ref.targetObjectId,ref.targetOffset??0,type.pointee);
+        addRoot('record-root',ref.targetObjectId,ref.targetOffset??0,type.pointee,'observed direct argument address/array decay');}
+    }
     if(ref?.targetObjectId&&type?.pointee?.kind==='pointer'&&type.pointee.pointee?.kind==='record'){
       const embedded=[...nodes.values()].some(n=>n.objectId===ref.targetObjectId&&ref.targetOffset>=n.offset&&ref.targetOffset<n.offset+n.size);
       if(!embedded)addRoot('pointer-slot',ref.targetObjectId,ref.targetOffset??0,type.pointee.pointee,'observed address of root pointer slot');
@@ -223,6 +234,9 @@ export function linkedStructures(plan,{events,objects,views,arrays=[]}){
         objectId=e.value.reference.targetObjectId;offset=(e.value.reference.targetOffset??0)+spec.offset;
       }
       if(!objectId)continue;const node=addNode(objectId,offset,spec.cType);if(!node)continue;
+      // An address expression can be the only stable root (no separate head
+      // variable is required). Its boundary role is independent of payload.
+      addRoot('anchor',objectId,offset,spec.cType,'compiler boundary expression and observed record address');
       if(!boundaryRecords.has(node.id)){
         boundaryRecords.set(node.id,{nodeId:node.id,objectId,offset,size:node.size,recordTypeId:node.recordTypeId,
           evidenceExecutionIds:[e.eventId],sourceNodeIds:[spec.comparisonNodeId],evidence:'compiler termination comparison and observed base storage plus member byte offset'});changed=true;
@@ -242,17 +256,20 @@ export function linkedStructures(plan,{events,objects,views,arrays=[]}){
       reference:s.reference,lastWrite:s.lastWrite,status:s.reference?.targetObjectId&&!alive.has(s.reference.targetObjectId)?'ended-target':s.reference?.status??'unknown'};
   }
   function state(c,e){
-    const family=c.root.recordTypeId,rootAlive=alive.has(c.root.objectId),anchor=c.root.kind==='anchor'?nodeAt.get(`${slot(c.root.objectId,c.root.offset)}:${family}`):null,
+    const family=c.root.recordTypeId,rootAlive=alive.has(c.root.objectId),rootNode=nodeAt.get(`${slot(c.root.objectId,c.root.offset)}:${family}`),
+      anchor=c.root.kind==='anchor'&&!payloadReads.has(rootNode)?rootNode:null,
       rootReference=slots.get(slot(c.root.objectId,c.root.offset))?.reference,
-      start=rootAlive?(anchor??target(rootReference,family)):null,connected=new Set(start?[start]:[]),
+      direct=c.root.kind==='record-root'||c.root.kind==='anchor'&&!anchor?rootNode:null,
+      start=rootAlive?(direct??anchor??target(rootReference,family)):null,connected=new Set(start?[start]:[]),
       storageTopology=rootedConnectivity(start,{nodes,roles:c.roles,relation,isAlive:n=>alive.has(n.objectId),
-        rootStatus:!rootAlive?'ended-root':anchor?'in-bounds':rootReference?.status??'unknown'}),
+        rootStatus:!rootAlive?'ended-root':anchor||direct?'in-bounds':rootReference?.status??'unknown'}),
       options={nodes,relation,isAlive:n=>!!n&&alive.has(n.objectId),isTerminal:n=>!!n&&boundaryRecords.has(n.id)&&alive.has(n.objectId),
-        includeRootBoundary:!!anchor,rootStatus:!rootAlive?'ended-root':anchor?'in-bounds':rootReference?.status??'unknown'},
+        includeRootBoundary:!!anchor,rootStatus:!rootAlive?'ended-root':anchor||direct?'in-bounds':rootReference?.status??'unknown'},
       hasBoundary=[...boundaryRecords.values()].some(b=>b.recordTypeId===family&&alive.has(b.objectId)),
       fullTopology=hasBoundary?rootedConnectivity(start,{...options,roles:c.roles}):storageTopology,
       properGroups=c.roleGroups.filter(g=>g.fieldNodeIds.length<c.roles.length),
-      selectedGroup=properGroups.length===1?properGroups[0]:null,
+      widestGroups=properGroups.filter(g=>g.fieldNodeIds.length===Math.max(...properGroups.map(x=>x.fieldNodeIds.length))),
+      selectedGroup=widestGroups.length===1?widestGroups[0]:null,
       roleTopologies=c.roleGroups.map(g=>({roleGroupId:g.id,fieldNodeIds:g.fieldNodeIds.slice(),auxiliaryFieldNodeIds:g.auxiliaryFieldNodeIds.slice(),
         topology:g.fieldNodeIds.length===c.roles.length?fullTopology:rootedConnectivity(start,{...options,roles:c.roles.filter(r=>g.fieldNodeIds.includes(r.fieldNodeId))})})),
       topology=selectedGroup?roleTopologies.find(g=>g.roleGroupId===selectedGroup.id).topology:fullTopology;
@@ -308,8 +325,23 @@ export function linkedStructures(plan,{events,objects,views,arrays=[]}){
         status:inconsistencies.length?'intermediate-or-inconsistent':topology.status==='partial'?'partial':'observed'};
     const prev=c.states.at(-1);if(!prev||JSON.stringify({...prev,afterExecutionId:null})!==JSON.stringify({...row,afterExecutionId:null}))c.states.push(row);
   }
+  function fromCursor(id,seen=new Set()){
+    if(seen.has(id))return false;seen.add(id);const e=byEvent.get(id);if(!e)return false;
+    if(e.kind==='READ'&&cursors.has(objectDecl.get(e.target?.objectId)))return true;
+    return [...e.dataInputs??[],...e.addressInputs??[]].some(id=>fromCursor(id,seen));
+  }
   for(const e of events){
     let changed=observeBoundaries(e);
+    if(e.kind==='READ'&&e.target&&!e.value?.reference){
+      const n=unwrap(defs.get(e.instructionId)?.expression);
+      if(n?.kind==='MemberExpr'&&n.cType?.kind!=='pointer'&&(e.addressInputs??[]).some(id=>fromCursor(id)))for(const record of nodes.values())
+        if(record.objectId===e.target.objectId&&e.target.offset>=record.offset&&e.target.offset+e.target.size<=record.offset+record.size){
+          payloadReads.add(record.id);if(boundaryRecords.delete(record.id))changed=true;
+        }
+    }
+    // A termination comparison can mark a return-to-start boundary. Once the
+    // record's data was consumed it cannot be excluded as a dummy sentinel.
+    for(const id of payloadReads)if(boundaryRecords.delete(id))changed=true;
     if(e.action==='object.begin'){alive.add(e.objectId);changed=true;}
     if(e.action==='object.end'){alive.delete(e.objectId);ended.set(e.objectId,{eventId:e.eventId,reason:e.reason});changed=true;}
     if(e.action==='frame.end')for(const id of e.endedObjects??[]){alive.delete(id);ended.set(id,{eventId:e.eventId,reason:'frame-end'});changed=true;}
@@ -350,7 +382,7 @@ export function linkedStructures(plan,{events,objects,views,arrays=[]}){
     return {...base,nodes:[...new Set(logicalNodes.flatMap(n=>viewIds.get(n.objectId)??[]))],edges:[],logicalNodes,
       warningEpisodes,
       storageNodes:[...nodes.values()].filter(n=>n.recordTypeId===c.root.recordTypeId).map(n=>({...n,ended:ended.get(n.objectId)??null})),
-      roles:supported,inversePairs:paired,views:[...(supported.length===1&&c.roles.length===1?['singly-linked-candidate']:[]),...(paired.length&&!hasChildSubset?['doubly-linked-candidate']:[]),
+      roles:c.roles,traversalRoles:supported,inversePairs:paired,views:[...(supported.length===1&&c.roles.length===1?['singly-linked-candidate']:[]),...(paired.length&&!hasChildSubset?['doubly-linked-candidate']:[]),
         ...new Set(c.states.flatMap(s=>s.topology.views)),
         ...(c.states.some(s=>s.boundaries.length)?['sentinel-candidate']:[]),
         ...(c.root.kind==='anchor'&&c.states.some(s=>s.orders.some(o=>o.termination==='anchor'))?['circular-linked-candidate','sentinel-candidate']:[])],

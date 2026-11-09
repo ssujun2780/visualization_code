@@ -1,4 +1,12 @@
 // Adapter for the bundled LLVM 8 textual format. C syntax is parsed by Clang.
+export const llvmSymbol='(?:[-\\w.$]+|"[^"\\r\\n]+")';
+export const llvmLocal=`%${llvmSymbol}`;
+export function llvmName(text){
+  const value=text?.replace(/^"|"$/g,'');
+  return value?.replace(/(?:\\[0-9a-fA-F]{2})+/g,s=>Buffer.from(s.split('\\').slice(1).map(x=>parseInt(x,16))).toString('utf8'));
+}
+export const llvmDefinition=new RegExp(`^\\s*(${llvmLocal}) = (.*)$`);
+export const llvmFunction=new RegExp(`@(${llvmSymbol})\\(`);
 export function splitTop(text, separator = ",") {
   const result=[];let start=0,depth=0,quoted=false;
   for(let i=0;i<text.length;i++) {
@@ -34,7 +42,7 @@ export function operand(text) {
 export function metadata(ir) {
   const nodes=new Map();for(const line of ir.split("\n")) {const m=/^!(\d+) = (.*)/.exec(line);if(m)nodes.set(m[1],m[2]);}
   const field=(id,key)=>new RegExp(`(?:^|[, (])${key}: ("(?:[^"\\\\]|\\\\.)*"|![0-9]+|[^,)]+)`).exec(nodes.get(String(id))??"")?.[1];
-  const clean=v=>v?.replace(/^!/,"").replace(/^"|"$/g,"");
+  const clean=v=>llvmName(v?.replace(/^!/,""));
   const locationCache=new Map();
   function location(id,seen=new Set()) {
     if(!id)return null;id=String(id);
@@ -54,7 +62,7 @@ export function metadata(ir) {
     sizeBits:Number(field(id,"size")??0),offsetBits:Number(field(id,"offset")??0),encoding:field(id,"encoding")??null,
     baseType:/^!\d+$/.test(field(id,"baseType")??'')?`debug:${clean(field(id,"baseType"))}`:null,
     elements:field(id,"elements")? [...(nodes.get(clean(field(id,"elements")))??"").matchAll(/!(\d+)/g)].map(m=>`debug:${m[1]}`):[],
-    flags:field(id,'flags')??null,
+    flags:field(id,'flags')??null,source:location(id),
     ...(field(id,'flags')?.includes('DIFlagBitField')?{bitField:true,storageOffsetBits:Number(/i\d+ (-?\d+)/.exec(field(id,'extraData')??'')?.[1]??0)}:{}),
     evidence:"compiler"}));
   for(const t of types.filter(t=>t.tag==='DW_TAG_enumeration_type')){

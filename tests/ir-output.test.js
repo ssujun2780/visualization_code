@@ -20,7 +20,7 @@ function fixture(){
     call:()=>{const e=add('FLOW','call.begin',{callee:'@printf',arguments:[]});callEventId=e.eventId;return e;},
     output:(text,fields={})=>{
       const channel=fields.channel??'stdout',byteLength=Buffer.byteLength(text),streamOffset=offsets[channel];
-      const e=add('WRITE','output',{text,channel,byteLength,streamOffset,callEventId,...fields});
+      const e=add('WRITE','output',{text,bytesHex:Buffer.from(text).toString('hex'),channel,byteLength,streamOffset,callEventId,...fields});
       offsets[channel]=e.streamOffset+e.byteLength;return e;
     },
     resume:fields=>add('FLOW','call.end',{callEventId,value:{signed:'0'},...fields}),

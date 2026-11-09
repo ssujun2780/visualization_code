@@ -15,30 +15,50 @@ export function applyMacroLocations(nodes,dump){
     tokens.push(token);const k=key(token.spelling??token.at);if(!locations.has(k))locations.set(k,[]);locations.get(k).push(token.index);
   }
   const roots=nodes.filter(n=>n.kind==='FunctionDecl'&&userFunction(n)===n);
+  function mapExpansion(node,best,root){
+    const a=tokens[best.a],b=tokens[best.b];
+    if(!(a.spelling||b.spelling))return;
+    const mapped={file:'/main.c',start:a.at,end:b.at,macroInvocation:order(a.at,b.at)===0,
+      evidence:'compiler token expansion locations'};
+    node.expansionSource=mapped;node.macroTokenRange={start:best.a,end:best.b};
+    if(['VarDecl','ParmVarDecl'].includes(node.kind)){
+      const point=node.declarationPoint;
+      const declaration=tokens.slice(best.a,best.b+1).filter(t=>key(t.spelling??t.at)===key(point));
+      if(declaration.length===1)node.expansionDeclarationPoint={...declaration[0].at};
+    }
+    const valid=node.source?.file==='/main.c'&&order(root.source.start,node.source.start)<=0&&order(node.source.end,root.source.end)<=0;
+    if(!valid)node.source={...mapped};
+  }
   for(const root of roots){const stack=[{node:root,lo:0,hi:tokens.length-1}],anchors=new WeakMap();
     const anchorPoints=n=>{if(anchors.has(n))return anchors.get(n);const p=n.spellingRange?.start;
       const points=n.children.length?n.children.flatMap(anchorPoints):p?.file==='/main.c'&&order(root.source.start,p)<=0&&order(p,root.source.end)<=0?[p]:[];
       anchors.set(n,points);return points;};
     while(stack.length){const frame=stack.at(-1),{node,lo,hi}=frame;
       if(frame.entered){const child=node.children[frame.next++];if(child){stack.push({node:child,lo:frame.ordered?frame.cursor:frame.low,hi:frame.high,orderedContext:frame.ordered});continue;}
+        // Nested substitutions can give a parent the same spelling endpoints
+        // as either child. Its full span must contain every resolved child,
+        // not merely one occurrence of each repeated source token.
+        if(node.macroLocationGap&&node.children.length&&node.children.every(c=>c.macroTokenRange)){
+          const start=Math.min(...node.children.map(c=>c.macroTokenRange.start)),end=Math.max(...node.children.map(c=>c.macroTokenRange.end));
+          let best=null,ambiguous=false;
+          for(const a of locations.get(key(node.spellingRange?.start))??[])if(a>=lo&&a<=start)
+            for(const b of locations.get(key(node.spellingRange?.end))??[])if(b>=end&&b<=hi){
+              if(!best||b-a<best.b-best.a){best={a,b};ambiguous=false;}
+              else if(b-a===best.b-best.a&&(a!==best.a||b!==best.b))ambiguous=true;
+            }
+          if(best&&!ambiguous){mapExpansion(node,best,root);delete node.macroLocationGap;frame.best=best;}
+        }
         stack.pop();if(frame.best&&stack.length)stack.at(-1).cursor=Math.max(stack.at(-1).cursor,frame.best.b+1);continue;}
       const r=node.spellingRange;let best=null,ambiguous=false;
       if(r)for(const a of locations.get(key(r.start))??[])if(a>=lo&&a<=hi)for(const b of locations.get(key(r.end))??[])if(b>=a&&b<=hi){
         const point=['VarDecl','ParmVarDecl'].includes(node.kind)?node.declarationPoint:null;
-        if(point?.file==='/main.c'&&(order(tokens[a].at,point)>0||order(point,tokens[b].at)>0))continue;
+        if(point?.file==='/main.c'&&order(root.source.start,point)<=0&&order(point,root.source.end)<=0&&
+          (order(tokens[a].at,point)>0||order(point,tokens[b].at)>0))continue;
         if(!anchorPoints(node).every(p=>(locations.get(key(p))??[]).some(i=>i>=a&&i<=b)))continue;
         if(!best||b-a<best.b-best.a){best={a,b};ambiguous=false;}else if(b-a===best.b-best.a&&(a!==best.a||b!==best.b)&&!frame.orderedContext)ambiguous=true;
       }
       if(best&&!ambiguous){
-        const a=tokens[best.a],b=tokens[best.b],expanded=!!(a.spelling||b.spelling);
-        if(expanded){const mapped={file:'/main.c',start:a.at,end:b.at,macroInvocation:order(a.at,b.at)===0,
-            evidence:'compiler token expansion locations'};node.expansionSource=mapped;
-          // Distinct substitutions can share both spelling and expansion points.
-          // Preserve their compiler token occurrences for SSA operand binding.
-          node.macroTokenRange={start:best.a,end:best.b};
-          const valid=node.source?.file==='/main.c'&&order(root.source.start,node.source.start)<=0&&order(node.source.end,root.source.end)<=0;
-          if(!valid)node.source={...mapped};
-        }
+        mapExpansion(node,best,root);
       }
       if(ambiguous){node.macroLocationGap='ambiguous compiler expansion';if(node.source?.file!=='/main.c'||order(node.source.start,root.source.start)<0)node.source=null;}
       Object.assign(frame,{entered:true,next:0,best:best&&!ambiguous?best:null,low:best&&!ambiguous?best.a:lo,high:best&&!ambiguous?best.b:hi,

@@ -15,7 +15,7 @@ const limit=r=>{const flags=r.leb();r.leb();if(flags&1)r.leb();if(flags&~3)throw
 export function observeWasmMemory(binary){
   const bytes=Buffer.from(binary),r=new Reader(bytes);if(r.take(8).toString('hex')!=='0061736d01000000')throw new Error('Expected WASM v1');
   const sections=[];while(r.p<bytes.length){const id=r.byte(),size=r.leb();sections.push({id,data:r.take(size)});}
-  const types=[],functions=[];let emit=null,imports=0;
+  const types=[],functions=[],dataRegions=[];let emit=null,imports=0;
   for(const section of sections){const a=new Reader(section.data);
     if(section.id===1){for(let n=a.leb();n--;){if(a.byte()!==0x60)throw new Error('Unsupported WASM type');const params=a.leb();a.take(params);const returns=a.leb();a.take(returns);types.push(params);}}
     if(section.id===2)for(let n=a.leb();n--;){const module=a.string(),name=a.string(),kind=a.byte();
@@ -23,6 +23,14 @@ export function observeWasmMemory(binary){
       else if(kind===1){a.byte();limit(a);}else if(kind===2)limit(a);else if(kind===3){a.byte();a.byte();}else throw new Error('Unsupported WASM import');
     }
     if(section.id===3)for(let n=a.leb();n--;)functions.push(a.leb());
+    if(section.id===11)for(let n=a.leb();n--;){
+      const flags=a.leb();if(flags===1){a.take(a.leb());continue;}
+      if(flags===2&&a.leb()!==0)throw new Error('Unsupported data memory');
+      if(flags!==0&&flags!==2)throw new Error('Unsupported data segment');
+      if(a.byte()!==0x41)throw new Error('Nonconstant linked data offset');
+      const address=a.leb();if(a.byte()!==0x0b)throw new Error('Invalid linked data offset');
+      const size=a.leb();a.take(size);dataRegions.push({address,size,evidence:'linked active WASM data segment',objectBounds:'unknown'});
+    }
   }
   if(emit===null)throw new Error('Linked memory observer requires cvtrace.emit');
   let loads=0,stores=0;
@@ -59,5 +67,5 @@ export function observeWasmMemory(binary){
   }
   code.data=Buffer.concat([Buffer.from(u(count)),...bodies]);
   return {bytes:Buffer.concat([bytes.subarray(0,8),...sections.flatMap(x=>[Buffer.from([x.id,...u(x.data.length)]),x.data])]),
-    coverage:{method:'linked wasm32 scalar memory operations',functions:count,loads,stores,source:'observed memory access; no function-name classifier'}};
+    dataRegions,coverage:{method:'linked wasm32 scalar memory operations',functions:count,loads,stores,source:'observed memory access; no function-name classifier'}};
 }

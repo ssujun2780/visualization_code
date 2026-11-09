@@ -103,6 +103,10 @@ export function queueStructures(plan,{events,objects,structures=[]}){
       }
       const ops=[...operations(frontAccesses,'front'),...operations(backAccesses,'back')].sort((a,b)=>byEvent.get(a.accessExecutionId).index-byEvent.get(b.accessExecutionId).index);
       if(!ops.some(o=>o.kind==='dequeue'&&o.status==='supported')||!ops.some(o=>o.kind==='enqueue'&&o.status==='supported'))continue;
+      const consumption=ops.filter(o=>o.kind==='dequeue'&&o.status==='supported'),
+        copyReads=new Set((work.transfers??[]).filter(t=>t.target?.arrayId&&t.wholeElement).map(t=>t.readExecutionId)),
+        onlyCopies=consumption.every(o=>copyReads.has(o.accessExecutionId)),
+        coveredAccesses=new Set(ops.map(o=>o.accessExecutionId)),unexplained=own.filter(a=>!coveredAccesses.has(a.executionId)).map(a=>a.executionId);
       const changes=new Set([...writes.get(frontKey)??[],...writes.get(backKey)??[]].map(e=>e.eventId));
       for(const o of ops){changes.add(o.accessExecutionId);if(o.updateExecutionId)changes.add(o.updateExecutionId);}
       for(const c of compare)changes.add(c.executionId);
@@ -134,7 +138,12 @@ export function queueStructures(plan,{events,objects,structures=[]}){
       }
       const supporting=['dequeue','enqueue'].map(kind=>ops.find(o=>o.kind===kind&&o.status==='supported').completedAtExecutionId).concat(compare[0].executionId),
         inferredAt=supporting.reduce((a,b)=>byEvent.get(a).index>byEvent.get(b).index?a:b);
-      results.push({id:`queue:${array.id}:${frontKey}:${backKey}`,kind:'queue-candidate',views:['fifo-candidate'],classification:'candidate',origin:'inferred',intent:'unconfirmed',
+      results.push({id:`queue:${array.id}:${frontKey}:${backKey}`,kind:onlyCopies?'cursor-interval-candidate':'queue-candidate',
+        views:onlyCopies?['array-cursor-interval']:['fifo-candidate'],classification:'candidate',origin:'inferred',intent:'unconfirmed',
+        assessment:{status:onlyCopies?'insufficient-consumption-evidence':ops.some(o=>o.status==='contradicted')?'contradicted':unexplained.length?'partial':'supported',
+          supportingExecutionIds:ops.filter(o=>o.status==='supported').map(o=>o.accessExecutionId),
+          contradictingExecutionIds:ops.filter(o=>o.status==='contradicted').map(o=>o.accessExecutionId),
+          unexplainedAccessExecutionIds:unexplained,consumption:onlyCopies?'array copies do not establish logical removal':'endpoint access/update candidate'},
         arrayId:array.id,objectId:array.objectId,range:array.range,elementBytes:array.elementBytes,capacity:array.capacity,nodes:array.nodes??[],edges:[],
         roles:{front,back,indexOffset:offset},inferredAtExecutionId:inferredAt,operations:ops,comparisons:compare,states,
         evidence:['compiler array-index identities','recorded cursor reads and writes','executed comparison between cursor storage'],

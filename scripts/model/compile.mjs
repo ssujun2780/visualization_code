@@ -11,9 +11,9 @@ export function validateSource(source){
 export async function prepareCModel(source,options={}){
   validateSource(source);
   const analysis=await emitLLVM(source);
-  const parsedNodes=analysis.parsedNodes??astNodes(analysis.ast),macroTokens=needsMacroLocations(parsedNodes)?await macroTokenLocations(source):null;
-  try{return {analysis,generated:instrumentLLVM(analysis.llvm,source,{...options,ast:analysis.ast,parsedNodes,macroTokens,recordLayouts:analysis.recordLayouts})};}
-  catch(error){error.stage='ir-conversion';throw error;}
+  try{const parsedNodes=analysis.parsedNodes??astNodes(analysis.ast),macroTokens=needsMacroLocations(parsedNodes)?await macroTokenLocations(source):null;
+    return {analysis,generated:instrumentLLVM(analysis.llvm,source,{...options,ast:analysis.ast,parsedNodes,macroTokens,recordLayouts:analysis.recordLayouts})};}
+  catch(error){error.stage='ir-conversion';error.analysis=analysis;throw error;}
 }
 
 // This runs the compiler frontend, never the user's C program.

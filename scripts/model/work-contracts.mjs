@@ -2,11 +2,12 @@
 const memoryActions=new Set(['read','write','copy','fill','write.range']);
 const safe=n=>Number.isSafeInteger(n)&&n>=0;
 const hex=s=>typeof s==='string'&&/^(?:[0-9a-f]{2})*$/i.test(s);
+const incompleteExecution=trace=>trace.coverage?.execution==='not started'||['limited','engine-error'].includes(trace.status);
 
 export function inspectWorkTrace(plan,trace){
   const issues=[],events=new Map(trace.events.map((e,i)=>[e.eventId,{event:e,index:i}])),
     objects=new Map((trace.objects??[]).map(o=>[o.id,o])),frames=new Map((trace.frames??[]).map(f=>[f.id,f]));
-  const ledgerAvailable=objects.size>0||!['limited','engine-error'].includes(trace.status);
+  const ledgerAvailable=objects.size>0||!incompleteExecution(trace);
   const issue=(code,event,detail)=>issues.push({code,eventId:event?.eventId??null,detail});
   function snapshot(s,event,expectedSize){
     if(!s||s.format!=='memory-ranges-v1'||!safe(s.byteLength)||!Array.isArray(s.ranges)||s.byteLength!==expectedSize){
@@ -34,6 +35,8 @@ export function inspectWorkTrace(plan,trace){
       issue('memory-range',event,'memory operation exceeds its storage object');
     const begin=events.get(object.createdBy),end=events.get(object.endedBy);
     if(!begin||begin.index>index||end&&end.index<=index)issue('memory-lifetime',event,'memory operation is outside the recorded object lifetime');
+    if(Number.isInteger(event.recordedOrder)&&end&&Number.isInteger(end.event.recordedOrder)&&end.event.recordedOrder<=event.recordedOrder)
+      issue('runtime-memory-lifetime',event,'deferred field cleanup cannot extend the observed runtime memory lifetime');
     if(target.address&&safe(object.address)&&/^0x[0-9a-f]+$/i.test(target.address)&&Number(BigInt(target.address))!==object.address+target.offset)
       issue('memory-address',event,'address does not match object and offset');
   }
@@ -79,18 +82,31 @@ export function inspectWorkTrace(plan,trace){
   }
   // Truncated worker transport can intentionally have no object/frame summary.
   // Such a result remains limited/engine-error; it cannot establish lifetime correctness.
-  if(!['limited','engine-error'].includes(trace.status))for(const object of objects.values()){
+  if(!incompleteExecution(trace))for(const object of objects.values()){
     const begin=events.get(object.createdBy),end=events.get(object.endedBy);
     if(!begin||object.endedBy&&(!end||end.index<begin.index))issue('object-ledger-order',begin?.event,'storage creation/end history is incomplete');
+  }
+  for(const object of objects.values())if(object.storageAlias){
+    const alias=object.storageAlias,backing=objects.get(alias.objectId),root=objects.get(alias.rootObjectId),begin=events.get(object.createdBy);
+    if(!backing||!root||!safe(alias.offset)||alias.offset+object.size>backing.size||
+      object.address!==backing.address+alias.offset||alias.size!==object.size||
+      events.get(backing.createdBy)?.index>=begin?.index||alias.rootObjectId!==(backing.storageAlias?.rootObjectId??backing.id))
+      issue('source-storage-alias',begin?.event,'source lifetime and shared physical storage binding disagree');
+  }
+  for(const frame of frames.values())if(frame.callbackOfCallExecutionId){
+    const call=events.get(frame.callbackOfCallExecutionId)?.event;
+    if(call?.action!=='call'||call.kind!=='FLOW'||call.activationId!==frame.parent)
+      issue('callback-owner',call,'callback frame has no matching public caller');
   }
   return issues;
 }
 
 export function validateWorkTrace(plan,trace){
   const issues=inspectWorkTrace(plan,trace);
-  if(issues.length){const first=issues[0];throw new Error(`중간언어 작업 계약 위반: ${first.code} (${first.eventId??'ledger'}): ${first.detail}`);}
+  if(issues.length){const first=issues[0],error=new Error(`중간언어 작업 계약 위반: ${first.code} (${first.eventId??'ledger'}): ${first.detail}`);
+    error.code='ir-work-contract';error.eventId=first.eventId;error.context={contract:first.code,detail:first.detail};throw error;}
   trace.coverage??={};trace.coverage.workContracts={scope:'observed payload, storage range/lifetime, dependency order, output bytes and conditional decision',
-    storageLedger:(trace.objects?.length||!['limited','engine-error'].includes(trace.status))?'checked':'unavailable',
+    storageLedger:(trace.objects?.length||!incompleteExecution(trace))?'checked':'unavailable',
     semanticCompleteness:'not established by structural validation'};
   return trace;
 }

@@ -14,6 +14,8 @@ import {arrayCursorPathStructures} from './array-cursor-paths.mjs';
 import {indexRelationStructures} from './index-relations.mjs';
 import {assertionObservation} from './assertions.mjs';
 import {buildResultDeliveries} from './result-delivery.mjs';
+import {orderReturnCleanup,remapExecutionReferences} from './return-sequence.mjs';
+import {runtimeArrayViews} from './runtime-array-views.mjs';
 import {resolvedCoverage} from './coverage-resolution.mjs';
 import {indexedGraphStructures} from './indexed-graph-views.mjs';
 import {recordIndexStructures} from './record-index-views.mjs';
@@ -22,12 +24,16 @@ import {attachConversionConsumers} from './conversion-consumers.mjs';
 import {valueIndexStructures} from './value-index-views.mjs';
 import {parallelArrayStructures} from './parallel-array-views.mjs';
 import {createValueFlow} from './observed-value-flow.mjs';
+import {storageRelationStructures} from './storage-relations.mjs';
+import {coindexedRecordStructures} from './coindexed-record-views.mjs';
+import {separateArrayStructures} from './separate-array-views.mjs';
+import {createObservationResolver,createAliasResolver} from './observation-dependencies.mjs';
 const unique=list=>[...new Set(list.filter(Boolean))];
 const sourceBoolean=(value,spec)=>{const bit=BigInt(value.bits)!==0n,source=spec.invert?!bit:bit;
   return cResult({...value,bits:source?'0x1':'0x0',evidence:'AST truth mapped from observed LLVM boolean',
     truthEvidence:{backendBits:value.bits,backendType:value.type,inverted:spec.invert}},spec.cType,true);};
 const references=['dataInputs','addressInputs','controlInputs','calleeInputs'];
-const copyFields=['target','value','memoryState','previousMemoryState','sourceAddress','sourceObjectId','sourceOffset','sourceSize',
+const copyFields=['target','value','memoryState','previousMemoryState','sourceAddress','sourceObjectId','sourceOffset','sourceSize','storageAlias','returnStorage',
   'readRegions','includesNullTerminator','terminatorOffset','paddingSize','byte','storage','initialized','size','address','reason',
   'frameId','objectId','name','parameterIndex','condition','backendCondition','selected','channel','text','bytesHex','byteLength','streamOffset','diagnostic',
   'left','right','operator','predicate','conversion','initializationEvidence','uncertainRegions','copiedFrom','observedConsumerValue','outputOrigin','selection',
@@ -120,7 +126,7 @@ export function recordIR(plan,observations,raw) {
       // retain their actual representation and captured value.
       const integer=['signed','unsigned'].includes(spec.cType?.signedness),value=
         result.value.bits&&(!result.observationId||integer)?cResult(result.value,spec.cType):{...result.value,cType:spec.cType};
-      return {...result,nodeId:spec.nodeId,value:{...value,evidence:result.observationId?
+      return {...result,nodeId:spec.nodeId,...(spec.foldedExpression?{foldedExpression:spec.foldedExpression}:{}),value:{...value,evidence:result.observationId?
         'observed operand value + AST operand type':'compiler operand bits + AST operand type'}};
     }
     return result;
@@ -169,12 +175,15 @@ export function recordIR(plan,observations,raw) {
     control.claim(command,e);
     command.observationIds.push(e.eventId);rawToExecution.set(e.eventId,command.eventId);
     for(const key of references)command[key].push(...(e[key]??[]));
-    for(const key of copyFields)if(e[key]!==undefined)command[key]=e[key];
+    for(const key of copyFields)if(e[key]!==undefined)command[key]=key==='copiedFrom'?structuredClone(e[key]):e[key];
     // Public CALC labels follow the source definition on both grouped and
     // single-observation paths. LLVM opcodes stay in the raw observations.
     const definition=instructions.get(command.instructionId);
     if(['CALC','FLOW'].includes(command.kind)&&definition?.operator!=null)command.operator=definition.operator;
     if(e.readRegions)command.readRegions=e.readRegions.map(r=>({...r,dataInputs:[...(r.dataInputs??[])]}));
+    if(e.inputStage)command.inputStage=e.inputStage;
+    if(e.streamReadRegions)command.streamReadRegions=e.streamReadRegions.map(r=>({...r,dataInputs:[...r.dataInputs]}));
+    if(e.libraryReadRegions)command.libraryReadRegions=e.libraryReadRegions.map(r=>({...r,dataInputs:[...r.dataInputs]}));
     if(e.callEventId)command.callObservationId=e.callEventId;
     if(e.returnEventId)command.returnObservationId=e.returnEventId;
     if(e.bufferWriterCallEventId)command.bufferWriterCallObservationId=e.bufferWriterCallEventId;
@@ -226,8 +235,9 @@ export function recordIR(plan,observations,raw) {
     const distance=command.steps.find(s=>s.distance&&s.nodeId===instructions.get(p.instructionId)?.expression?.nodeId);
     if(distance){command.distance=distance.distance;command.value=distance.value;}
     const inside=new Set(p.events.map(e=>e.eventId));
-    command.inputs=command.steps.flatMap(s=>(s.inputs??[]).filter(input=>!(s.builtin&&!s.builtin.hasLiteralArguments&&input.observationId===null)))
+    command.inputs=[...command.steps.flatMap(s=>(s.inputs??[]).filter(input=>!(s.builtin&&!s.builtin.hasLiteralArguments&&input.observationId===null))),...p.attemptedInputs??[]]
       .filter(input=>!inside.has(input.observationId));
+    if(p.attemptedInputs)command.dataInputs.push(...command.inputs.map(input=>input.observationId).filter(Boolean));
     // A short-circuit PHI can select a constant even though its decision used
     // an observed operand. Keep those actual inputs as value dependencies too.
     if([...evaluated.values()].some(e=>e.kind==='logical'))
@@ -325,7 +335,13 @@ export function recordIR(plan,observations,raw) {
       control.claim(command,e);command.observationIds.push(e.eventId);command.evidence='compiler-folded source calculation at observed consumer';
       command.value=spec.cType.encoding==='DW_ATE_float'?{...observed,cType:spec.cType}:cResult(observed,spec.cType);command.operator=definition.operator;command.inputs=spec.inputs;
       command.controlInputs=[...(e.controlInputs??[])];
-      command.steps=[{nodeId:spec.nodeId,operator:definition.operator,value:command.value,inputs:spec.inputs,observationIds:[e.eventId],evidence:command.evidence}];
+      // A folded result observes the whole expression, not a binary operation
+      // on flattened leaves. Preserve the compiler tree without inventing
+      // intermediate execution values (or asking the animator to parse C).
+      command.foldedExpression={nodeId:spec.nodeId,expression:definition.expression,inputs:spec.inputs,
+        value:command.value,intermediateValues:'not-observed',evidence:command.evidence};
+      command.steps=[{nodeId:spec.nodeId,kind:'folded-expression',operator:'expression',expression:definition.expression,
+        value:command.value,inputs:spec.inputs,observationIds:[e.eventId],evidence:command.evidence}];
       const token=`folded:${e.eventId}:${spec.instructionId}`;rawToExecution.set(token,command.eventId);
       results.push({executionId:command.eventId,token,consumer:spec.consumer});
     }
@@ -476,7 +492,7 @@ export function recordIR(plan,observations,raw) {
       else e.dataInputs=runtimeInputs(e,op).map(input=>definitions.get(definitionKey(e.activationId,input.value))?.eventId).filter(Boolean);
     }
     const key=definitionKey(e.activationId,e.instructionId);
-    if(e.phase==='commit'||['copy','fill','write.range','call.end'].includes(e.action))for(const site of b?.returnSourceFor??[])
+    if(e.phase!=='attempt')for(const site of b?.returnSourceFor??[])
       returnSources.set(definitionKey(e.activationId,site.returnObservationId),site.sourceNodeId);
     if(b?.foldedCalculations&&(e.action==='call.begin'||e.phase==='commit'||e.action==='return.value')){
       flushPending();const tokens=emitFolded(e,b);if(tokens.length)e={...e,dataInputs:[...(e.dataInputs??[]),...tokens]};
@@ -529,6 +545,11 @@ export function recordIR(plan,observations,raw) {
       while(pending&&b?.failedInstructionId&&!belongsToPendingExpression(e,b.failedInstructionId)){
         flushCurrent();pending=suspended.pop()??null;
       }
+      // A checked operation can fail before its result observation is emitted.
+      // Its operands have nevertheless already been obtained. Preserve those
+      // values without inventing a completed operation or evaluating C again.
+      if(pending&&op?.kind==='CALC'&&b?.failedInstructionId&&belongsToPendingExpression(e,b.failedInstructionId))
+        pending.attemptedInputs=calculationInputs(e,op);
       const hadPending=!!pending||callCalculations.size>0;flushPending('failed');finishHeldCalls('failed');
       for(const attempt of [...attempts.values()]){
         attempts.delete(definitionKey(attempt.activationId,attempt.instructionId));
@@ -615,11 +636,16 @@ export function recordIR(plan,observations,raw) {
       emitSingle(e);const argument=pendingArguments.get(key),argumentId=b.roles['WRITE:argument'];
       if(argument){const command=emitSingle(argument,argumentId);if(command){command.target={objectId:e.objectId,address:e.address,offset:0,size:e.size};
         command.value={kind:'aggregate',type:op.parameter.type.slice(0,-1),cType:instructions.get(argumentId)?.cType??op.cType,
-          byteLength:e.size,evidence:'observed by-value memory'};command.abiValue=argument.value;command.memoryState=e.memoryState;command.copiedFrom=e.copiedFrom;
+          byteLength:e.size,evidence:'observed by-value memory'};command.abiValue=argument.value;command.memoryState=e.memoryState;command.copiedFrom=structuredClone(e.copiedFrom);
         command.inputs=e.copiedFrom?[{kind:'memory-range',...e.copiedFrom}]:[];
+        command.dataInputs=[...argument.dataInputs??[]];
         const sourceCall=executions.get(rawToExecution.get(argument.callEventId));
-        if(sourceCall){const value={...command.value,memoryState:e.memoryState,copiedFrom:e.copiedFrom};
-          sourceCall.arguments[command.parameterIndex]=value;sourceCall.inputs[command.parameterIndex]={...sourceCall.inputs[command.parameterIndex],value,parameterIndex:command.parameterIndex};}
+        if(sourceCall){const value={...command.value,memoryState:e.memoryState,copiedFrom:structuredClone(e.copiedFrom)};
+          const previous=sourceCall.inputs[command.parameterIndex];
+          if(previous?.observationId){sourceCall.addressInputs.push(previous.observationId);sourceCall.dataInputs=sourceCall.dataInputs.filter(id=>id!==previous.observationId);}
+          sourceCall.dataInputs.push(...command.dataInputs);
+          sourceCall.arguments[command.parameterIndex]=value;sourceCall.inputs[command.parameterIndex]={kind:'memory-range',...e.copiedFrom,
+            observationId:e.copiedFrom?.valueObservationId??null,value,parameterIndex:command.parameterIndex};}
       }
         pendingArguments.delete(key);}
     }else emitSingle(e);
@@ -633,59 +659,19 @@ export function recordIR(plan,observations,raw) {
     attempts.delete(definitionKey(attempt.activationId,attempt.instructionId));
     const command=emitSingle(attempt);if(command){command.phase=raw.status==='fault'?'failed':'incomplete';delete command.value;}
   }
-  function resolve(id,seen=new Set()){
-    if(!id||id==='unobserved'||seen.has(id))return [];seen.add(id);
-    if(rawToExecution.has(id))return [rawToExecution.get(id)];
-    return (aliases.get(id)??[]).flatMap(next=>resolve(next,new Set(seen)));
-  }
+  const resolve=createAliasResolver(rawToExecution,aliases);
   const eventOrder=new Map(events.map((e,index)=>[e.eventId,index]));
-  function dependency(id,command,role,seen=new Set(),related={}){
-    if(!id||id==='unobserved'||seen.has(id))return [];seen.add(id);
-    const executionId=rawToExecution.get(id),producer=executions.get(executionId);
-    if(producer?.kind==='FLOW'&&producer.action==='conditional'&&valueForwardings.has(id)&&
-      role!=='controlInputs'&&executionId!==command.eventId){
-      (related.controlInputs??=[]).push(executionId);
-      return valueForwardings.get(id).flatMap(input=>input.observationId?
-        dependency(input.observationId,command,role,new Set(seen),related):[]);
-    }
-    if(!producer){
-      if(aliasRoles.has(id)){
-        const result=[];
-        for(const [inputRole,ids]of Object.entries(aliasRoles.get(id))){
-          // Crossing a hidden operation does not turn a controlling branch or
-          // an address into a value producer. Preserve those causes by role.
-          const nextRole=inputRole==='controlInputs'||role==='controlInputs'?'controlInputs':
-            role==='dataInputs'?inputRole:role;
-          const resolved=ids.flatMap(next=>dependency(next,command,nextRole,new Set(seen),related));
-          if(nextRole===role)result.push(...resolved);else (related[nextRole]??=[]).push(...resolved);
-        }
-        return result;
-      }
-      const forwarded=command.kind==='CALC'&&role==='dataInputs'&&valueForwardings.has(id)?
-        valueForwardings.get(id).map(input=>input.observationId).filter(Boolean):aliases.get(id)??[];
-      return forwarded.flatMap(next=>dependency(next,command,role,new Set(seen),related));
-    }
-    if(executionId===command.eventId)return [];
-    if(producer.kind!=='CALC'||eventOrder.get(executionId)<eventOrder.get(command.eventId))return [executionId];
-    // A short-circuit decision can use an observed intermediate result of a
-    // still-open source expression. Its final CALC is emitted after the RHS
-    // reads. Refer to that observed step, not to a future completed result;
-    // flat dependencies stay on the already available inputs of that step.
-    const sample=rawEvents.get(id),step=producer.steps?.find(s=>s.observationIds.includes(id));
-    const inputs=unique([...(sample?.dataInputs??[]),...(sample?.addressInputs??[])]
-      .flatMap(next=>dependency(next,command,role,new Set(seen),related)));
-    const partial={role,executionId,observationId:id,sourceNodeId:step?.nodeId??null,
-      value:step?.value??sample?.value,inputExecutionIds:inputs,evidence:'observed subcalculation before expression completion'};
-    const list=command.partialCalculationInputs??=[];
-    if(!list.some(p=>p.role===role&&p.observationId===id))list.push(partial);
-    return inputs;
-  }
   const boundary=(id,actions)=>{const direct=rawToExecution.get(id),e=executions.get(direct);return e?.kind==='FLOW'&&actions.includes(e.action)?direct:null;};
   for(const command of events){
+    const dependency=createObservationResolver({rawToExecution,executions,aliases,aliasRoles,valueForwardings,rawEvents,eventOrder},command);
     const related={};
-    for(const key of references)command[key]=unique(command[key].flatMap(id=>dependency(id,command,key,new Set(),related))).filter(id=>id!==command.eventId);
+    for(const key of references)command[key]=unique(command[key].flatMap(id=>dependency(id,key,related))).filter(id=>id!==command.eventId);
     for(const key of references)command[key]=unique([...command[key],...related[key]??[]]).filter(id=>id!==command.eventId);
     if(command.storageDataInputs)command.storageDataInputs=unique(command.storageDataInputs.flatMap(id=>resolve(id))).filter(id=>id!==command.eventId);
+    for(const range of [command.copiedFrom,...command.inputs??[],...command.arguments?.map(a=>a.copiedFrom)??[]].filter(Boolean)){
+      if(range.valueObservationId)range.valueExecutionId=resolve(range.valueObservationId)[0]??null;
+      if(range.kind==='memory-range'||range===command.copiedFrom||range.valueObservationId)range.dataInputs=unique((range.dataInputs??[]).flatMap(id=>executions.has(id)?[id]:resolve(id)));
+    }
     if(command.callObservationId)command.callExecutionId=boundary(command.callObservationId,['call']);
     if(command.returnObservationId)command.returnExecutionId=boundary(command.returnObservationId,['return','resume']);
     if(command.bufferWriterCallObservationId)command.bufferWriterCallExecutionId=boundary(command.bufferWriterCallObservationId,['call']);
@@ -702,7 +688,7 @@ export function recordIR(plan,observations,raw) {
         // The hidden address has no public value-producing event. Do not name
         // its first base/index dependency as if it had produced this address.
         input.executionId=null;const related={};
-        command.addressInputs=unique([...command.addressInputs,...dependency(input.observationId,command,'addressInputs',new Set(),related)]);
+        command.addressInputs=unique([...command.addressInputs,...dependency(input.observationId,'addressInputs',related)]);
         command.controlInputs=unique([...command.controlInputs,...related.controlInputs??[]]);
       }
       if(command.kind==='CALC'&&!rawToExecution.has(input.observationId)&&privateOp?.opcode==='bitcast'&&(producer?.value?.bits||producer?.value?.address)){
@@ -720,8 +706,13 @@ export function recordIR(plan,observations,raw) {
     }
     for(const step of command.steps??[])for(const input of step.inputs??[])if(input.observationId)input.executionId=resolve(input.observationId)[0]??null;
     for(const region of command.readRegions??[])if(region.dataInputs)region.dataInputs=unique(region.dataInputs.flatMap(id=>resolve(id))).filter(id=>id!==command.eventId);
+    for(const region of [...command.streamReadRegions??[],...command.libraryReadRegions??[]])region.dataInputs=unique(region.dataInputs.flatMap(id=>resolve(id))).filter(id=>id!==command.eventId);
   }
-  const ref=id=>resolve(id)[0]??null;
+  const executionIds=orderReturnCleanup(events,buildResultDeliveries(plan,{events}),plan);
+  remapExecutionReferences(control.transitions,executionIds);
+  for(const [id,executionId]of rawToExecution)rawToExecution.set(id,executionIds.get(executionId)??executionId);
+  executions.clear();for(const e of events)executions.set(e.eventId,e);
+  const projectedResolve=createAliasResolver(rawToExecution,aliases),ref=id=>projectedResolve(id)[0]??null;
   const represented=new Set(events.flatMap(e=>e.observationIds)),deferred=new Set([...pendingStorage.values()].map(e=>e.eventId)),
     accounting={total:raw.events.length,represented:0,forwarded:0,administrative:0,deferredStorage:0,unexplained:[]};
   for(const e of raw.events){
@@ -731,10 +722,14 @@ export function recordIR(plan,observations,raw) {
     else accounting.unexplained.push({eventId:e.eventId,instructionId:e.instructionId,kind:e.kind,action:e.action});
   }
   if(accounting.unexplained.length)gaps.add('observations-without-disposition');
-  const flowTransitions=control.transitions.map(t=>({...t,controlInputs:unique(t.controlInputs.flatMap(id=>resolve(id)))}));
+  const flowTransitions=control.transitions.map(t=>({...t,controlInputs:unique(t.controlInputs.flatMap(id=>projectedResolve(id)))}));
   const excluded=new Set([...hiddenObjects,...pendingStorage.keys()]),
     views=(raw.views??[]).filter(v=>!excluded.has(v.objectId)),viewIds=new Set(views.map(v=>v.id));
   const objects=(raw.objects??[]).filter(o=>!excluded.has(o.id)).map(o=>({...o,createdBy:ref(o.createdBy),endedBy:ref(o.endedBy),
+    runtimeLifetime:{createdAtObservationId:o.createdBy,endedAtObservationId:o.endedBy??null},
+    ...(o.valueProducedBy?{valueProducedBy:ref(o.valueProducedBy)}:{}),
+    ...(o.storageEvidence?.callEventId?{storageEvidence:{...o.storageEvidence,callEventId:undefined,
+      callObservationId:o.storageEvidence.callEventId,callExecutionId:boundary(o.storageEvidence.callEventId,['call'])}}:{}),
     initializationRanges:o.initializationRanges?.map(r=>({...r,writer:r.writer==='unobserved'?r.writer:ref(r.writer)})),
     bitInitializationRanges:o.bitInitializationRanges?.map(r=>({...r,writer:r.writer==='unobserved'?r.writer:ref(r.writer)}))}));
   const implementationObjects=new Set(objects.filter(o=>instructions.get(executions.get(o.createdBy)?.instructionId)?.visibility==='implementation').map(o=>o.id)),
@@ -746,7 +741,8 @@ export function recordIR(plan,observations,raw) {
       temporalScope:'historical-union',classification:'storage-association-only',views:edges.length?['storage-reference-graph']:[],
       snapshot:'last observed source references; historical ended objects are retained'};
   }).filter(s=>s.nodes.length);
-  const arrays=arrayStructures(plan,{events,objects,views}),linked=linkedStructures(plan,{events,objects,views,arrays});
+  const runtimeArrays=runtimeArrayViews(plan,observations,raw,{events,objects}),
+    arrays=arrayStructures(plan,{events,objects,views,runtimeArrays}),linked=linkedStructures(plan,{events,objects,views,arrays});
   structures.push(...arrays,...linked,...linkedRootCollections(plan,{events,objects,views,arrays,linked}));
   structures.push(...indexedGraphStructures(plan,{events,objects,structures,resultDeliveries,valueFlow}));
   structures.push(...recordIndexStructures(plan,{events,objects,structures,resultDeliveries,valueFlow}));
@@ -756,10 +752,15 @@ export function recordIR(plan,observations,raw) {
   structures.push(...parallelArrayStructures(plan,{events,objects,structures,frames:raw.frames??[],resultDeliveries,valueFlow}));
   structures.push(...queueStructures(plan,{events,objects,structures}));
   structures.push(...indexRelationStructures(plan,{events,objects,views,frames:raw.frames??[],structures}));
+  structures.push(...storageRelationStructures(plan,{events,objects,structures,resultDeliveries,valueFlow}));
+  structures.push(...coindexedRecordStructures(plan,{events,objects,structures}));
+  structures.push(...separateArrayStructures(plan,{events,objects,structures}));
   attachConversionConsumers(plan,events);
-  return validateIRTrace(plan,{schemaVersion:3,programId:plan.programId,runId:raw.runId,backend:raw.backend,status:raw.status,exitCode:raw.exitCode,
+  const trace={schemaVersion:3,programId:plan.programId,runId:raw.runId,backend:raw.backend,status:raw.status,exitCode:raw.exitCode,
     events,flowTransitions,objects,resultDeliveries,
-    frames:raw.frames??[],views,references:(raw.references??[]).filter(r=>!excluded.has(r.objectId)&&!excluded.has(r.targetObjectId)).map(r=>({...r,eventId:ref(r.eventId)})),
+    frames:(raw.frames??[]).map(f=>{const {callbackOfCallEventId,...frame}=f;return {...frame,...(callbackOfCallEventId?{
+      callbackOfCallObservationId:callbackOfCallEventId,callbackOfCallExecutionId:boundary(callbackOfCallEventId,['call'])}: {})};}),
+    views,references:(raw.references??[]).filter(r=>!excluded.has(r.objectId)&&!excluded.has(r.targetObjectId)).map(r=>({...r,eventId:ref(r.eventId)})),
     structures,
     diagnostics:(raw.diagnostics??[]).map(d=>({...d,eventId:ref(d.eventId)})),
     coverage:{...plan.coverage,...raw.coverage,...resolvedCoverage(plan,{events}),irEvents:events.length,observationEvents:raw.events.length,irGaps:[...gaps],
@@ -770,5 +771,11 @@ export function recordIR(plan,observations,raw) {
       stdioOutput:outputCoverage,
       controlFlow:{method:'observed edges with postdominator regions per activation',
         pendingTransitions:flowTransitions.filter(t=>!t.beforeExecutionId).map(t=>t.id)},
-      seek:'not implemented; IR and state effects are recorded for a future consumer',animation:'stub'}});
+      seek:'not implemented; IR and state effects are recorded for a future consumer',animation:'stub'}};
+  try{return validateIRTrace(plan,trace);}
+  catch(error){
+    const failed=executions.get(error.eventId);
+    if(failed)error.context={instructionId:failed.instructionId,source:instructions.get(failed.instructionId)?.source,...error.context};
+    throw error;
+  }
 }

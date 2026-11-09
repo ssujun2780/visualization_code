@@ -19,6 +19,7 @@ import {bindResultDeliveries} from './result-delivery.mjs';
 import {resolvedCoverage} from './coverage-resolution.mjs';
 import {bindConversionConsumers} from './conversion-consumers.mjs';
 import {booleanRepresentationBindings} from './boolean-representation.mjs';
+import {bindFunctionDeclarations} from './function-declarations.mjs';
 const position=(a,b)=>a.line-b.line||a.column-b.column;
 const contains=(range,p)=>!!range&&!!p&&range.file===p.file&&position(range.start,p)<=0&&position(p,range.end)<=0;
 const operator=n=>n?.kind==='UnaryOperator'?/\b(?:prefix|postfix) '([^']+)'/.exec(n.details)?.[1]??null:
@@ -32,13 +33,13 @@ const visibleOperator=n=>{
     (/<(?:LValueToRValue|NoOp|ArrayToPointerDecay|FunctionToPointerDecay)>/.test(n.details)?null:'cast');
   if(n.kind==='CStyleCastExpr')return 'cast';
   if(['ConditionalOperator','BinaryConditionalOperator'].includes(n.kind))return '?:';
-  return n.builtin?.pure?n.builtin.name:operator(n);
+  return n.builtin?.pure?n.builtin.name:n.pureCall?.name??operator(n);
 };
 const visibleEvaluation=n=>{while(n){const selected=selectedExpression(n);if(selected){n=selected;continue;}
   if(['ImplicitCastExpr','ParenExpr'].includes(n.kind)&&n.children.length===1){n=n.children[0];continue;}break;}
   return evaluationKind(n)?n:null;};
 const expressionKinds=new Set(['BinaryOperator','UnaryOperator','ImplicitCastExpr','CStyleCastExpr','ParenExpr','ConditionalOperator','BinaryConditionalOperator']);
-const leafKinds=new Set(['DeclRefExpr','IntegerLiteral','FloatingLiteral','CharacterLiteral','StringLiteral','GNUNullExpr','MemberExpr','ArraySubscriptExpr']);
+const leafKinds=new Set(['DeclRefExpr','IntegerLiteral','FloatingLiteral','CharacterLiteral','StringLiteral','GNUNullExpr','MemberExpr','ArraySubscriptExpr','OffsetOfExpr']);
 const mutation=n=>n.kind==='CompoundAssignOperator'||n.kind==='BinaryOperator'&&operator(n)==='='||n.kind==='UnaryOperator'&&['++','--'].includes(operator(n));
 const selectedExpression=n=>n.kind==='GenericSelectionExpr'?n.selectedAssociation?.children.at(-1):n.kind==='GenericAssociation'&&n.selected?n.children.at(-1):null;
 const expressionChildren=n=>['GenericSelectionExpr','GenericAssociation'].includes(n.kind)?[selectedExpression(n)].filter(Boolean):n.children;
@@ -112,7 +113,8 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
   const scopeFor=n=>{for(let at=n;at;at=at.parent)if(scopeByAST.has(at.astId))return scopeByAST.get(at.astId);return null;};
   for(const n of localNodes.filter(n=>['VarDecl','ParmVarDecl'].includes(n.kind))){
     const declaration={id:`d${plan.declarations.length+1}`,name:name(n),kind:n.kind,functionName:n.functionName??null,
-      scopeId:scopeFor(n.parent),source:sourceMap.range(n.source),point:n.declarationPoint&&{...n.declarationPoint,file:filename},
+      scopeId:scopeFor(n.parent),source:sourceMap.range(n.source),point:n.declarationPoint&&{...(n.expansionDeclarationPoint??n.declarationPoint),file:filename},
+      ...(n.expansionSource?{macroExpansion:{source:sourceMap.range(n.expansionSource),spelling:n.spellingRange}}:{}),
       type:n.type,cType:types.spelling(n.type,n.canonical),storage:/\bstatic\b/.test(n.details)?'static':n.functionName?'automatic':'static',
       hasInitializer:n.kind==='VarDecl'&&n.children.length>0,...(initializationFor(n)?{initialization:initializationFor(n)}:{})};
     plan.declarations.push(declaration);declarationByAST.set(n.astId,declaration.id);
@@ -140,6 +142,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
       ...(n.kind==='GenericAssociation'?{selected:n.selected,isDefault:n.isDefault}:{}),
       ...(n.executionState?{evaluationState:n.executionState}:{}),
       ...(n.builtin?{builtin:n.builtin}:{}),
+      ...(n.pureCall?{pureCall:n.pureCall}:{}),
       ...(n.kind==='ImplicitCastExpr'||n.kind==='CStyleCastExpr'?{cast:/<([^<>]+)>\s*$/.exec(n.details)?.[1]??null}:{}),
       source:location,...(aggregate?{elementCount:n.children.length,childrenOmitted:true}:{}),children:aggregate?[]:n.children.map(c=>tree(c,depth+1))};
     treeCache.set(n.id,result);return result;
@@ -164,7 +167,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
   };
   const aggregates=aggregateBindings(observations,{types,nearest,abi,nodes,source:aggregateSource});
   plan.coverage.sourceTemporaries={bound:aggregates.temporaries.size,unresolved:aggregates.temporaryGaps};
-  const bitfields=bitfieldBindings(observations,{nearest,source:aggregateSource,types});
+  const bitfields=bitfieldBindings(observations,{nearest,source:aggregateSource,types,abi,paths:aggregates.paths});
   plan.coverage.bitfields={accesses:bitfields.accesses.size,unresolved:bitfields.gaps};
   const evaluations=evaluationBindings(observations,nearest,nodes),evaluationByNode=new Map(),logicalNots=logicalNotBindings(observations,{nodes:localNodes,types,nearest});
   plan.evaluations=localNodes.filter(n=>evaluationKind(n)).map(n=>{
@@ -180,6 +183,9 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
     const fn=observations.functions.find(f=>f.id===op.functionId)?.name,local=op.local??op.global;
     if(!local)return null;const candidates=plan.declarations.filter(d=>d.name===local.name&&(!fn||d.functionName===fn||d.storage==='static'));
     const line=local.source?.line??op.source?.line;
+    const column=local.source?.column||op.source?.column;
+    const atPoint=candidates.filter(d=>d.point?.line===line&&d.point?.column===column);
+    if(atPoint.length===1)return atPoint[0];
     const exact=candidates.filter(d=>d.point?.line===line||d.source?.line===line);
     return exact.length===1?exact[0]:candidates.length===1?candidates[0]:null;
   };
@@ -246,16 +252,51 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
   const usedValues=new Set(observations.instructions.flatMap(o=>
     [...(o.inputs??[]),...(o.args??[]),...(o.incoming??[]),o.pointer].filter(Boolean).map(v=>`${o.functionId}:${v.value}`)));
   const valueProducers=new Map(observations.instructions.filter(o=>o.result).map(o=>[`${o.functionId}:${o.result}`,o])),returnStores=new Map(),returnAnchors=[];
+  const valueUsers=new Map();
+  for(const o of observations.instructions)for(const value of new Set([...o.inputs??[],...o.args??[],...o.incoming??[],o.pointer].filter(Boolean).map(i=>i.value))){
+    const key=`${o.functionId}:${value}`,list=valueUsers.get(key)??[];list.push(o);valueUsers.set(key,list);
+  }
   // LLVM GEP adapts narrow source indices to its address-index width even
   // when Clang has no C conversion expression. This only forwards the already
   // observed index value; it is not a calculation on the array base.
   const addressIndexAdaptations=new Set(observations.instructions.filter(o=>o.result&&o.action==='convert'&&
     ['zext','sext','trunc'].includes(o.opcode)&&!o.conversion&&
     semanticExpression(o)?.kind!=='CStyleCastExpr').filter(o=>{
-      const users=observations.instructions.filter(u=>u.functionId===o.functionId&&
-        [...u.inputs??[],...u.args??[],u.pointer].filter(Boolean).some(input=>input.value===o.result));
+      const users=valueUsers.get(`${o.functionId}:${o.result}`)??[];
       return users.length&&users.every(u=>u.action==='address'&&u.inputs.slice(1).some(input=>input.value===o.result));
     }).map(o=>o.id));
+  // VLA subscripts are lowered to index * runtime row stride. Only compiler
+  // calculations with no source operator and exclusively address consumers
+  // are bookkeeping. A written i*cols remains an ordinary source CALC.
+  const addressScales=new Set();
+  const variableArray=t=>!!t&&(t.kind==='array'&&(t.variableLength||variableArray(t.elementType))||t.kind==='pointer'&&variableArray(t.pointee));
+  let scaleChanged=true;
+  while(scaleChanged){scaleChanged=false;
+    for(const o of observations.instructions){
+      if(addressScales.has(o.id)||!o.result||o.action!=='calculate'||
+        !['mul','add'].includes(o.opcode)||visibleOperator(expressionOwner(o)?.node??semanticExpression(o)))continue;
+      const n=semanticExpression(o);if(!variableArray(types.spelling(n?.type,n?.canonical)))continue;
+      const users=valueUsers.get(`${o.functionId}:${o.result}`)??[];
+      if(users.length&&users.every(u=>addressScales.has(u.id)||u.action==='address'&&u.inputs.slice(1).some(i=>i.value===o.result))){
+        addressScales.add(o.id);scaleChanged=true;
+      }
+    }
+  }
+  const runtimeArrayScales=new Map();
+  for(const o of observations.instructions.filter(o=>addressScales.has(o.id)&&o.opcode==='mul')){
+    const n=nearest(o,n=>n.kind==='ArraySubscriptExpr'&&variableArray(types.spelling(n.type,n.canonical))),
+      arrayType=n&&types.spelling(n.type,n.canonical),index=n?.children[1];
+    if(arrayType?.kind!=='array'||!index)continue;
+    const ids=new Set(),visit=n=>{ids.add(n.id);for(const c of n.children??[])visit(c);};visit(index);
+    const matches=(input,seen=new Set())=>{
+      if(!input||seen.has(input.value))return false;seen.add(input.value);
+      const p=valueProducers.get(`${o.functionId}:${input.value}`);
+      if(p)return !!nearest(p,n=>ids.has(n.id))||p.action==='convert'&&matches(p.inputs[0],seen);
+      return [...ids].some(id=>{const n=localNodes.find(n=>n.id===id);return n?.kind==='IntegerLiteral'&&/ (-?\d+)\s*$/.exec(n.details)?.[1]===input.value;});
+    };
+    const indices=o.inputs.map((input,i)=>matches(input)?i:null).filter(i=>i!==null);
+    if(indices.length===1)runtimeArrayScales.set(o.id,{indexInput:indices[0],arrayType,sourceNodeId:n.id});
+  }
   for(const ret of observations.instructions.filter(o=>o.action==='function.return')){
     if(aggregates.returns.get(ret.id)?.sites.length){returnStores.set(ret.id,aggregates.returns.get(ret.id).sites);continue;}
     const load=valueProducers.get(`${ret.functionId}:${ret.inputs?.[0]?.value}`);if(load?.action!=='load')continue;
@@ -263,11 +304,34 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
       .map(store=>({store,node:nearest(store,n=>n.kind==='ReturnStmt')})).filter(s=>s.node);
     if(stores.length)returnStores.set(ret.id,stores);
   }
+  // A source return can reach a shared LLVM epilogue without a carrier store
+  // (void return, direct SSA value, or NRVO). Its executed edge/value is an
+  // anchor; a lexical tail return is also the function's fall-through exit.
+  const tailReturns=new Map();
+  for(const fn of observations.functions){const body=functionNode(fn.name)?.children.find(n=>n.kind==='CompoundStmt'),last=body?.children.at(-1);
+    if(last?.kind==='ReturnStmt')tailReturns.set(fn.id,last);}
+  for(const ret of observations.instructions.filter(o=>o.action==='function.return')){
+    const sites=returnStores.get(ret.id)??[],edges=observations.instructions.filter(o=>o.functionId===ret.functionId&&o.action==='branch');
+    const reaches=start=>{const pending=[start],seen=new Set();while(pending.length){const block=pending.pop();if(block===ret.block)return true;
+      if(seen.has(block))continue;seen.add(block);for(const e of edges)if(e.block===block)pending.push(...e.destinations);}return false;};
+    for(const op of observations.instructions.filter(o=>o.functionId===ret.functionId&&o.id!==ret.id)){
+      const node=nearest(op,n=>n.kind==='ReturnStmt');
+      if(node&&reaches(op.block)&&!sites.some(s=>s.store.id===op.id)&&
+        (op.action==='branch'||op.action==='load'||op.action==='store'||op.kind==='CALC'||op.action==='call'))sites.push({store:op,node});
+    }
+    if(sites.length)returnStores.set(ret.id,sites);
+  }
+  // Pointer comparisons that only control compiler-generated aggregate
+  // zero-initialization have no source expression owner. Do not expose them
+  // as user comparisons/loops; source comparisons inside an initializer do.
+  const initializerControls=new Set(observations.instructions.filter(op=>op.opcode==='icmp'&&
+    op.inputs?.length===2&&op.inputs.every(i=>i.type?.endsWith('*'))&&!expressionOwner(op)&&
+    nearest(op,n=>n.kind==='InitListExpr')).map(op=>op.id));
   for(const op of observations.instructions){
     const binding={roles:{},administrative:false},node=nearest(op),declaration=declarationsFor(op),role=defaultRole(op);
     if(op.addressBinding)binding.addressBinding=op.addressBinding;
     const put=(selector,kind,action,owner=node,fields={})=>{
-      const key=`${op.functionId??'program'}:${kind}:${action}:${owner?.id??op.id}:${fields.accessType??''}`;
+      const key=`${op.functionId??'program'}:${kind}:${action}:${owner?.id??op.id}:${fields.accessType??''}:${fields.targetPath?JSON.stringify(fields.targetPath):''}`;
       const instruction=add(key,kind,action,op,owner,fields);binding.roles[selector]=instruction.id;return instruction;
     };
     const bitfield=bitfields.accesses.get(op.id);
@@ -316,7 +380,9 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
     const unusedBooleanExtension=op.opcode==='zext'&&op.inputs?.[0]?.type==='i1'&&!op.conversion&&
       !usedValues.has(`${op.functionId}:${op.result}`);
     if(booleanRepresentations.has(op.id))binding.booleanRepresentation=booleanRepresentations.get(op.id);
-    if(op.action==='globals.ready'||op.action==='function.address'||op.action==='stack.save'||compilerSlots.has(op.id)||compilerSlotUses.has(op.id)||unusedBooleanExtension||addressIndexAdaptations.has(op.id)||booleanRepresentations.has(op.id)){
+    const initializerControl=initializerControls.has(op.id)||op.action==='branch'&&op.inputs?.length===1&&
+      initializerControls.has(valueProducers.get(`${op.functionId}:${op.inputs[0].value}`)?.id);
+    if(initializerControl||op.action==='globals.ready'||op.action==='function.address'||op.action==='stack.save'||compilerSlots.has(op.id)||compilerSlotUses.has(op.id)||unusedBooleanExtension||addressIndexAdaptations.has(op.id)||booleanRepresentations.has(op.id)){
       binding.administrative=true;binding.hiddenStorage=compilerSlots.has(op.id);plan.bindings[op.id]=binding;continue;
     }
     if(op.action==='function.enter'){
@@ -331,7 +397,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
       op.cType??=parameter?.cType;
       put('WRITE:argument','WRITE','argument',null,{parameterIndex:sourceIndex,abiParameterIndex:op.parameter.index,declarationId:parameter?.id??null,cType:parameter?.cType??op.cType,source:parameter?.source??null});
       put('SPACE:object.begin','SPACE','object.begin',null,{declarationId:parameter?.id??null,storage:'automatic',cType:parameter?.cType??op.cType,source:parameter?.source??null});
-    }else if(op.action==='object.begin'||op.action==='global.begin'||op.action==='lifetime.start'){
+    }else if(op.action==='object.begin'||op.action==='global.begin'||op.action==='lifetime.start'||op.action==='source.alias'){
       const allocation=op.action==='lifetime.start'?observations.instructions.find(o=>o.id===op.allocationObservationId):op;
       const temporary=aggregates.temporaries.get(allocation?.id);
       if(op.action==='object.begin'&&op.lifetimeManaged)binding.administrative=true;
@@ -339,7 +405,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
       if(temporary)binding.sourceTemporary=true;
       put('SPACE:object.begin','SPACE','object.begin',temporary?.node??(declaration?byAST.get([...declarationByAST].find(([,id])=>id===declaration.id)?.[0]):null),
         {declarationId:declaration?.id??null,storage:op.action==='global.begin'?'static':'automatic',cType:temporary?.cType??op.cType??op.global?.cType??null,
-          ...(temporary?{sourceTemporary:true}:{}),visibility:declaration||temporary?'source':'implementation',
+          ...(temporary?{sourceTemporary:true,temporaryRole:temporary.role??'compound-literal'}:{}),visibility:temporary?.visibility??(declaration||temporary?'source':'implementation'),
           scopeId:temporary?scopeFor(temporary.node):declaration?.scopeId??null,
           source:temporary?sourceMap.range(temporary.node.source):declaration?.source??op.source??null});
     }else if(op.action==='source.declaration'){
@@ -359,7 +425,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
       put('SPACE:object.end','SPACE','object.end',null,{declarationId:declaration?.id??null,
         scopeId:declaration?.scopeId??null,source:sourceMap.locate(op.source),reason:op.endReason});
     }else if(op.action==='function.return'){
-      const owner=nearest(op,n=>n.kind==='ReturnStmt');
+      const owner=nearest(op,n=>n.kind==='ReturnStmt')??tailReturns.get(op.functionId)??null;
       op.cType=sourceReturnTypes.get(functionNames.get(op.functionId))??op.cType;
       const returnType=op.aggregateReturn?.cType??op.cType??op.type;
       if(op.type!=='void'||op.aggregateReturn)put('WRITE:return.value','WRITE','return.value',owner,{returnType});
@@ -382,7 +448,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
       const resolvedCall=semanticNodes.get(op.semanticNodeId),callNode=aggregates.memoryCalls.has(op.id)?aggregates.memoryCalls.get(op.id):
         resolvedCall?.kind==='CallExpr'?resolvedCall:nearest(op,n=>n.kind==='CallExpr'),
         owner=callNode??nearest(op,n=>n.kind==='VarDecl'||n.kind==='ReturnStmt'||mutation(n));
-      let target=callNode?.children[0];while(target&&target.children.length===1)target=target.children[0];
+      let target=callNode?.children[0];while(target&&['ParenExpr','ImplicitCastExpr','CStyleCastExpr'].includes(target.kind)&&target.children.length===1)target=target.children[0];
       const sourceName=/\bFunction 0x[0-9a-f]+ '([^']+)'/.exec(target?.details??'')?.[1];
       const callInfo={callee:sourceName?`@${sourceName}`:op.callee,backendCallee:op.callee};
       const projection=callProjection(op,callNode,{types,sourceName});
@@ -402,7 +468,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
         if(/^(?:llvm\.)?mem(?:cpy|move)/.test(callee)||['strcpy','strncpy','strcat'].includes(callee))put('WRITE:copy','WRITE','copy',owner,{callee:op.callee,...memoryInfo,evidence:'library API effect'});
         if(/^(?:llvm\.)?memset/.test(callee))put('WRITE:fill','WRITE','fill',owner,{callee:op.callee,...memoryInfo,evidence:'library API effect'});
         if(['scanf','__isoc99_scanf','sscanf','fscanf','fgets'].includes(callee))put('WRITE:input','WRITE','input',owner,{callee:op.callee,...memoryInfo,evidence:'library API effect'});
-        if(['malloc','calloc','realloc'].includes(callee))put('SPACE:object.begin','SPACE','object.begin',owner,{storage:'heap',callee:op.callee});
+        put('SPACE:object.begin','SPACE','object.begin',owner,{callee:op.callee,evidence:'observed allocation or compiler-proven storage'});
         if(['free','realloc'].includes(callee))put('SPACE:object.end','SPACE','object.end',owner,{callee:op.callee});
       }
     }else if(op.kind==='CALC'){
@@ -417,16 +483,18 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
         explicitAddress=pointerOperation&&!pointerOperation.children.some(c=>contains(c.source,point));
       // A GEP located in the lvalue child is storage selection, not another
       // source operator step. The verified binding still describes its target.
-      if(op.action==='address'&&!explicitAddress||
+      if(addressScales.has(op.id)||op.action==='address'&&!explicitAddress||
         ['bitcast','addrspacecast','ptrtoint','inttoptr'].includes(op.opcode)&&!nearest(op,n=>n.kind==='CStyleCastExpr'&&
           !/<(?:NoOp|LValueToRValue)>/.test(n.details)&&types.spelling(n.type,n.canonical)?.kind==='pointer'===op.type.endsWith('*')&&
           (op.opcode!=='bitcast'||types.spelling(n.children[0]?.type,n.children[0]?.canonical)?.kind==='pointer'))||
         op.action==='merge'&&!nearest(op,n=>['ConditionalOperator','BinaryConditionalOperator'].includes(n.kind)||['&&','||'].includes(operator(n)))){
         binding.administrative=true;
+        if(runtimeArrayScales.has(op.id))binding.runtimeArrayScale=runtimeArrayScales.get(op.id);
       }else{
         const grouped=owner?.kind==='expression'||owner?.kind==='update'&&owner.node.children.every(canCompose);
         const instruction=put('CALC','CALC',grouped?'expression':op.action,owner?.node??node,
-          {expression:owner?tree(owner.node):null,cType:owner?types.spelling(owner.node.type,owner.node.canonical)??op.cType??null:op.cType??null,operator:owner?visibleOperator(owner.node):op.opcode,
+          {expression:owner?tree(owner.node):null,cType:owner?types.spelling(owner.node.type,owner.node.canonical)??op.cType??null:op.cType??null,
+            operator:!grouped&&op.action==='convert'?'cast':owner?visibleOperator(owner.node):op.opcode,
             grouping:owner?.kind??'unmapped-observation',observationIds:[],
             ...(owner?.node.kind==='CompoundAssignOperator'?compoundTypes(owner.node,types):{})});
         instruction.observationIds.push(op.id);binding.group=grouped?instruction.id:null;
@@ -504,7 +572,9 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
     if(['IntegerLiteral','CharacterLiteral'].includes(n.kind)){
       const literal=/ (-?\d+)\s*$/.exec(n.details)?.[1];return literal===undefined?null:[{nodeId:n.id,value:{literal,decimal:literal,cType:types.spelling(n.type,n.canonical),evidence:'compiler AST literal'}}];
     }
-    if(n.kind==='FloatingLiteral'||n.kind==='StringLiteral')return [{nodeId:n.id,value:{literal:/ ('[^']*'|[^\s]+)\s*$/.exec(n.details)?.[1],
+    if(n.kind==='StringLiteral'){const expression=tree(n);return [{nodeId:n.id,value:{literal:expression.literal,
+      ...(expression.literalTruncated?{literalTruncated:true}:{}),cType:expression.cType,evidence:'compiler AST literal'}}];}
+    if(n.kind==='FloatingLiteral')return [{nodeId:n.id,value:{literal:/ ('[^']*'|[^\s]+)\s*$/.exec(n.details)?.[1],
       cType:types.spelling(n.type,n.canonical),evidence:'compiler AST literal'}}];
     if(n.builtin?.pure){
       const args=n.children.slice(1).map(constantInputs);if(!args.every(Boolean))return null;
@@ -512,23 +582,27 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
       return category?[{nodeId:n.id,value:{category,cType:types.spelling(n.type,n.canonical),compilerBuiltin:n.builtin.name,
         evidence:'compiler constant semantics; bits unobserved'},inputs:args.flat()}]:args.flat();
     }
-    if(['ParenExpr','ImplicitCastExpr','CStyleCastExpr','UnaryOperator','BinaryOperator'].includes(n.kind)&&canGroup(n)){
+    if(n.pureCall)return n.children.slice(1).flatMap(arg=>constantInputs(arg)??[{nodeId:arg.id,
+      value:{cType:types.spelling(arg.type,arg.canonical),evidence:'compiler-folded argument expression; no runtime read'},expression:tree(arg)}]);
+    if(['ParenExpr','ImplicitCastExpr','CStyleCastExpr','UnaryOperator','BinaryOperator'].includes(n.kind)&&!mutation(n)){
       const parts=n.children.map(constantInputs);return parts.every(Boolean)?parts.flat():null;
     }
     return null;
   }
-  const hasCalculation=n=>selectedExpression(n)?hasCalculation(selectedExpression(n)):!n.sizeofInfo&&!n.alignofInfo&&(n.builtin?.pure||n.kind==='BinaryOperator'||
+  const hasCalculation=n=>selectedExpression(n)?hasCalculation(selectedExpression(n)):!n.sizeofInfo&&!n.alignofInfo&&(n.builtin?.pure||n.pureCall||n.kind==='BinaryOperator'||
     ['CStyleCastExpr','ImplicitCastExpr'].includes(n.kind)&&/<(?:IntegralCast|FloatingToIntegral|IntegralToFloating|FloatingCast)>/.test(n.details)||
     n.kind==='UnaryOperator'&&['+','-','~','!'].includes(operator(n))||n.children.some(hasCalculation));
+  const compilerScalar=input=>input&&(/^i\d+$/.test(input.type)?/^-?\d+$/.test(input.value)||['true','false'].includes(input.value):
+    ['float','double'].includes(input.type)&&/^(?:0x[0-9A-Fa-f]+|[-+]?(?:\d|\.))/.test(input.value));
   function folded(op,expression,input,consumer){
-    if(!expression||!input||!(/^i\d+$/.test(input.type)?/^-?\d+$/.test(input.value)||['true','false'].includes(input.value):
-      ['float','double'].includes(input.type)&&/^(?:0x[0-9A-Fa-f]+|[-+]?(?:\d|\.))/.test(input.value))||!hasCalculation(expression))return;
+    if(!expression||!compilerScalar(input)||!hasCalculation(expression))return;
     const inputs=constantInputs(expression),cType=types.spelling(expression.type,expression.canonical);if(!inputs||!cType||!(cType.signedness||cType.encoding==='DW_ATE_float'))return;
     // A real producer already bound to this AST expression wins.
     if(plan.instructions.some(i=>i.kind==='CALC'&&i.expression?.nodeId===expression.id&&i.observationIds?.length))return;
     const instruction=add(`${op.functionId}:CALC:folded:${expression.id}`,'CALC','expression',op,expression,
       {expression:tree(expression),operator:visibleOperator(expression),cType,grouping:'expression',evidence:'compiler-folded source calculation'});
     (plan.bindings[op.id].foldedCalculations??=[]).push({instructionId:instruction.id,nodeId:expression.id,inputs,consumer,cType});
+    const pending=[expression];while(pending.length){const n=pending.pop();if(n.pureCall)boundNodes.add(n.id);pending.push(...n.children);}
   }
   for(const op of observations.instructions){
     if(op.action==='call'){
@@ -542,7 +616,25 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
       const owner=nearest(op,n=>n.kind==='ReturnStmt');folded(op,owner?.children[0],op.inputs[0],{kind:'value'});
     }
   }
+  // A folded subexpression can be an immediate operand of a larger observed
+  // CALC. Keep it inside that CALC, with the compiler-consumed value and AST
+  // identity, rather than fabricating a runtime call or another calculation.
+  const foldedOperands=[];
+  for(const op of observations.instructions){const b=plan.bindings[op.id];
+    for(const [index,spec]of (b?.inputTypes??[]).entries()){
+      const input=op.inputs?.[index],node=semanticNodes.get(spec?.nodeId);
+      if(!node||!compilerScalar(input))continue;
+      const pending=[node],calls=[];while(pending.length){const n=pending.pop();if(n.kind==='CallExpr'){
+        if(!n.pureCall||boundNodes.has(n.id)){calls.length=0;break;}calls.push(n);
+      }pending.push(...n.children);}
+      if(!calls.length)continue;
+      spec.foldedExpression={nodeId:node.id,source:sourceMap.range(node.source),expression:tree(node),
+        callNodeIds:calls.map(n=>n.id),evidence:'compiler literal operand for AST pure-call expression'};
+      for(const n of calls)boundNodes.add(n.id);foldedOperands.push({observationId:op.id,inputIndex:index,nodeId:node.id,callNodeIds:calls.map(n=>n.id)});
+    }
+  }
   plan.coverage.foldedCalculations={defined:Object.values(plan.bindings).reduce((n,b)=>n+(b.foldedCalculations?.length??0),0),source:'AST expressions at literal LLVM consumers'};
+  plan.coverage.foldedCalculations.operands=foldedOperands;
   const projections=Object.entries(plan.bindings).filter(([,b])=>b.callProjection);
   plan.coverage.callABI={source:'compiler AST and LLVM slots',mapped:projections.filter(([,b])=>b.callProjection.status==='mapped').length,
     unresolved:projections.filter(([,b])=>b.callProjection.status!=='mapped').map(([id,b])=>({observationId:id,reason:b.callProjection.reason}))};
@@ -600,6 +692,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
   plan.processInstructions=Object.fromEntries(plan.instructions.filter(i=>i.processEffect).map(i=>[`${i.kind}:${i.action}`,i.id]));
   plan.functions=observations.functions.map(f=>({...f,parameters:parametersFor(f.name),
     source:sourceMap.range(localNodes.find(n=>n.kind==='FunctionDecl'&&n.functionName===f.name&&n.children.some(c=>c.kind==='CompoundStmt'))?.source)}));
+  bindFunctionDeclarations(plan,{nodes,sourceMap});
   for(const n of localNodes.filter(n=>['CallExpr','ReturnStmt','VarDecl'].includes(n.kind)&&n.functionName))if(!boundNodes.has(n.id))
     plan.coverage.unboundSourceWork.push({nodeId:n.id,kind:n.kind,source:readSource(n.source),reason:'no reliable observed source-work binding'});
   // Retain source work eliminated by constant folding or an unreachable path.

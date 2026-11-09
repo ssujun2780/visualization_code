@@ -2,15 +2,18 @@ import {validateCalcPlan,validateCalcTrace} from './calc-contract.mjs';
 import {validateWorkTrace} from './work-contracts.mjs';
 import {validatePresentationContract} from './presentation-contract.mjs';
 import {validateResultDeliveryPlan,validateResultDeliveries} from './result-delivery.mjs';
+import {validateReturnSequence} from './return-sequence.mjs';
 import {validateStructureOverlays} from './structure-overlay-contract.mjs';
 import {validateRecordIndexStructures} from './record-index-contract.mjs';
 import {validateLinkedProjections} from './linked-projection-contract.mjs';
 import {validateConversionConsumers} from './conversion-consumers.mjs';
 import {validateValueIndexStructures} from './value-index-views.mjs';
 import {validateParallelArrayStructures} from './parallel-array-views.mjs';
+import {validateCoindexedRecords} from './coindexed-record-views.mjs';
 import {arrayGeometry,arrayLocation} from './array-geometry.mjs';
 import {validateArrayValueDependencies} from './array-value-dependencies.mjs';
 import {validateArrayCursorPaths} from './array-cursor-paths.mjs';
+import {validateFunctionDeclarations} from './function-declarations.mjs';
 export const IR_VERSION=3;
 export const IR_KINDS=Object.freeze(['READ','WRITE','CALC','FLOW','SPACE','ERROR']);
 
@@ -75,6 +78,7 @@ export function validateIRPlan(plan){
       throw new Error(`case 레이블의 switch 명령이 없습니다: ${label.id}`);
   }
   validateCalcPlan(plan);
+  validateFunctionDeclarations(plan);
   validatePresentationContract(plan);
   validateResultDeliveryPlan(plan);
   validateConversionConsumers(plan);
@@ -241,11 +245,13 @@ export function validateIRTrace(plan,trace){
   validateLinkedProjections(trace);
   validateValueIndexStructures(trace);
   validateParallelArrayStructures(trace);
+  validateCoindexedRecords(trace);
   validateArrayValueDependencies(trace);
   validateArrayCursorPaths(plan,trace);
   validateConversionConsumers(plan,trace.events);
   validateCalcTrace(plan,trace);
   validateWorkTrace(plan,trace);
   validateResultDeliveries(plan,trace);
+  validateReturnSequence(trace,plan);
   return trace;
 }

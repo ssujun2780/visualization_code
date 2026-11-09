@@ -78,7 +78,7 @@ export function bindArrayStructures(plan){
 }
 
 // Build lazy views over recorded ranges. This adds no program objects or READs.
-export function arrayStructures(plan,{events,objects,views}){
+export function arrayStructures(plan,{events,objects,views,runtimeArrays=[]}){
   const defs=new Map(plan.instructions.map(d=>[d.id,d])),byObject=new Map(objects.map(o=>[o.id,o])),
     roles=plan.structureBindings?.arrayRoles??[],contexts=new Map(),arrays=new Map(),executionDefs=new Map(events.map(e=>[e.eventId,defs.get(e.instructionId)])),
     alive=new Set(),fieldAccess=new Map(),typed=new Map(),definitionNodes=new Map(),viewsByObject=new Map(),typeIdentity=compilerTypeIdentity(plan.types),indexedTypes=new Map();
@@ -225,7 +225,8 @@ export function arrayStructures(plan,{events,objects,views}){
       lifecycle:byObject.get(c.ownerObjectId)?.lifecycle??'unknown',confidence:verified?'candidate validated by observed bounds and allocation extent':'observed indexed writes with inconsistent or incomplete bounds',
       snapshot:'execution history; states retain actual lifetimes'};
   });
-  return [...arrays.values(),...dynamic,...embeddedArrayStructures(plan,{events,objects,views})]
+  const result=[...arrays.values(),...runtimeArrays,...dynamic,...embeddedArrayStructures(plan,{events,objects,views})],seen=new Set();
+  return result.filter(s=>{if(s.kind!=='array')return true;const id=JSON.stringify([s.range,s.elementBytes,typeIdentity.key(s.elementType)]);if(seen.has(id))return false;seen.add(id);return true;})
     .map(s=>s.kind==='array'?{...s,geometry:arrayGeometry(s,byObject.get(s.objectId))}:s);
 }
 import {bindEmbeddedArrays,embeddedArrayStructures} from './embedded-array-views.mjs';

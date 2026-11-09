@@ -1,6 +1,7 @@
 // Compiler identities establish candidates; only recorded accesses and updates
 // establish operation evidence. This module never evaluates source expressions.
 import {observeScalarBytes} from './observed-scalar-bytes.mjs';
+import {createValueFlow} from './observed-value-flow.mjs';
 const walk=n=>n?[n,...(n.children??[]).flatMap(walk)]:[];
 const unwrap=n=>{while(n&&['ImplicitCastExpr','CStyleCastExpr','ParenExpr'].includes(n.kind))n=n.children[0];return n;};
 const position=s=>`${s?.file}:${s?.start?.byte??`${s?.line}:${s?.column}`}`;
@@ -50,6 +51,28 @@ export function bindEmbeddedArrays(plan){
       fields:[...fields.values()].filter(f=>f.recordTypeId===data.recordTypeId&&f.cType.signedness&&f.size>0&&f.size<=8),
       evidence:['compiler fixed-array field identity and extent','compiler indexed-access dependencies through declarations and assignments']});
   }
+  const scalarDeclarations=new Map((plan.declarations??[]).filter(d=>d.cType?.signedness&&d.cType.sizeBits>0&&d.cType.sizeBits<=64).map(d=>[d.id,d]));
+  for(const data of plan.declarations??[]){
+    const type=data.cType,capacity=type?.count,elementBytes=type?.elementType?.sizeBits/8;
+    if(type?.kind!=='array'||!Number.isSafeInteger(capacity)||capacity<=0||!(elementBytes>0))continue;
+    const accesses=[...nodes.values()].filter(n=>n.kind==='ArraySubscriptExpr'&&unwrap(n.children[0])?.declarationId===data.id).map(n=>{
+      const deps=dependencies(n.children[1]),ids=[...new Set(deps.map(x=>x.declarationId).filter(id=>scalarDeclarations.has(id)))];
+      return {nodeId:n.nodeId,indexDeclarations:ids,indexFields:ids.map(id=>`declaration:${id}`),
+        moduloCapacity:deps.some(x=>x.operator==='%'&&literal(x.children[1])===capacity)};
+    });
+    if(!accesses.length)continue;
+    const indexIds=new Set(accesses.flatMap(a=>a.indexDeclarations)),bounds=[],ids=new Set(indexIds);
+    for(const n of nodes.values())if(['<','<=','>','>='].includes(n.operator))for(const [fexpr,other]of [n.children,[...n.children].reverse()]){
+      const f=unwrap(fexpr);if(!scalarDeclarations.has(f?.declarationId))continue;
+      if(literal(other)===capacity||dependencies(other).some(x=>indexIds.has(x.declarationId))){
+        ids.add(f.declarationId);bounds.push({fieldNodeId:`declaration:${f.declarationId}`,sourceNodeId:n.nodeId,kind:'observed-bound-candidate'});
+      }
+    }
+    roles.push({id:`separate-fixed-role:${data.id}`,storage:'separate',recordTypeId:null,
+      data:{declarationId:data.id,offset:0,size:capacity*elementBytes,cType:type},elementBytes,capacity,accesses,bounds,
+      fields:[...ids].map(id=>{const d=scalarDeclarations.get(id);return {declarationId:id,fieldNodeId:`declaration:${id}`,offset:0,size:d.cType.sizeBits/8,cType:d.cType};}),
+      evidence:['compiler array and scalar declaration identities','observed endpoint operations share the same container contract as embedded fields']});
+  }
   plan.structureBindings??={};plan.structureBindings.embeddedArrayRoles=roles;
   plan.coverage.structureInference??={};Object.assign(plan.coverage.structureInference,{embeddedArrayCandidates:roles.length,
     embeddedArrayPolicy:'recorded endpoint operations and compiler bounds; multi-write prefix operations retain intermediate states'});
@@ -62,10 +85,17 @@ function inactive(range,bytes,capacity,start,count){
 export function embeddedArrayStructures(plan,{events,objects,views}){
   const roles=plan.structureBindings?.embeddedArrayRoles??[];if(!roles.length)return [];
   const defs=new Map(plan.instructions.map(d=>[d.id,d])),byObject=new Map(objects.map(o=>[o.id,o])),byEvent=new Map(events.map(e=>[e.eventId,e])),
-    contexts=new Map(),alive=new Set(),instructionNodes=new Map(plan.instructions.map(d=>[d.id,new Set(walk(d.expression).map(n=>n.nodeId))]));
+    contexts=new Map(),alive=new Set(),valueFlow=createValueFlow(plan,{events}),instructionNodes=new Map(plan.instructions.map(d=>[d.id,new Set(walk(d.expression).map(n=>n.nodeId))]));
   function context(objectId,offset,type){
     const o=byObject.get(objectId);if(!o||defs.get(byEvent.get(o.createdBy)?.instructionId)?.visibility==='implementation')return;
-    for(const role of roles.filter(r=>r.recordTypeId===type?.recordTypeId)){
+    const declaration=defs.get(byEvent.get(o.createdBy)?.instructionId)?.declarationId;
+    for(const candidate of roles.filter(r=>r.storage==='separate'?r.data.declarationId===declaration:!!r.recordTypeId&&r.recordTypeId===type?.recordTypeId)){
+      let role=candidate;
+      if(candidate.storage==='separate'){
+        const fields=candidate.fields.map(f=>{const matches=objects.filter(x=>defs.get(byEvent.get(x.createdBy)?.instructionId)?.declarationId===f.declarationId&&
+          (x.storage==='static'||x.frameId===o.frameId));return matches.length===1?{...f,objectId:matches[0].id}:null;}).filter(Boolean);
+        role={...candidate,fields};
+      }
       const at=offset+role.data.offset,key=`${objectId}:${offset}:${role.id}`;
       if(at<0||at+role.data.size>o.size||contexts.has(key))continue;
       contexts.set(key,{id:`array-structure:${key}`,ownerObjectId:objectId,ownerOffset:offset,role,
@@ -76,7 +106,7 @@ export function embeddedArrayStructures(plan,{events,objects,views}){
   for(const e of events){const ref=e.value?.reference;if(ref?.targetObjectId)context(ref.targetObjectId,ref.targetOffset??0,e.value.cType?.pointee);}
   function indexInput(id,c,fields,seen=new Set()){
     if(seen.has(id))return false;seen.add(id);const e=byEvent.get(id);if(!e)return false;
-    if(e.target?.objectId===c.ownerObjectId&&c.role.fields.some(f=>fields.includes(f.fieldNodeId)&&e.target.offset===c.ownerOffset+f.offset))return true;
+    if(c.role.fields.some(f=>fields.includes(f.fieldNodeId)&&e.target?.objectId===(f.objectId??c.ownerObjectId)&&e.target.offset===(f.objectId?0:c.ownerOffset)+f.offset))return true;
     return (e.dataInputs??[]).some(id=>indexInput(id,c,fields,seen));
   }
   for(let sequence=0;sequence<events.length;sequence++){
@@ -85,7 +115,7 @@ export function embeddedArrayStructures(plan,{events,objects,views}){
     if(e.action==='frame.end')for(const id of e.endedObjects??[])alive.delete(id);
     for(const c of contexts.values()){
       const {role}=c,previous={...c.values},target=e.target?.objectId===c.ownerObjectId,
-        own=target?role.fields.find(f=>c.ownerOffset+f.offset===e.target.offset&&f.size===e.target.size):null;
+        own=role.fields.find(f=>e.target?.objectId===(f.objectId??c.ownerObjectId)&&(f.objectId?0:c.ownerOffset)+f.offset===e.target.offset&&f.size===e.target.size);
       let access=target&&['READ','WRITE'].includes(e.kind)?role.accesses.find(a=>instructionNodes.get(e.instructionId)?.has(a.nodeId)):null;
       // One compiler instruction can cover both an index-field read and the
       // eventual element read. Recorded address dependencies disambiguate them.
@@ -103,9 +133,9 @@ export function embeddedArrayStructures(plan,{events,objects,views}){
         if(observed){c.bytes.set(own.fieldNodeId,observed);const value=observed.value??undefined;
           changed=c.values[own.fieldNodeId]!==value;if(value===undefined)delete c.values[own.fieldNodeId];else c.values[own.fieldNodeId]=value;}
       }
-      if(e.memoryState&&['WRITE','SPACE'].includes(e.kind)&&(e.target?.objectId??e.objectId)===c.ownerObjectId){
-        for(const f of role.fields){const observed=observeScalarBytes(c.bytes.get(f.fieldNodeId),{size:f.size,signed:f.cType.signedness==='signed',
-          snapshot:e.memoryState,start:e.target?.offset??0,offset:c.ownerOffset+f.offset});
+      if(e.memoryState&&['WRITE','SPACE'].includes(e.kind)){
+        for(const f of role.fields.filter(f=>(e.target?.objectId??e.objectId)===(f.objectId??c.ownerObjectId))){const observed=observeScalarBytes(c.bytes.get(f.fieldNodeId),{size:f.size,signed:f.cType.signedness==='signed',
+          snapshot:e.memoryState,start:e.target?.offset??0,offset:(f.objectId?0:c.ownerOffset)+f.offset});
           if(observed){c.bytes.set(f.fieldNodeId,observed);const value=observed.value??undefined;
             changed||=c.values[f.fieldNodeId]!==value;if(value===undefined)delete c.values[f.fieldNodeId];else c.values[f.fieldNodeId]=value;}}
       }
@@ -120,7 +150,7 @@ export function embeddedArrayStructures(plan,{events,objects,views}){
           target:{...e.target},sourceNodeId:access.nodeId,indexFields:access.indexFields,moduloCapacity:access.moduloCapacity,
           dataInputs:e.dataInputs??[],addressInputs:e.addressInputs??[]};g.accesses.push(a);c.accesses.push(a);}
       }
-      const active=alive.has(c.ownerObjectId),last=c.states.at(-1);
+      const active=alive.has(c.ownerObjectId)&&role.fields.every(f=>!f.objectId||alive.has(f.objectId)),last=c.states.at(-1);
       if(changed||access||last?.active!==active||e.action==='frame.end'&&c.groups.has(e.activationId))c.states.push({afterExecutionId:e.eventId,sequence,fieldValues:{...c.values},active,
         currentAccess:access?c.accesses.at(-1):null});
     }
@@ -129,12 +159,29 @@ export function embeddedArrayStructures(plan,{events,objects,views}){
   for(const c of contexts.values()){
     const {role,range}=c,viewIds=views.filter(v=>v.objectId===c.ownerObjectId&&v.kind==='array'&&v.offset===range.offset&&v.size===range.size).map(v=>v.id),
       nodes=views.filter(v=>v.objectId===c.ownerObjectId).map(v=>v.id),operations=[];
-    for(const f of role.fields)for(const g of c.groups.values()){
-      if(g.accesses.length!==1)continue;
-      const a=g.accesses[0],delta=g.after[f.fieldNodeId]-g.before[f.fieldNodeId],updates=g.updates.filter(u=>u.fieldNodeId===f.fieldNodeId);
-      if(updates.length!==1||!((delta===1&&a.kind==='WRITE')||(delta===-1&&a.kind==='READ')))continue;
-      if(!role.accesses.some(x=>x.indexFields.includes(f.fieldNodeId)))continue;
-      operations.push({field:f,group:g,access:a,delta});
+    for(const f of role.fields)for(const original of c.groups.values()){
+      const changes=original.updates.filter(u=>u.fieldNodeId===f.fieldNodeId);
+      // Repeated inline operations can share a frame. Partition on observed
+      // count mutations; helper frames with one mutation keep their full span.
+      const groups=changes.length<=1?[original]:changes.map((u,i)=>({activationId:original.activationId,
+        before:{...original.before,[f.fieldNodeId]:u.from},after:{...original.after,[f.fieldNodeId]:u.to},
+        updates:original.updates.filter(x=>x.sequence>(changes[i-1]?.sequence??-1)&&x.sequence<=u.sequence),
+        accesses:original.accesses.filter(a=>a.sequence>(changes[i-1]?.sequence??-1)&&a.sequence<=u.sequence)}));
+      for(const g of groups){
+        const delta=g.after[f.fieldNodeId]-g.before[f.fieldNodeId],updates=g.updates.filter(u=>u.fieldNodeId===f.fieldNodeId);
+        if(updates.length!==1||Math.abs(delta)!==1)continue;
+        if(!role.accesses.some(x=>x.indexFields.includes(f.fieldNodeId))&&!role.bounds.some(b=>b.fieldNodeId===f.fieldNodeId))continue;
+        const copies=[];
+        for(const w of g.accesses.filter(a=>a.kind==='WRITE'))for(const id of w.dataInputs)
+          for(const r of valueFlow.reads(id)){
+            const a=g.accesses.find(a=>a.executionId===r.eventId&&a.kind==='READ');
+            if(a&&!copies.some(x=>x.write===w))copies.push({read:a,write:w});
+          }
+        const candidates=g.accesses.filter(a=>a.kind===(delta===1?'WRITE':'READ')&&
+          !copies.some(x=>delta===1?x.write===a:x.read===a));
+        if(candidates.length!==1)continue;
+        operations.push({field:f,group:g,access:candidates[0],delta,copies});
+      }
     }
     const possibilities=[];
     for(const length of role.fields){
@@ -151,7 +198,29 @@ export function embeddedArrayStructures(plan,{events,objects,views}){
             o.group.after[head.fieldNodeId]===(o.group.before[head.fieldNodeId]+1)%role.capacity&&o.group.updates.filter(u=>u.fieldNodeId===head.fieldNodeId).length===1;
         if(inserts.some(fifoInsert)&&removes.some(fifoRemove))possibilities.push({length,head,role:'fifo',ops,
           supported:new Set([...inserts.filter(fifoInsert),...removes.filter(fifoRemove)])});
+        const frontInsert=o=>o.access.inBounds&&o.access.indexFields.includes(head.fieldNodeId)&&
+          o.group.after[head.fieldNodeId]===(o.group.before[head.fieldNodeId]+role.capacity-1)%role.capacity&&
+          o.access.physicalIndex===o.group.after[head.fieldNodeId],
+          backRemove=o=>o.access.inBounds&&o.access.moduloCapacity&&o.access.indexFields.includes(head.fieldNodeId)&&
+          o.access.indexFields.includes(length.fieldNodeId)&&o.group.after[head.fieldNodeId]===o.group.before[head.fieldNodeId]&&
+          o.access.physicalIndex===(o.group.before[head.fieldNodeId]+o.group.after[length.fieldNodeId])%role.capacity;
+        if(inserts.length&&removes.length&&(inserts.some(frontInsert)||removes.some(backRemove))&&
+          (inserts.some(fifoInsert)||removes.some(fifoRemove)))possibilities.push({length,head,role:'deque',ops,
+          supported:new Set(ops.filter(o=>o.delta===1?fifoInsert(o)||frontInsert(o):fifoRemove(o)||backRemove(o)))});
       }
+      const shifted=(o,direction)=>{
+        const size=o.delta===1?o.group.before[length.fieldNodeId]:o.group.after[length.fieldNodeId];
+        if(size<0||size>role.capacity||o.copies.length!==size)return false;
+        const destinations=new Set();
+        for(const x of o.copies){if(x.write.physicalIndex-x.read.physicalIndex!==direction||!x.read.inBounds||!x.write.inBounds)return false;destinations.add(x.write.physicalIndex);}
+        return destinations.size===size&&[...destinations].every(i=>direction===1?i>=1&&i<=size:i>=0&&i<size);
+      };
+      const shiftedRemove=o=>o.access.physicalIndex===0&&shifted(o,-1),
+        shiftedInsert=o=>o.access.physicalIndex===0&&shifted(o,1);
+      if(inserts.some(lifoInsert)&&removes.some(shiftedRemove))possibilities.push({length,head:null,role:'fifo',ops,
+        supported:new Set([...inserts.filter(lifoInsert),...removes.filter(shiftedRemove)]),representation:'shifted-prefix'});
+      if(inserts.some(shiftedInsert)&&removes.some(shiftedRemove))possibilities.push({length,head:null,role:'lifo',ops,
+        supported:new Set([...inserts.filter(shiftedInsert),...removes.filter(shiftedRemove)]),representation:'shifted-prefix'});
     }
     // Count is a storage-range role independent of LIFO/FIFO ordering. Support
     // multi-access updates only with observed endpoint and boundary evidence.
@@ -173,7 +242,9 @@ export function embeddedArrayStructures(plan,{events,objects,views}){
       prefixPossibilities.push({length,head:null,role:'active-prefix',ops,supported:new Set(ops.filter(o=>o.supported)),
         boundEvidence:observedBounds.map(e=>e.eventId)});
     }
-    const choices=possibilities.length?possibilities:prefixPossibilities,chosen=choices.length===1?choices[0]:null;
+    const choices=possibilities.some(p=>p.ops.every(o=>p.supported.has(o)))?possibilities:prefixPossibilities.length?prefixPossibilities:possibilities,
+      completeChoices=choices.filter(p=>p.ops.every(o=>p.supported.has(o))),
+      chosen=completeChoices.length===1?completeChoices[0]:choices.length===1?choices[0]:null;
     const operationEvidence=(chosen?.ops??operations).map(o=>{
       const changes=o.group.updates.filter(u=>u.fieldNodeId===o.field.fieldNodeId||u.fieldNodeId===chosen?.head?.fieldNodeId),effects=[o.access,...changes].sort((a,b)=>a.sequence-b.sequence);
       const end=o.prefix?events.findIndex(e=>e.action==='frame.end'&&e.activationId===o.group.activationId):-1,
@@ -201,11 +272,15 @@ export function embeddedArrayStructures(plan,{events,objects,views}){
     result.push({id:`array:${c.id}`,kind:'array',objectId:c.ownerObjectId,range,nodes:viewIds,edges:[],elementBytes:role.elementBytes,
       elementType:role.data.cType.elementType,capacity:role.capacity,lifecycle:byObject.get(c.ownerObjectId).lifecycle,
       evidence:['compiler embedded-array extent; same storage as record field'],snapshot:'physical range including inactive bytes'});
-    result.push({id:c.id,kind:'array-structure',storage:'embedded',ownerObjectId:c.ownerObjectId,ownerOffset:c.ownerOffset,
+    result.push({id:c.id,kind:'array-structure',storage:role.storage??'embedded',ownerObjectId:c.ownerObjectId,ownerOffset:c.ownerOffset,
       recordTypeId:role.recordTypeId,range,nodes,edges:[],arrayViewIds:viewIds,elementBytes:role.elementBytes,elementType:role.data.cType.elementType,capacity:role.capacity,
       roles:{data:role.data,length:chosen?.length??null,head:chosen?.head??null},roleCandidates:chosen?[chosen.role]:choices.map(p=>p.role),
       circularAccess:{observed:c.accesses.some(a=>a.moduloCapacity),evidence:c.accesses.filter(a=>a.moduloCapacity).map(a=>a.executionId),meaning:'compiler modulo-capacity access; does not alone establish FIFO'},
-      roleAlternatives:choices.map(p=>({role:p.role,lengthFieldNodeId:p.length.fieldNodeId,headFieldNodeId:p.head?.fieldNodeId??null})),
+      roleAlternatives:choices.map(p=>({role:p.role,lengthFieldNodeId:p.length.fieldNodeId,headFieldNodeId:p.head?.fieldNodeId??null,
+        representation:p.representation??'indexed-endpoints',status:p.ops.every(o=>p.supported.has(o))?'supported':'contradicted',
+        supportingExecutionIds:p.ops.filter(o=>p.supported.has(o)).map(o=>o.access.executionId),
+        contradictingExecutionIds:p.ops.filter(o=>!p.supported.has(o)).map(o=>o.access.executionId),
+        unexplainedAccessExecutionIds:c.accesses.filter(a=>!p.ops.some(o=>o.group.accesses.includes(a))).map(a=>a.executionId)})),
       boundEvidence:chosen?.boundEvidence??[],
       operationEvidence:operationEvidence.map(({startSequence,completeSequence,...o})=>o),accesses:c.accesses.map(({sequence,...a})=>a),states,
       latestValidState:states.findLast(s=>s.status==='consistent'&&s.active)??null,lifecycle:byObject.get(c.ownerObjectId).lifecycle,

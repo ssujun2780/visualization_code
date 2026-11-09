@@ -5,11 +5,68 @@ const field=n=>n?.kind==='MemberExpr'&&/\bbitfield\b/.test(n.details);
 const mutation=n=>n.kind==='CompoundAssignOperator'||n.kind==='BinaryOperator'&&opOf(n)==='='||n.kind==='UnaryOperator'&&['++','--'].includes(opOf(n));
 const codes={'+':['add','fadd'],'-':['sub','fsub'],'*':['mul','fmul'],'/':['sdiv','udiv'],'%':['srem','urem'],
   '&':['and'],'|':['or'],'^':['xor'],'<<':['shl'],'>>':['ashr','lshr'],'++':['add'],'--':['sub']};
-export function bitfieldBindings(observations,{nearest,source,types}){
+export function bitfieldBindings(observations,{nearest,source,types,abi,paths=new Map()}){
   const accesses=new Map(),hidden=new Set(),gaps=[],producers=new Map(),preserving=new Set(),actual=new Set(),extractions=new Map();
   const key=(o,v)=>`${o.functionId}:${v}`;
   for(const o of observations.instructions)if(o.result)producers.set(key(o,o.result),o);
+  const initializerAccesses=new Map();
+  function storage(o,value,seen=new Set()){
+    if(seen.has(value))return null;seen.add(value);
+    const known=paths.get(key(o,value));if(known?.cType?.kind==='record')return {base:known,offset:0};
+    const p=producers.get(key(o,value));if(p?.opcode==='bitcast')return storage(o,p.inputs[0].value,seen);
+    if(p?.action!=='address'||!abi)return null;
+    const parent=storage(o,p.pointer.value,seen);if(!parent)return null;
+    let backend=p.baseType,offset=parent.offset;
+    for(const [i,input]of p.inputs.slice(1).entries()){
+      if(!/^-?\d+$/.test(input.value))return null;const index=Number(input.value),layout=abi.layout(backend);
+      if(i===0)offset+=index*layout.size;
+      else if(layout.fields){const f=layout.fields[index];if(!f)return null;offset+=f.offset;backend=f.type;}
+      else if(layout.elementType){backend=layout.elementType;offset+=index*abi.layout(backend).size;}
+      else return null;
+    }
+    return {...parent,offset};
+  }
+  // Aggregate initialization has no MemberExpr. The preserved-bit mask and
+  // actual destination path identify the compiler field, even with padding,
+  // nested records or several fields sharing a debug location.
+  for(const store of observations.instructions.filter(o=>o.action==='store')){
+    const storagePath=storage(store,store.pointer.value),base=storagePath?.base,init=base&&nearest(store,n=>n.kind==='InitListExpr'&&
+      types.spelling(n.type,n.canonical)?.recordTypeId===base.cType?.recordTypeId);
+    if(!init||base.cType?.kind!=='record')continue;
+    const bits=Number(/^i(\d+)$/.exec(store.type)?.[1]);if(!(bits>0&&bits<=64))continue;
+    const pending=[store.inputs[0]],visited=new Set(),matches=[];
+    while(pending.length){const input=pending.pop();if(!input||visited.has(input.value))continue;visited.add(input.value);
+      const p=producers.get(key(store,input.value));if(!p)continue;
+      if(p.opcode==='and')for(let index=0;index<2;index++){
+        const load=producers.get(key(store,p.inputs[index]?.value)),constant=p.inputs[1-index]?.value;
+        if(load?.action!=='load'||load.pointer.value!==store.pointer.value||! /^-?\d+$/.test(constant??''))continue;
+        const changed=BigInt.asUintN(bits,~BigInt(constant));
+        for(const [memberIndex,m]of base.cType.members.entries())if(m.bitField&&m.sizeBits>0&&m.sizeBits<=bits){
+          const shift=m.offsetBits-m.storageOffsetBits;
+          if(m.storageOffsetBits!==storagePath.offset*8||shift<0||shift+m.sizeBits>bits||changed!==((1n<<BigInt(m.sizeBits))-1n)<<BigInt(shift))continue;
+          matches.push({load,mask:p,m,memberIndex,shift});
+        }
+      }
+      if(['and','or','shl','trunc','zext','sext'].includes(p.opcode))pending.push(...p.inputs);
+    }
+    if(matches.length!==1)continue;
+    const {load,mask,m,memberIndex,shift}=matches[0],child=init.children[memberIndex],part={kind:'member',name:m.name,index:memberIndex,
+      offsetBits:m.offsetBits,sizeBits:m.sizeBits,typeId:m.typeId,bitField:true,storageOffsetBits:m.storageOffsetBits},path=[...base.path,part],
+      info={node:child?.source?child:init,initializer:child?.source?child:init,owner:null,direct:false,
+        memberPath:path.filter(p=>p.kind==='member').map(p=>p.name),targetPath:path,cType:types.debug(m.typeId),
+        width:m.sizeBits,offsetBits:m.offsetBits,storageOffsetBits:m.storageOffsetBits,shift,evidence:'compiler initializer destination and preserved-bit mask'};
+    if(!info.cType)continue;
+    for(const o of [store,load,mask])initializerAccesses.set(o.id,info);
+    const childNodes=new Set(),visit=n=>{if(n){childNodes.add(n.id);for(const c of n.children??[])visit(c);}};visit(child);
+    const chain=[store.inputs[0]],seen=new Set();while(chain.length){const v=chain.pop();if(!v||seen.has(v.value))continue;seen.add(v.value);
+      const p=producers.get(key(store,v.value));if(!p||p===load||!['or','and','shl','trunc','zext','sext'].includes(p.opcode))continue;
+      // Stop at the user's RHS operator. Only compiler packing operations
+      // outside that expression belong to the field WRITE.
+      if(nearest(p,n=>childNodes.has(n.id)&&(codes[opOf(n)]??[]).includes(p.opcode)))continue;
+      initializerAccesses.set(p.id,info);chain.push(...p.inputs);}
+  }
   function locate(o){
+    if(initializerAccesses.has(o.id))return initializerAccesses.get(o.id);
     const direct=nearest(o,field),owner=nearest(o,n=>mutation(n)&&field(unwrap(n.children[0]))),node=direct??unwrap(owner?.children[0]);
     if(!node)return null;
     const rhs=owner?.children[1]?.source,p=o.source,order=(a,b)=>a.line-b.line||a.column-b.column;
@@ -38,6 +95,7 @@ export function bitfieldBindings(observations,{nearest,source,types}){
     const info=locate(o);if(!info)continue;
     if(o.opcode==='bitcast'&&o.type.endsWith('*')){hidden.add(o.id);continue;}
     if(o.conversion)continue; // Keep actual C value conversions.
+    if(info.initializer){hidden.add(o.id);continue;}
     if(info.direct&&['and','shl','ashr','lshr','trunc','zext','sext'].includes(o.opcode)){
       const p=producers.get(key(o,o.inputs?.[0]?.value)),load=accesses.get(p?.id);
       if(load?.role==='read'&&load.node.id===info.node.id||extractions.get(p?.id)===info.node.id){hidden.add(o.id);extractions.set(o.id,info.node.id);}
@@ -64,7 +122,7 @@ export function bitfieldBindings(observations,{nearest,source,types}){
         input={type:`i${info.cType.sizeBits}`,value:'0'};break;
       }else input=p.inputs?.[0];
     }
-    const rhs=info.owner?.kind==='BinaryOperator'&&opOf(info.owner)==='='?info.owner.children[1]:null,literal=unwrap(rhs),
+    const rhs=info.initializer??(info.owner?.kind==='BinaryOperator'&&opOf(info.owner)==='='?info.owner.children[1]:null),literal=unwrap(rhs),
       text=literal?.kind==='IntegerLiteral'?/ (-?\d+)\s*$/.exec(literal.details)?.[1]:null;
     // Clang may fold field insertion into a shifted literal. A compiler AST
     // literal retains the source input before that storage encoding/truncation.
