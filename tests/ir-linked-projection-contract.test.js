@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {validateLinkedProjections} from '../scripts/model/linked-projection-contract.mjs';
+import {validateLinkedProjections} from '../scripts/inference/linked-projection-contract.mjs';
 
 function fixture(){
   const nodes=['a','b','nil'].map((id,index)=>({id,objectId:'pool',offset:index*16,size:16,recordTypeId:'T'})),

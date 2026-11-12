@@ -1,5 +1,4 @@
 import {randomUUID} from "node:crypto";
-import {topology} from "./structure.mjs";
 import {MemorySnapshots,filledMemory,initializationOf} from "./memory-state.mjs";
 import {RangeOrigins} from './ranges.mjs';
 import {bitSegments,markBits} from './bitfields.mjs';
@@ -668,13 +667,10 @@ export class ModelRecorder {
     }}catch(error){if(!(error instanceof TraceStopped))throw error;}
     const status=this.status??"completed";
     this.flush();
-    const edges=[...this.references.values()],groups=[];
-    for(const type of new Set(this.views.filter(v=>v.kind==="record").map(v=>v.type))){const nodes=this.views.filter(v=>v.type===type),links=[];
-      for(const edge of edges){const from=nodes.find(v=>v.objectId===edge.objectId&&edge.offset>=v.offset&&edge.offset+4<=v.offset+v.size),to=nodes.find(v=>v.objectId===edge.targetObjectId&&v.address===edge.address);if(from&&to)links.push({from:from.id,to:to.id,offset:edge.offset});}
-      groups.push({type,nodes:nodes.map(v=>v.id),edges:links,...topology(nodes,links),snapshot:"last observed references, including ended objects"});}
+    const edges=[...this.references.values()];
     return {schemaVersion:2,programId:this.plan.programId,runId:this.runId,backend:this.plan.backend,status,exitCode:execution.exitCode,
       events:this.events,objects:this.objects.map(({writes,bitWrites,...o})=>({...o,initializationRanges:writes,bitInitializationRanges:bitWrites})),
-      frames:this.frames.map(({definitions,origins,allocations,selects,calls,activeCall,sourceDecisions,stackSaves,...f})=>f),views:this.views,references:edges,structures:groups,
+      frames:this.frames.map(({definitions,origins,allocations,selects,calls,activeCall,sourceDecisions,stackSaves,...f})=>f),views:this.views,references:edges,structures:[],
       diagnostics:this.diagnostics,coverage:{...this.plan.coverage,
         ...(this.nativeMemoryCoverage?{linkedMemory:this.nativeMemoryCoverage,memory:'user LLVM accesses and linked WASM scalar accesses to tracked objects; allocation contracts remain explicit',libraryInternals:'linked scalar memory reads/stores observed; library arithmetic and source frames are not instrumented'}:{}),
         observationBytes:this.observationBytes,maxObservationBytes:this.maxObservationBytes,

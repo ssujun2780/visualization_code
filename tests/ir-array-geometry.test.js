@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {arrayGeometry,arrayLocation} from '../scripts/model/array-geometry.mjs';
+import {arrayGeometry,arrayLocation} from '../scripts/inference/array-geometry.mjs';
 const scalar={kind:'integer',name:'opaque',sizeBits:16},
   nested=(count,elementType)=>({kind:'array',count,elementType,sizeBits:count*elementType.sizeBits});
 const view=(type,offset=0)=>({id:'array',objectId:'memory',range:{objectId:'memory',offset,size:type.sizeBits/8},

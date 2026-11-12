@@ -1,32 +1,15 @@
 // Bind real observations to source IR. No C expression is evaluated here.
 import {validateIRTrace} from './ir-schema.mjs';
-import {topology} from './structure.mjs';
 import {outputEvents} from './output-events.mjs';
 import {createControlTracker} from './control-flow.mjs';
 import {createEvaluationTracker,cResult} from './evaluation.mjs';
 import {bitfieldValue} from './bitfields.mjs';
 import {createGuardTracker} from './guard-conditions.mjs';
-import {arrayStructures} from './array-views.mjs';
-import {linkedStructures} from './linked-views.mjs';
-import {linkedRootCollections} from './linked-root-collections.mjs';
-import {arrayWorkStructures} from './array-work.mjs';
-import {arrayCursorPathStructures} from './array-cursor-paths.mjs';
-import {indexRelationStructures} from './index-relations.mjs';
 import {assertionObservation} from './assertions.mjs';
 import {buildResultDeliveries} from './result-delivery.mjs';
 import {orderReturnCleanup,remapExecutionReferences} from './return-sequence.mjs';
-import {runtimeArrayViews} from './runtime-array-views.mjs';
 import {resolvedCoverage} from './coverage-resolution.mjs';
-import {indexedGraphStructures} from './indexed-graph-views.mjs';
-import {recordIndexStructures} from './record-index-views.mjs';
-import {queueStructures} from './queue-views.mjs';
 import {attachConversionConsumers} from './conversion-consumers.mjs';
-import {valueIndexStructures} from './value-index-views.mjs';
-import {parallelArrayStructures} from './parallel-array-views.mjs';
-import {createValueFlow} from './observed-value-flow.mjs';
-import {storageRelationStructures} from './storage-relations.mjs';
-import {coindexedRecordStructures} from './coindexed-record-views.mjs';
-import {separateArrayStructures} from './separate-array-views.mjs';
 import {createObservationResolver,createAliasResolver} from './observation-dependencies.mjs';
 const unique=list=>[...new Set(list.filter(Boolean))];
 const sourceBoolean=(value,spec)=>{const bit=BigInt(value.bits)!==0n,source=spec.invert?!bit:bit;
@@ -732,36 +715,14 @@ export function recordIR(plan,observations,raw) {
       callObservationId:o.storageEvidence.callEventId,callExecutionId:boundary(o.storageEvidence.callEventId,['call'])}}:{}),
     initializationRanges:o.initializationRanges?.map(r=>({...r,writer:r.writer==='unobserved'?r.writer:ref(r.writer)})),
     bitInitializationRanges:o.bitInitializationRanges?.map(r=>({...r,writer:r.writer==='unobserved'?r.writer:ref(r.writer)}))}));
-  const implementationObjects=new Set(objects.filter(o=>instructions.get(executions.get(o.createdBy)?.instructionId)?.visibility==='implementation').map(o=>o.id)),
-    sourceViews=new Set(views.filter(v=>!implementationObjects.has(v.objectId)).map(v=>v.id));
-  const resultDeliveries=buildResultDeliveries(plan,{events}),valueFlow=createValueFlow(plan,{events,resultDeliveries});
-  const structures=(raw.structures??[]).map(s=>{
-    const nodes=s.nodes.filter(id=>sourceViews.has(id)),edges=s.edges.filter(e=>sourceViews.has(e.from)&&sourceViews.has(e.to));
-    return {...s,kind:'record-graph-candidate',nodes,edges,...topology(nodes.map(id=>({id})),edges),
-      temporalScope:'historical-union',classification:'storage-association-only',views:edges.length?['storage-reference-graph']:[],
-      snapshot:'last observed source references; historical ended objects are retained'};
-  }).filter(s=>s.nodes.length);
-  const runtimeArrays=runtimeArrayViews(plan,observations,raw,{events,objects}),
-    arrays=arrayStructures(plan,{events,objects,views,runtimeArrays}),linked=linkedStructures(plan,{events,objects,views,arrays});
-  structures.push(...arrays,...linked,...linkedRootCollections(plan,{events,objects,views,arrays,linked}));
-  structures.push(...indexedGraphStructures(plan,{events,objects,structures,resultDeliveries,valueFlow}));
-  structures.push(...recordIndexStructures(plan,{events,objects,structures,resultDeliveries,valueFlow}));
-  structures.push(...arrayWorkStructures(plan,{events,objects,views,frames:raw.frames??[],structures,resultDeliveries,valueFlow}));
-  structures.push(...arrayCursorPathStructures(plan,{events,objects,structures}));
-  structures.push(...valueIndexStructures(plan,{events,objects,structures,frames:raw.frames??[],resultDeliveries,valueFlow}));
-  structures.push(...parallelArrayStructures(plan,{events,objects,structures,frames:raw.frames??[],resultDeliveries,valueFlow}));
-  structures.push(...queueStructures(plan,{events,objects,structures}));
-  structures.push(...indexRelationStructures(plan,{events,objects,views,frames:raw.frames??[],structures}));
-  structures.push(...storageRelationStructures(plan,{events,objects,structures,resultDeliveries,valueFlow}));
-  structures.push(...coindexedRecordStructures(plan,{events,objects,structures}));
-  structures.push(...separateArrayStructures(plan,{events,objects,structures}));
+  const resultDeliveries=buildResultDeliveries(plan,{events});
   attachConversionConsumers(plan,events);
   const trace={schemaVersion:3,programId:plan.programId,runId:raw.runId,backend:raw.backend,status:raw.status,exitCode:raw.exitCode,
     events,flowTransitions,objects,resultDeliveries,
     frames:(raw.frames??[]).map(f=>{const {callbackOfCallEventId,...frame}=f;return {...frame,...(callbackOfCallEventId?{
       callbackOfCallObservationId:callbackOfCallEventId,callbackOfCallExecutionId:boundary(callbackOfCallEventId,['call'])}: {})};}),
     views,references:(raw.references??[]).filter(r=>!excluded.has(r.objectId)&&!excluded.has(r.targetObjectId)).map(r=>({...r,eventId:ref(r.eventId)})),
-    structures,
+    structures:[],
     diagnostics:(raw.diagnostics??[]).map(d=>({...d,eventId:ref(d.eventId)})),
     coverage:{...plan.coverage,...raw.coverage,...resolvedCoverage(plan,{events}),irEvents:events.length,observationEvents:raw.events.length,irGaps:[...gaps],
       observationAccounting:accounting,pendingCleanup:[...cleanup.values()].flat().map(e=>e.objectId),

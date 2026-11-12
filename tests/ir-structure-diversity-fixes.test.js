@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {traceModel} from '../scripts/model/index.mjs';
-import {queryStorageReferences,storageRelationStructures} from '../scripts/model/storage-relations.mjs';
+import {traceWithStructureView as traceModel} from './helpers/structure-runner.mjs';
+import {queryStorageReferences,storageRelationStructures} from '../scripts/inference/storage-relations.mjs';
 async function inspect(source){const r=await traceModel(source);assert.equal(r.trace.status,'completed',JSON.stringify(r.trace.diagnostics));assert.equal(r.trace.exitCode,0);
  assert.deepEqual(r.trace.coverage.irGaps,[]);assert.deepEqual(r.trace.coverage.observationAccounting.unexplained,[]);assert.equal(r.plan.sourceMap.stats.semanticSourceScans,0);return r;}
 const structures=(r,kind)=>r.trace.structures.filter(s=>s.kind===kind);

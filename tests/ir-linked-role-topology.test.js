@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {traceModel} from '../scripts/model/index.mjs';
-import {rootedConnectivity} from '../scripts/model/rooted-connectivity.mjs';
+import {traceWithStructureView as traceModel} from './helpers/structure-runner.mjs';
+import {rootedConnectivity} from '../scripts/inference/rooted-connectivity.mjs';
 
 async function inspect(source,exitCode){
   const r=await traceModel(source);assert.equal(r.trace.status,'completed',JSON.stringify(r.trace.diagnostics));

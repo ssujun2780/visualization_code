@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {traceModel} from '../scripts/model/index.mjs';
 import {runModelCore} from '../scripts/model/core.mjs';
 import {partialResult} from '../scripts/model/partial-result.mjs';
-import {writeJSON,writeJSONLines} from '../scripts/model/json-output.mjs';
+import {writeJSON,writeJSONLines} from '../scripts/shared/json-output.mjs';
 
 const source='#include <stdio.h>\nint main(){fputs("앞🙂\\n",stdout);fflush(stdout);fputs("err\\n",stderr);fflush(stderr);int n=0;for(;;){n=(n+1)%7;}}';
 

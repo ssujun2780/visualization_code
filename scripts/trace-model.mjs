@@ -1,11 +1,11 @@
 import {readFile,writeFile,mkdir} from "node:fs/promises";
 import {resolve,join} from "node:path";
 import {traceModel,compileCToIR} from "./model/index.mjs";
-import {writeJSON,writeJSONLines} from './model/json-output.mjs';
+import {writeJSON,writeJSONLines} from './shared/json-output.mjs';
 
 try {
   const args=process.argv.slice(2);
-  if(args.includes("--help")){console.log("사용법: pnpm trace:c [입력.c] [--compile-only] [--stdin 입력.txt] [--out-dir 기록폴더] [--max-events 100000] [--max-observation-bytes 16777216] [--timeout-ms 25000] [--with-observations]");}
+  if(args.includes("--help")){console.log("사용법: pnpm trace:c [입력.c] [--compile-only] [--stdin 입력.txt] [--out-dir 기록폴더] [--max-events 100000] [--max-observation-bytes 16777216] [--timeout-ms 25000] [--with-observations]\n중간언어만 생성합니다. 자료구조 추론은 node scripts/infer-structures.mjs 기록폴더로 별도 실행합니다.");}
   else {
     let input="examples/c/instrumentation-basic.c",output="test-results/c-model",inputFile,hasInput=false,compileOnly=false;const options={};
     for(let i=0;i<args.length;i++){

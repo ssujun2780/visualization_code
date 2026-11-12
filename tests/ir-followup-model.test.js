@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {traceModel,recommendStructureViews,queryStorageReferences} from '../scripts/model/index.mjs';
+import {recommendStructureViews,queryStorageReferences} from '../scripts/inference/index.mjs';
+import {traceWithStructureView as traceModel} from './helpers/structure-runner.mjs';
 async function inspect(source,stdout=''){
   const r=await traceModel(source,{includeObservations:true});
   assert.equal(r.trace.status,'completed',JSON.stringify(r.trace.diagnostics));assert.equal(r.trace.exitCode,0);assert.equal(r.stdout,stdout);

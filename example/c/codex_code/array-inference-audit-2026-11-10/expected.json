@@ -1,0 +1,292 @@
+{
+  "provenance": "Unchanged pre-execution predictions and pre-fix core trace hashes from array-inference-audit-2026-11-10. No expected values taken from the repaired inference.",
+  "cases": [
+    {
+      "name": "01_embedded_prefix",
+      "stdout": "2 11 22 33 33\n",
+      "expected": [
+        {
+          "roles": {
+            "storage": "b.cell",
+            "length": "b.used"
+          },
+          "capacity": 6,
+          "activeIndices": [
+            0,
+            1
+          ],
+          "logicalOrder": [
+            0,
+            1
+          ],
+          "inactiveIndices": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "retainedRemovedValue": 33
+        }
+      ],
+      "coreSha256": {
+        "events": "65bd5b7e6dce74ee2dec137321e16394dc8a12551205af8749a21ca9624274e5",
+        "objects": "0bba1bf25d17394d128ebe8d74727b415450bf1964c95fe837fabd6f6b909790",
+        "frames": "19cde1d449e7e7ef095e8c7d32f12323ebf56f1425e19019a6b35605075be8bf",
+        "resultDeliveries": "87280e607c2288495830ef61d2b37c1b0f8611b16af43482686185526f887894"
+      }
+    },
+    {
+      "name": "02_pointer_prefix",
+      "stdout": "2 6 11 22 33 33\n",
+      "expected": [
+        {
+          "roles": {
+            "storage": "b.base target",
+            "length": "b.used",
+            "capacity": "b.limit"
+          },
+          "capacity": 6,
+          "activeIndices": [
+            0,
+            1
+          ],
+          "logicalOrder": [
+            0,
+            1
+          ],
+          "inactiveIndices": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "retainedRemovedValue": 33
+        }
+      ],
+      "coreSha256": {
+        "events": "aac05efd0cebd56a06d29e3f73ef208975cf47a658f0c7ef0dbd2dccc66795ce",
+        "objects": "7b9698fbe48ccaff5a2825852098e33c8d3e043644d562053f27f953f3870189",
+        "frames": "bc39a5b5d82d129d361b9dc638b92b2ad874393f5c4e15c7939c0153b3acfb85",
+        "resultDeliveries": "0bafae0728c8269b27c7ae915cd8c34daa6e6a249ae8f16d732fcc8c04804328"
+      }
+    },
+    {
+      "name": "03_separate_growth",
+      "stdout": "3 6 10 20 30 40\n",
+      "expected": [
+        {
+          "roles": {
+            "storage": "storage target",
+            "length": "amount",
+            "capacity": "bound"
+          },
+          "capacity": 6,
+          "activeIndices": [
+            0,
+            1,
+            2
+          ],
+          "logicalOrder": [
+            0,
+            1,
+            2
+          ],
+          "inactiveIndices": [
+            3,
+            4,
+            5
+          ],
+          "retainedRemovedValue": 40,
+          "allocationCapacities": [
+            3,
+            6
+          ]
+        }
+      ],
+      "coreSha256": {
+        "events": "e0b002377d5e4ebbedb7068ce0436716aa3462a76bd562793cb0579927d38466",
+        "objects": "7c4e699da027f5fb33b661c2aada512420d0ef7e4b976da7cfc6b3e1710aaffb",
+        "frames": "1d4232231cd0e05805dc8d046cdd751198d7b3b337c8f2396f585ec8cde92917",
+        "resultDeliveries": "7fdd4a0fc046b80fa3a008a46774e5b672b1371fd528f7231627cd761eb3df59"
+      }
+    },
+    {
+      "name": "04_bulk_prefix",
+      "stdout": "2 6 11 22 33\n",
+      "expected": [
+        {
+          "roles": {
+            "storage": "b.base target",
+            "length": "b.used",
+            "capacity": "b.limit"
+          },
+          "capacity": 6,
+          "activeIndices": [
+            0,
+            1
+          ],
+          "logicalOrder": [
+            0,
+            1
+          ],
+          "inactiveIndices": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "retainedRemovedValue": 33
+        }
+      ],
+      "coreSha256": {
+        "events": "ed7f4f0cde83e0832e1adb3f6811e17a82532479d635c98671aed77157808f38",
+        "objects": "87c9b62fe120aa4e40907598048e2b1fb62b50fe73aecfaa43191936ffe22163",
+        "frames": "956df0e76dfb2eca9673946ff07477a30a8d1c20e37fd3c7487aeac4a7c951d3",
+        "resultDeliveries": "63193e8cd6e2744862be638293ccf89aed76fb46a765e12c2ed0f93646340d23"
+      }
+    },
+    {
+      "name": "05_scan_only",
+      "stdout": "60\n",
+      "expected": [
+        {
+          "physicalCapacity": 8,
+          "accessedIndices": [
+            0,
+            1,
+            2
+          ],
+          "logicalMembership": "unknown",
+          "logicalOrder": "unknown",
+          "mustNotInfer": "n is live element count; a[3..7] inactive"
+        }
+      ],
+      "coreSha256": {
+        "events": "3a5c8a75d02a882743c67a74046b43198b5a92aab1dabc63df4eac6c3b984506",
+        "objects": "6fddc5bb76f2eef58d0462e7d88d40536a1adc8cca9a40a656344fe80c187b31",
+        "frames": "69e388c2a366b6c7291dfdddf2a836b2b7495c15dd1aa2df22cbb61d3dbbb4d8",
+        "resultDeliveries": "ca536432972a2a32286aa627fca3660779e624b1f5eca3498465c1e8da08369b"
+      }
+    },
+    {
+      "name": "06_ring",
+      "stdout": "live 2 4 30 40 50 60\nempty 1 0 180\n",
+      "expected": [
+        {
+          "roles": {
+            "storage": "r.cell",
+            "length": "r.n",
+            "head": "r.h"
+          },
+          "capacity": 5,
+          "activeIndices": [
+            0,
+            2,
+            3,
+            4
+          ],
+          "logicalOrder": [
+            2,
+            3,
+            4,
+            0
+          ],
+          "inactiveIndices": [
+            1
+          ]
+        },
+        {
+          "roles": {
+            "storage": "r.cell",
+            "length": "r.n",
+            "head": "r.h"
+          },
+          "capacity": 5,
+          "activeIndices": [],
+          "logicalOrder": [],
+          "inactiveIndices": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ],
+      "coreSha256": {
+        "events": "8ebce09e6f6eae301e7a17c408bcdd3d516422c133b2a38e9466a8731e36ae0f",
+        "objects": "925ecde25e877767a2e7d473eebbaf77692c7e6be3cf981be05c1c88fb6c8d48",
+        "frames": "26135e84d95a98478207e1306002e0c6fd45f3cac63e419b5bce282033773532",
+        "resultDeliveries": "77b93c1d11b0c2136cb19447d5f5532c55abfd76923974acd7950b456ca323c2"
+      }
+    },
+    {
+      "name": "07_sparse",
+      "stdout": "2 14 7\n",
+      "expected": [
+        {
+          "roles": {
+            "storage": "s.cell",
+            "membership": "s.occupied",
+            "cardinality": "s.count"
+          },
+          "capacity": 6,
+          "activeIndices": [
+            4,
+            5
+          ],
+          "logicalOrder": "unknown; ascending index is traversal order only",
+          "inactiveIndices": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "retainedRemovedValue": 7,
+          "mustNotInfer": "count=2 means active prefix [0,2)"
+        }
+      ],
+      "coreSha256": {
+        "events": "b387316dc3d3ea8de02573004b254699b2095e4b2b3ab26f11a16fb067760202",
+        "objects": "1622668626440ce5df1583336bf5491d42df01b92271bf26d90b7f20f94f4503",
+        "frames": "2f7c10dcc498d2eefd92680f13fe0bb67a478d4e79209c450c0654cf279b7efc",
+        "resultDeliveries": "74f78fc9cbcff9599ebe4d366c7bb7bc833436beba881f4e14b193c7c9256aa9"
+      }
+    },
+    {
+      "name": "08_bulk_with_take",
+      "stdout": "2 6 11 22 33 33\n",
+      "expected": [
+        {
+          "roles": {
+            "storage": "b.base target",
+            "length": "b.used",
+            "capacity": "b.limit"
+          },
+          "capacity": 6,
+          "activeIndices": [
+            0,
+            1
+          ],
+          "logicalOrder": [
+            0,
+            1
+          ],
+          "inactiveIndices": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "retainedRemovedValue": 33
+        }
+      ],
+      "coreSha256": {
+        "events": "de06204320f35af11fd6a5283e2d2f778a44cefbe6532e9b098e370ade5f6c6b",
+        "objects": "d4677e273fb1ea0ecb99d9ceb43c43b617a09f940ff30b0fc1e5f4b5a6d01b8a",
+        "frames": "7a981770f07d83ec4e71d426eaf180f42c85d1fd043a74f1fc154fd999b4b5ef",
+        "resultDeliveries": "000182d40a72bc06e7f9079910677b6b99b71680379b9de8d0165e5218211a5c"
+      }
+    }
+  ]
+}

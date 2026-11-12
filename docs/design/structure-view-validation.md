@@ -116,9 +116,9 @@
 
 ## 현재 구현과의 관계
 
-scripts/model/structure.mjs는 관찰한 참조 그래프의 순환·부모 수 등을 검사해 directed-graph, tree-or-forest, linked-chain-or-chains 후보를 제안합니다. 현재 이것만으로 링크 역할, 배열 기반 힙·숲, Red-black의 의미나 실제 배치를 모두 판단하지는 못합니다.
+scripts/shared/topology.mjs는 관찰한 참조 그래프의 순환·부모 수 등을 검사해 directed-graph, tree-or-forest, linked-chain-or-chains 후보를 제안합니다. 2026-11-11 모델 분리 이후 이 판정은 별도 추론기에서 호출합니다. 현재 이것만으로 링크 역할, 배열 기반 힙·숲, Red-black의 의미나 실제 배치를 모두 판단하지는 못합니다.
 
-No21 보강으로 scripts/model/array-views.mjs가 일반 배열 범위와 필드 기반 동적 배열의 역할 후보·상태 대응을 기록합니다. 복사 목적지의 인덱스/stride 또는 타입이 있는 배열 인덱스 접근을, 사용량·용량 필드 비교와 연결합니다. 실제 쓰기·복사와 할당 범위로 후보를 검증하며 배수 성장이나 memcpy 사용을 필수 규칙으로 고정하지 않습니다. 이름만으로 역할을 결정하지 않으며 모호한 원소형은 후보로 유지합니다.
+No21 보강으로 scripts/inference/array-views.mjs가 일반 배열 범위와 필드 기반 동적 배열의 역할 후보·상태 대응을 기록합니다. 복사 목적지의 인덱스/stride 또는 타입이 있는 배열 인덱스 접근을, 사용량·용량 필드 비교와 연결합니다. 실제 쓰기·복사와 할당 범위로 후보를 검증하며 배수 성장이나 memcpy 사용을 필수 규칙으로 고정하지 않습니다. 이름만으로 역할을 결정하지 않으며 모호한 원소형은 후보로 유지합니다.
 
 dynamic-array의 논리 ID·소유 객체는 유지하고, 사건별 상태와 backingHistory로 재할당 객체들을 연결합니다. 주소가 같아도 종료된 할당의 별칭을 새 할당으로 자동 갱신하지 않습니다. 미사용 범위와 중간 불일치·종료 상태를 보존합니다. 배열의 용량만큼 논리 셀·C 객체·READ를 생성하지 않습니다. 초기화용 컴파일러 템플릿은 사용자 구조 후보에서 제외하며, 실제 간선이 없는 레코드 집합만으로 트리·연결 리스트를 추천하지 않습니다.
 
@@ -198,7 +198,7 @@ tests/ir-linked-root-aliases.test.js는 여러 단계 wrapper와 지역 별칭, 
 
 ## 배열 작업 관계 보강 (2026-11-04)
 
-scripts/model/array-work.mjs는 기존 배열 위에 `array-work` 관계를 추가합니다. `arrays`는 기존 배열 ID·objectId·바이트 범위를 재사용합니다. `accesses`는 실제 읽기·쓰기·복사 원본 범위, 원소 인덱스, 원소 안의 바이트 위치와 주소 계산에 사용된 커서 READ를 연결합니다. 복사의 원본 범위 표시는 이미 관측된 copy 사건을 가리키며 별도 READ를 생성하지 않습니다.
+scripts/inference/array-work.mjs는 기존 배열 위에 `array-work` 관계를 추가합니다. `arrays`는 기존 배열 ID·objectId·바이트 범위를 재사용합니다. `accesses`는 실제 읽기·쓰기·복사 원본 범위, 원소 인덱스, 원소 안의 바이트 위치와 주소 계산에 사용된 커서 READ를 연결합니다. 복사의 원본 범위 표시는 이미 관측된 copy 사건을 가리키며 별도 READ를 생성하지 않습니다.
 
 `transfers`는 관측된 copy 범위 또는 WRITE의 LLVM 데이터 입력과 실제 READ 범위를 연결합니다. 구조체 전체 복사와 필드별 쓰기를 구별하며 같은 값을 다시 쓰는 사건도 유지합니다. `temporaries`는 배열 값이 별도 지역 저장소로 복사된 사건과 수명을 기록합니다. 비교에서 사용된 임시값은 `copied-comparison-operand`로 연결하고 `isReference: false`로 명시합니다. 원본 배열 값이 바뀌어도 복사값을 원본에 대한 참조처럼 갱신하지 않습니다. 복사 목적 범위가 다시 쓰이면 `invalidatedBy`로 이전 관계의 종료 근거를 남깁니다.
 

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {traceModel} from '../scripts/model/index.mjs';
-import {coindexedRecordStructures,queryCoindexedRecords,validateCoindexedRecords} from '../scripts/model/coindexed-record-views.mjs';
-import {recommendStructureViews,setStructurePresentation,resolveStructurePresentation} from '../scripts/model/structure-presentation.mjs';
+import {traceWithStructureView as traceModel} from './helpers/structure-runner.mjs';
+import {coindexedRecordStructures,queryCoindexedRecords,validateCoindexedRecords} from '../scripts/inference/coindexed-record-views.mjs';
+import {recommendStructureViews,setStructurePresentation,resolveStructurePresentation} from '../scripts/inference/structure-presentation.mjs';
 const live=s=>s.states.filter(x=>x.alive).at(-1);
 async function inspect(source){
   const r=await traceModel(source);assert.equal(r.trace.status,'completed',JSON.stringify(r.trace.diagnostics));

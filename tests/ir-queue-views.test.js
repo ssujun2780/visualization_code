@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {traceModel} from '../scripts/model/index.mjs';
-import {queueStructures} from '../scripts/model/queue-views.mjs';
-import {validateStructureOverlays} from '../scripts/model/structure-overlay-contract.mjs';
+import {traceWithStructureView as traceModel} from './helpers/structure-runner.mjs';
+import {queueStructures} from '../scripts/inference/queue-views.mjs';
+import {validateStructureOverlays} from '../scripts/inference/structure-overlay-contract.mjs';
 
 async function inspect(source,stdout){
   const r=await traceModel(source);assert.equal(r.trace.status,'completed',JSON.stringify(r.trace.diagnostics));

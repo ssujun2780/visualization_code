@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {traceModel,recommendStructureViews,resolveStructurePresentation,setStructurePresentation,clearStructurePresentation,queryStorageReferences} from '../scripts/model/index.mjs';
+import {recommendStructureViews,resolveStructurePresentation,setStructurePresentation,clearStructurePresentation,queryStorageReferences} from '../scripts/inference/index.mjs';
+import {traceWithStructureView as traceModel} from './helpers/structure-runner.mjs';
 const target={objectId:'o1'};
 const fixture=()=>({programId:'P',runId:'R',objects:[{id:'o1',size:32,createdBy:'e1'},{id:'o2',size:32,createdBy:'e1'}],
  events:[{eventId:'e1'},{eventId:'e2'},{eventId:'e3'},{eventId:'e4'}],structures:[{

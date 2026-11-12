@@ -7,6 +7,8 @@
   "scripts": {
     "test": "node --test",
     "trace:c": "node scripts/trace-model.mjs",
+    "infer:c": "node scripts/infer-structures.mjs",
+    "infer:relations": "node scripts/infer-execution-relations.mjs",
     "trace:prototype": "node scripts/trace-c.mjs",
     "trace:regex": "node scripts/experiments/regex-equivalence/run.mjs",
     "dev": "vite --host 127.0.0.1",

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {parallelArrayStructures,validateParallelArrayStructures} from '../scripts/model/parallel-array-views.mjs';
+import {parallelArrayStructures,validateParallelArrayStructures} from '../scripts/inference/parallel-array-views.mjs';
 const integer={sizeBits:32,signedness:'signed'},value=n=>({decimal:String(n),bits:`0x${BigInt.asUintN(32,BigInt(n)).toString(16)}`,cType:integer}),
   target=(objectId,index)=>({objectId,offset:index*4,size:4}),
   array=(id,capacity)=>({id:`array:${id}`,kind:'array',objectId:id,range:{objectId:id,offset:0,size:capacity*4},

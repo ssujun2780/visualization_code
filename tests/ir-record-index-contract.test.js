@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {validateRecordIndexStructures} from '../scripts/model/record-index-contract.mjs';
+import {validateRecordIndexStructures} from '../scripts/inference/record-index-contract.mjs';
 
 // Hand-authored observation records keep the validator independent of inference.
 function fixture(){

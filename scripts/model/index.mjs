@@ -2,11 +2,11 @@ import {Worker} from "node:worker_threads";
 import {partialResult} from "./partial-result.mjs";
 import {validateSource} from "./compile.mjs";
 export {describeLogicalWork} from './presentation-contract.mjs';
-export {queryStorageReferences} from './storage-relations.mjs';
-export {queryCoindexedRecords} from './coindexed-record-views.mjs';
-export {recommendStructureViews,resolveStructurePresentation,setStructurePresentation,clearStructurePresentation,STRUCTURE_RECOMMENDATION_LIMIT} from './structure-presentation.mjs';
 
-export function traceModel(source,options={}){return runWorker(source,options,"trace");}
+export function traceModel(source,{inference,...options}={}){
+  if(inference===true)throw new Error('자료구조 추론은 scripts/inference/index.mjs에서 별도로 실행하거나 traceWithInference를 사용하십시오.');
+  return runWorker(source,options,"trace");
+}
 export function compileCToIR(source,options={}){return runWorker(source,options,"compile");}
 
 function runWorker(source,{timeoutMs=25000,...options}={},mode) {

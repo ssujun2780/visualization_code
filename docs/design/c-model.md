@@ -2,6 +2,8 @@
 
 현재 구현된 CLI 엔진입니다. 단일 C11 소스를 입력받아 번들 Clang으로 분석하고, 소스 이름이나 알고리즘별 관찰 지점 없이 LLVM 8 코드에 공통 관찰 함수를 삽입합니다. 실제 계산과 분기는 컴파일된 C가 수행합니다. JavaScript는 관측값과 관계를 기록합니다.
 
+2026-11-11부터 자료구조 추론은 [별도 추론 모델](inference-model.md)로 분리했습니다. `traceModel`은 추론을 호출하지 않으며, 생성 결과에 추론 후보·역할을 주입하지 않습니다. 이 문서의 자료구조 관련 절은 추론 소비자의 계약입니다. `structureBindings`는 `inference.bindings`, 추론된 `trace.structures`는 `inference.structures`에 저장하고, 필요할 때만 `createInferenceView`로 별도 조회용 객체를 만듭니다.
+
 추가 감사의 중간언어 오류 네 가지와 자료구조 관계·추천 보강은 [2026-11-09 후속 수정](structure-followup-fixes-2026-11-09.md)에 정리했습니다. 복잡한 표현의 관측 관계 보존과 자료구조 이름의 확정은 구분합니다.
 
 분리 배열의 논리 노드·실제 인덱스 연결, 함수 인자로 전달된 종료값, 시간별 구조 추천은 [저장 관계 기반 추론 보강](structure-inference-relations-2026-11-09.md)을 따릅니다.

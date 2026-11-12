@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {traceModel} from '../scripts/model/index.mjs';
-import {recordIndexStructures} from '../scripts/model/record-index-views.mjs';
+import {recordIndexStructures} from '../scripts/inference/record-index-views.mjs';
 async function inspect(source,limits){
   const r=await traceModel(source);assert.equal(r.trace.status,'completed');assert.equal(r.trace.exitCode,0);
   const before=JSON.stringify({events:r.trace.events,objects:r.trace.objects}),graphs=recordIndexStructures(r.plan,r.trace,limits);

@@ -8,11 +8,6 @@ import {aggregateBindings,aggregateSources} from './aggregate-bindings.mjs';
 import {bitfieldBindings} from './bitfields.mjs';
 import {callProjection} from './call-abi.mjs';
 import {bindGuardConditions} from './guard-conditions.mjs';
-import {bindLinkedStructures} from './linked-views.mjs';
-import {bindLinkedRootCollections} from './linked-root-collections.mjs';
-import {bindArrayStructures} from './array-views.mjs';
-import {bindArrayWork} from './array-work.mjs';
-import {bindIndexRelations} from './index-relations.mjs';
 import {bindAssertions} from './assertions.mjs';
 import {bindPresentationContract} from './presentation-contract.mjs';
 import {bindResultDeliveries} from './result-delivery.mjs';
@@ -735,11 +730,6 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
   }
   bindGuardConditions(plan,observations,{nodes,nearest,types,sourceMap,tree,add});
   bindAssertions(plan,observations,{nodes,types,sourceMap,tree,add});
-  bindArrayStructures(plan);
-  bindArrayWork(plan);
-  bindIndexRelations(plan);
-  bindLinkedStructures(plan);
-  bindLinkedRootCollections(plan);
   buildControlFlow(plan,observations,{nodes,nearest,readSource:raw=>sourceMap.range(raw),filename});
   const evaluationResults=new Set(Object.values(plan.bindings).filter(b=>['result','selection','folded'].includes(b.evaluation?.role)).map(b=>b.evaluation.nodeId));
   const guardResults=n=>{if(n.operator)evaluationResults.add(n.nodeId);for(const c of n.children??[])guardResults(c);};
