@@ -124,8 +124,11 @@ export function arrayStructures(plan,{events,objects,views,runtimeArrays=[]}){
     if(size<=0||size%bytes||offset+size>o.size)return;
     const canonical=typeIdentity.key(type),key=`${id}:${offset}:${size}:${canonical}`,inherited=[];
     for(const [k,a] of arrays)if(a.objectId===id&&a.canonicalElementType===canonical){
-      if(a.range.offset<=offset&&a.range.offset+a.range.size>=offset+size){addTypeView(a,type,evidence);return;}
-      if(offset<=a.range.offset&&offset+size>=a.range.offset+a.range.size){inherited.push(a);arrays.delete(k);}
+      // Row pointers carry a meaningful slice origin. Preserve that view beside
+      // the enclosing matrix; identical ranges still share one identity.
+      if(a.range.offset<=offset&&a.range.offset+a.range.size>=offset+size&&
+        (type.kind!=='array'||a.range.offset===offset&&a.range.size===size)){addTypeView(a,type,evidence);return;}
+      if(type.kind!=='array'&&offset<=a.range.offset&&offset+size>=a.range.offset+a.range.size){inherited.push(a);arrays.delete(k);}
     }
     if(!arrays.has(key))arrays.set(key,{id:`array:${key}`,kind:'array',objectId:id,nodes:viewIds(id),edges:[],
       range:{objectId:id,offset,size},storageIdentity:`storage:${id}:${offset}:${size}`,canonicalElementType:canonical,

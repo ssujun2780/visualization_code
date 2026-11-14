@@ -6,7 +6,9 @@ export const graphProofId=p=>JSON.stringify([p.kind??'index-domain',p.executionI
 const slot=r=>r.objectId+':'+r.offset+':'+r.size;
 export function graphEdgeIdentity(p,{matrix=p.kind?.startsWith('matrix-')}={}){
   // Distinct backing slots remain distinct, even for the same endpoints.
-  const ranges=matrix?[...p.sourceSlots??[],...(p.properties??[]).map(q=>q.source)]:p.sourceSlots??[];
+  // Presence storage identifies an edge. Observing its weight later enriches
+  // that edge, rather than creating another edge with a larger identity key.
+  const ranges=matrix&&!(p.sourceSlots?.length)?(p.properties??[]).map(q=>q.source):p.sourceSlots??[];
   return [matrix?'matrix-storage':p.kind,p.fromIndex,p.toIndex,[...new Set(ranges.map(slot))].sort().join('|')].join(':');
 }
 export function mergeGraphEvidence(previous,next){

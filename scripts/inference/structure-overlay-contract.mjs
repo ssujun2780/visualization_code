@@ -6,6 +6,7 @@ import {validateBSTOverlays} from './bst-contract.mjs';
 import {validateGraphStorage} from './graph-storage-contract.mjs';
 import {validateNeighborhoodProof} from './neighborhood-proofs.mjs';
 import {validateIndexedNeighborhoodProof} from './indexed-neighborhood-proofs.mjs';
+import {validateEdgeListProof} from './edge-list-proofs.mjs';
 import {createValueFlow} from './observed-value-flow.mjs';
 import {verificationStates} from './history-evidence.mjs';
 export function validateStructureOverlays(trace,plan){
@@ -89,13 +90,14 @@ export function validateStructureOverlays(trace,plan){
       for(const p of s.evidence){
         evidence(p.evidenceExecutionIds);
         const at=positions.get(p.executionId),target=events.get(p.targetAccessExecutionId);
-        if(!['computed-index-transfer','bounded-index-walk','matrix-operand-pair','matrix-gated-access','counted-row-access','indexed-list-access'].includes(p.kind)||
+        if(!['computed-index-transfer','bounded-index-walk','matrix-operand-pair','matrix-gated-access','counted-row-access','indexed-list-access','edge-list-gated-access'].includes(p.kind)||
           !p.evidenceExecutionIds.includes(p.executionId)||p.evidenceExecutionIds.some(id=>positions.get(id)>at)||
           ![p.fromIndex,p.toIndex].every(i=>Number.isInteger(i)&&i>=0&&i<a.capacity)||
           target?.target?.objectId!==a.objectId||Math.floor((target.target.offset-a.range.offset)/a.elementBytes)!==p.toIndex)
           fail('순회 후보의 대상 좌표 또는 실행 근거가 다릅니다.');
         for(const r of [...p.sourceSlots,...p.properties.map(p=>p.source)])range(r);
-        if(p.kind==='indexed-list-access')validateIndexedNeighborhoodProof(p,{events,relations,fail,trace,
+        if(p.kind==='edge-list-gated-access')validateEdgeListProof(p,{plan,trace,fail});
+        else if(p.kind==='indexed-list-access')validateIndexedNeighborhoodProof(p,{events,relations,fail,trace,
           accesses:new Map((trace.structures.find(s=>s.kind==='array-work')?.accesses??[]).map(a=>[a.executionId,a]))});
         else if(['matrix-gated-access','counted-row-access'].includes(p.kind))validateNeighborhoodProof(p,{events,relations,fail,trace,
           accesses:new Map((trace.structures.find(s=>s.kind==='array-work')?.accesses??[]).map(a=>[a.executionId,a]))});

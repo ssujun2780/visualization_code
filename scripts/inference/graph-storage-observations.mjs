@@ -122,8 +122,8 @@ export function observeGraphStorage(plan,trace,s,{maxStates=512,maxEvidence=8192
             r.target.objectId===relation.objectId&&pa?.target.index===sa?.target.index;}))continue;
         const reads=unique([source,...props,...other,...(schema.matrix?[]:[cursor])]);
         if(!fresh(reads,at))continue;
-        const sourceReads=schema.matrix?(schema.gate?.readSites??[]).map(site=>readAt(site,e)).filter(Boolean):[source,...other];
-        if(schema.matrix&&schema.gate&&sourceReads.length!==schema.gate.readSites.length)continue;
+        const sourceReads=schema.matrix?schema.sourceSites.map(site=>readAt(site,e)).filter(Boolean):[source,...other];
+        if(schema.matrix&&(sourceReads.length!==schema.sourceSites.length||!fresh(sourceReads,at)))continue;
         const slots=sourceReads.map(r=>r.target),identity=schema.matrix?graphEdgeIdentity({fromIndex:from,toIndex:to,sourceSlots:slots,properties:props.map(r=>({source:r.target}))},{matrix:true}):
           `${slots.map(slot).sort().join('|')}:${from}:${to}`;
         const row=rows.get(rowKey);if(row?.from===from){row.seen.add(identity);row.pending=false;row.watched.push(...slots,...props.map(r=>r.target));}
@@ -156,7 +156,9 @@ export function observeGraphStorage(plan,trace,s,{maxStates=512,maxEvidence=8192
       }
     }
     if(!base||!changed)continue;
-    const liveEdges=[...edges.values()].map(edge=>({...edge,status:ended.has(array.objectId)||[...edge.sourceSlots,...edge.properties.map(p=>p.source)].some(r=>ended.has(r.objectId))?'ended':edge.status})),
+    const liveEdges=[...edges.values()].map(edge=>({...edge,status:ended.has(array.objectId)||edge.sourceSlots.some(r=>ended.has(r.objectId))?'ended':edge.status,
+      properties:edge.properties.map(p=>({...p,status:ended.has(p.source.objectId)?'ended-source':p.status??'observed',
+        ...(ended.has(p.source.objectId)?{endedAtExecutionId:byObject.get(p.source.objectId)?.endedBy}:{})}))})),
       indices=unique([...base.nodes.map(n=>n.index),...membership.keys(),...liveEdges.flatMap(e=>[e.fromIndex,e.toIndex])]).sort((a,b)=>a-b),
       nodes=indices.map(index=>({id:nodeId(index),index,range:{objectId:array.objectId,offset:array.range.offset+index*array.elementBytes,size:array.elementBytes}})),
       links=liveEdges.filter(e=>e.status==='observed'),shape=topology(nodes,links),state={...base,afterExecutionId:e.eventId,nodes,edges:liveEdges,

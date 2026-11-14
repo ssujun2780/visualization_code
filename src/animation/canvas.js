@@ -188,7 +188,7 @@ export class SceneCanvas {
         const presented=structurePort(geometry,t);if(presented){boxes.push(presented.rectangle);continue;}
         const ref=object.value?.reference??object.cells?.get(0)?.value?.reference,backing=scene.objects.get(ref?.targetObjectId),id=backing?.alive&&this.layout.prepared?.tracks.has(backing.id)?backing.id:object.id,
           box=geometry.objects.get(id),projection=this.layout.projection(scene.objects.get(id));
-        if(box&&projection.structure&&box.width<=1000&&box.height<=600)boxes.push(box);
+        if(box&&projection.structure&&(projection.structure.view==='graph'||box.width<=1000&&box.height<=600))boxes.push(box);
         else {const cell=[...geometry.cells.values()].find(c=>c.objectId===object.id&&!c.hidden&&c.offset< (t.offset??0)+(t.size??1)&&c.offset+c.size>(t.offset??0));if(cell)boxes.push(cell);else if(box)boxes.push(box);}
       }
       if(player.event?.kind==='CALC'||dataFlowForEvent(player.recording,player.event).some(e=>e.from.kind==='device'||e.to.kind==='device'))boxes.push(this.layout.deviceRectangle('alu'));
@@ -202,7 +202,10 @@ export class SceneCanvas {
   focusEvent(player) {
     if(this.historyWaiting){this.pendingFocus=true;return;}
     const event = player.event;
-    const geometry = this.layout.resolve(this.displayState(player.after));
+    const scene=this.displayState(player.after),geometry = this.layout.resolve(scene);
+    const eventObjectId=event?.target?.objectId??event?.objectId,currentObject=scene.objects.get(eventObjectId),
+      graphBox=currentObject&&this.layout.projection(currentObject)?.structure?.view==='graph'
+        ?geometry.objects.get(eventObjectId):null;
     let rectangle = player.waitingForInput?geometry.mats.get('tool:input').rectangle:event?.target?.objectId
       ?this.flowRectangle({kind:'object',id:event.target.objectId,offset:event.target.offset??0,size:event.target.size},this.displayState(player.after))
       :geometry.objects.get(event?.objectId);
@@ -212,7 +215,9 @@ export class SceneCanvas {
     if(!rectangle&&effect?.target.kind==='mat')rectangle=geometry.mats.get(effect.target.id)?.rectangle;
     rectangle ??= event?.kind === 'CALC' ? geometry.mats.get('tool:workbench').rectangle : geometry.mats.get(`frame:${event?.activationId}`)?.rectangle;
     rectangle ??= geometry.mats.get('tool:workbench').rectangle;
-    this.camera.fit({...rectangle, x: rectangle.x - 80, y: rectangle.y - 80, width: rectangle.width + 160, height: rectangle.height + 160}, this.width, this.height);
+    rectangle=graphBox??rectangle;
+    const padding=graphBox?24:80;
+    this.camera.fit({...rectangle, x: rectangle.x - padding, y: rectangle.y - padding, width: rectangle.width + padding*2, height: rectangle.height + padding*2}, this.width, this.height);
     this.onCameraChange(this.camera.scale);
   }
 

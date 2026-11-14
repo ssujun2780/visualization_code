@@ -84,6 +84,19 @@ void use(S a,S b){printf(" [%d,%d,%d,%d]\\n",a.x,a.y,b.x,b.y);}
 int main(void){use(make(1),make(2));return 0;}`,'12 [1,11,2,12]\n');
 });
 
+test('compound literal initialization precedes ABI loads across argument regions',async()=>{
+  // A single-field aggregate is passed as a scalar by the ABI. Its load must
+  // still depend on initialization, even when the SSA address already exists.
+  for(const type of ['int','long long']){
+    const code=prelude+`typedef struct {${type} value;} Packet;
+${type} extract(Packet p){return p.value;}
+int main(void){consume(extract((Packet){mark(1)}),extract((Packet){mark(2)}));return 0;}`;
+    for(const evaluationOrder of ['left-to-right','right-to-left']){
+      await inspect(code,evaluationOrder==='left-to-right'?'12 [1,2]\n':'21 [1,2]\n',{evaluationOrder});
+    }
+  }
+});
+
 test('repeated expressions, recursion and macro-expanded calls retain operand identities',async()=>{
   await inspect(prelude+`#define APPLY(a,b) consume((a),(b))
 int descend(int n){if(!n)return 0;return mark(n)+descend(n-1);}

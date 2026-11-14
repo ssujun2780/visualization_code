@@ -25,8 +25,8 @@ export function structuredMemory(object,presentation,collapsed,windows){
     cells=new Map(),groups=new Map(),ports=new Map(),anchors=new Map(),nodeRects=new Map(),assigned=new Set(),annotations=[];
   const orphanNodes=!physical&&presentation.diagramOwnerObjectId===object.id?all.filter(n=>!n.ranges?.length):[];
   const keyCells=(n,values)=>{const roles=n.keyRanges??(n.keyRange?[n.keyRange]:[]);return multi&&roles.length?values.filter(c=>roles.some(r=>r.objectId===object.id&&overlap(c,r))):values;};
-  const record=shown.some(n=>sourceCells.filter(c=>overlap(c,n.range)).length>1),
-    sizes=shown.map(n=>{const local=sourceCells.filter(c=>overlap(c,n.range)),p=local.filter(c=>c.cType?.kind==='pointer').length,values=local.filter(c=>c.cType?.kind!=='pointer'),v=keyCells(n,values).length;return {w:Math.max(112,8+p*40,multi?16+Math.min(16,v)*56:0),h:multi?132+(v<values.length?64:0):Math.max(132,(round?155:112)+Math.max(0,Math.min(3,v)-1)*48)};}),
+  const record=shown.some(n=>sourceCells.filter(c=>overlap(c,n.range)).length>1),compactGraph=['graph','dag'].includes(view),valueLimit=compactGraph?1:3,
+    sizes=shown.map(n=>{const local=sourceCells.filter(c=>overlap(c,n.range)),p=local.filter(c=>c.cType?.kind==='pointer').length,values=local.filter(c=>c.cType?.kind!=='pointer'),v=keyCells(n,values).length;return {w:Math.max(112,8+p*40,multi?16+Math.min(16,v)*56:0),h:multi?132+(v<values.length?64:0):compactGraph?(p?155:132):Math.max(132,(round?155:112)+Math.max(0,Math.min(3,v)-1)*48)};}),
     sx=record?Math.max(1.4,(Math.max(112,...sizes.map(s=>s.w))+28)/112):1.15,sy=record?Math.max(1.5,(Math.max(132,...sizes.map(s=>s.h))+28)/116):1.05;
   const slotPositions=presentation.slots?new Map(presentation.slots.positions):null,
     localLayout=physical?(slotPositions?{...presentation.slots,positions:new Map(shown.map(n=>[n.id,slotPositions.get(n.index)]))}:layoutStructure({view,nodes:shown,edges:[],variant:presentation.variant,circular,semantic,capacity:descriptor.capacity,columns:object.cType?.dimensions?.at(-1)??descriptor.dimensions?.at(-1)})):null,
@@ -42,7 +42,7 @@ export function structuredMemory(object,presentation,collapsed,windows){
       original=[...raw.groups.values()].find(g=>g.id!==rootId&&g.offset===n.range.offset&&g.size===n.range.size),id=original?.id??`node:${object.id}:${n.range.offset}:${n.range.size}`;
     const rect={id,objectId:object.id,offset:n.range.offset,size:n.range.size,x,y,width:w,height:h,kind:'aggregate',path:original?.path??'',label:`${object.name} +${n.range.offset} B`,logicalNode:true,collapsed:collapsed.has(id),header:{x,y,width:w,height:14},toggle:{x:x+3,y:y+2,width:20,height:20},resizeHandle:{x:x+w-16,y:y+h-16,width:16,height:16},children:[],hidden:false,bare:round};
     if(record){groups.set(id,rect);ports.set(id,rect.collapsed?rect:{...rect,...rect.header});anchors.set(id,id);}
-    const visible=new Set((rect.collapsed?[]:[...values.slice(0,multi?16:3),...administrative.slice(0,3)]).map(c=>c.id));if(!rect.collapsed)for(const c of pointers)visible.add(c.id);
+    const visible=new Set((rect.collapsed?[]:[...values.slice(0,multi?16:valueLimit),...administrative.slice(0,3)]).map(c=>c.id));if(!rect.collapsed)for(const c of pointers)visible.add(c.id);
     const nodeLabel=n.label??(n.index!==undefined?String(n.index):original?.path??`+${n.range.offset}`),occupiedSlot=occupied(n.index),inactive=knownOccupancy?(occupiedSlot===null?!activeOffsets.has(n.range.offset):!occupiedSlot):!physical&&!current.has(n.id);
     let visual=rect;
     for(const c of local){

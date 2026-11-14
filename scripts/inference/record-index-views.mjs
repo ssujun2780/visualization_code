@@ -240,7 +240,10 @@ export function recordIndexStructures(plan,{events,objects,structures=[],resultD
         status:!state.active?'ended':!discovered||state.status!=='observed'||omittedEdges||edges.some(e=>!['observed','inferred'].includes(e.status))?'partial':'observed'};
       row.inactiveEdgeIds=edges.filter(edge=>row.prefixMembership.some(p=>p.relationId===edge.relationId&&p.nodeId===edge.from&&edge.slotIndex>=p.count)).map(edge=>edge.id);
       if(row.inactiveEdgeIds.length){const active=links.filter(edge=>!row.inactiveEdgeIds.includes(edge.id)),connected=active.filter(edge=>edge.status==='observed'&&visitedIds.has(edge.to)),
-        complete=state.active&&!omittedEdges&&!state.omittedNodeCount&&active.every(edge=>edge.status==='observed-termination'||edge.status==='observed'&&visitedIds.has(edge.to));
+        complete=state.active&&!omittedEdges&&!state.omittedNodeCount&&
+          visited.every(node=>own.filter(r=>r.kind==='record-embedded-index-array').every(r=>
+            row.prefixMembership.some(p=>p.relationId===r.id&&p.nodeId===node.id)))&&
+          active.every(edge=>edge.status==='observed-termination'||edge.status==='observed'&&visitedIds.has(edge.to));
         row.logicalTopology={...topology(visited,connected),complete,status:complete?'observed':'partial',
           maxChildren:Math.max(0,...visited.map(n=>connected.filter(e=>e.from===n.id).length)),sharedChildren:visited.filter(n=>connected.filter(e=>e.to===n.id).length>1).map(n=>n.id),
           evidenceExecutionIds:row.prefixMembership.flatMap(p=>p.evidenceExecutionIds)};

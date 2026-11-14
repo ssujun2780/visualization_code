@@ -74,8 +74,13 @@ focus=0;printf("C %d\\n",visit(focus));return saved==0;}`,{filename:'scope-varia
     assert.ok(!rs.flatMap(r=>r.alternatives).some(r=>r.representedNodeCount===0));
     assert.ok(rs.some(r=>r.view==='array'));
     const tree=rs.find(r=>r.view==='tree');assert.equal(tree.representedNodeCount,3);
-    const s=t.structures.find(s=>s.id===tree.candidateId),st=s.states.findLast(st=>positions.get(st.afterExecutionId)<=positions.get(at)),ids=new Set(st.topology.reachableNodeIds);
-    assert.deepEqual(s.logicalNodes.filter(n=>ids.has(n.id)).map(n=>n.offset/width).sort(),indices);
+    const s=t.structures.find(s=>s.id===tree.candidateId),ids=new Set(tree.memberNodeIds);
+    // The selected tree can come from the storage projection or a linked view.
+    // Check the same exact original records, independent of that adapter.
+    const members=(s.logicalNodes??s.nodes).filter(n=>ids.has(n.id));
+    assert.equal(members.length,3);
+    assert.ok(members.every(n=>(n.range?.objectId??n.objectId)===cells.id));
+    assert.deepEqual(members.map(n=>(n.range?.offset??n.offset)/width).sort(),indices);
   }
   const field=cells.cType.elementType.members.find(f=>f.name==='west'),emptySlot={objectId:cells.id,offset:width+field.offsetBits/8,size:field.sizeBits/8};
   const direct=recommendStructureViews(t,{target:{ranges:[emptySlot]},afterExecutionId:output('A')});

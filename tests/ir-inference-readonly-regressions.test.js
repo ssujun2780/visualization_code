@@ -120,8 +120,11 @@ test('bounded index walks and presence matrices provide graph proofs independent
   for(const [i,body]of sources.entries()){
     const r=await run('#include <stdio.h>\nint main(void){'+body+'return 0;}'),s=graphs(r,'observed-traversal-graph-candidate')[0];assert.ok(s);
     const state=at(r,s,output(r));assert.equal(state.topology.nodeCount,3);assert.equal(state.topology.edgeCount,4);
-    assert.ok(s.evidence.every(e=>e.kind===(i?'matrix-operand-pair':'bounded-index-walk')));
-    if(i){assert.ok(s.evidence.some(e=>e.properties.some(p=>p.value.decimal==='0')));assert.ok(s.evidence.every(e=>e.sourceSlots.length));}
+    // A presence proof and an operand-pair proof may support the same edge.
+    // Preserve both, while requiring the original four edges and weight proof.
+    assert.ok(s.evidence.every(e=>i?['matrix-operand-pair','matrix-gated-access'].includes(e.kind):e.kind==='bounded-index-walk'));
+    if(i){assert.ok(s.evidence.some(e=>e.kind==='matrix-operand-pair'&&e.properties.some(p=>p.value.decimal==='0')));assert.ok(s.evidence.every(e=>e.sourceSlots.length));
+      for(const edge of state.edges){assert.ok(edge.supportingProofIds?.length>=2);assert.ok(edge.properties.length);}}
     else assert.equal(graphs(r,'index-domain-graph-candidate').length,0,'range bounds are not vertex edges');
   }
 });

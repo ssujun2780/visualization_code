@@ -67,13 +67,18 @@ function context(trace,afterExecutionId){
 function graphSnapshot(s,ctx,roleIds,target,typeIds=null){
   const edges=new Map(),ended=new Set();for(const c of s.changes??[]){if(!ctx.occurred(c.afterExecutionId))continue;
     for(const e of c.upsertEdges)edges.set(e.id,e);for(const id of c.endedObjectIds)ended.add(id);}
-  let nodes=(s.nodes??[]).filter(n=>ctx.occurred(n.discoveredAtExecutionId)&&!ended.has(n.range.objectId)&&(!typeIds||typeIds.includes(n.cType?.recordTypeId)));
+  let exactRoot=false,nodes=(s.nodes??[]).filter(n=>ctx.occurred(n.discoveredAtExecutionId)&&!ended.has(n.range.objectId)&&(!typeIds||typeIds.includes(n.cType?.recordTypeId)));
   // Global storage metadata is scoped to the clicked storage and its outgoing
   // references; an unrelated tree elsewhere is not this object's suggestion.
   if(target.ranges){const wanted=new Set(nodes.filter(n=>target.ranges.some(r=>r.objectId===n.range.objectId&&r.offset<=n.range.offset&&r.offset+r.size>=n.range.offset+n.range.size)).map(n=>n.id));
     // Opening a pointer box selects its observed target before filtering the
     // record-field roles. The alias slot itself is not a structural node.
-    if(typeIds)for(const e of edges.values())if(!e.sourceTypeId&&e.to&&nodes.some(n=>n.id===e.to)&&target.ranges.some(r=>r.objectId===e.source.objectId&&r.offset<=e.source.offset&&r.offset+r.size>=e.source.offset+e.source.size))wanted.add(e.to);
+    for(const e of edges.values())if(!e.sourceTypeId&&target.ranges.some(r=>r.objectId===e.source.objectId&&r.offset<=e.source.offset&&r.offset+r.size>=e.source.offset+e.source.size)){
+      const alias=nodes.find(n=>n.id===e.from&&n.range.offset===e.source.offset&&n.range.size===e.source.size);
+      if(alias)wanted.delete(alias.id);
+      if(e.to&&nodes.some(n=>n.id===e.to))wanted.add(e.to);
+      if(e.to&&target.ranges.some(r=>r.objectId===e.source.objectId&&r.offset===e.source.offset&&r.size===e.source.size))exactRoot=true;
+    }
     for(const id of wanted)for(const e of edges.values())if(e.from===id&&e.to&&(!roleIds||roleIds.includes(e.roleId)))wanted.add(e.to);
     nodes=nodes.filter(n=>wanted.has(n.id));}
   const ids=new Set(nodes.map(n=>n.id)),selected=[...edges.values()].filter(e=>ids.has(e.from)&&(!roleIds||roleIds.includes(e.roleId))),
@@ -83,7 +88,7 @@ function graphSnapshot(s,ctx,roleIds,target,typeIds=null){
       // Only roles actually declared on this record are required. A
       // heterogeneous target record need not have the source record's field.
       !selected.some(e=>e.from===n.id&&e.roleId===r.id)).map(r=>({nodeId:n.id,roleId:r.id,status:'unobserved-slot'})));
-  return {...shape,roleIds:unique(selected.filter(e=>e.sourceTypeId).map(e=>e.roleId)),reachableNodeIds:nodes.map(n=>n.id),unknownRelations:missing,maxChildren:Math.max(0,...nodes.map(n=>links.filter(e=>e.from===n.id).length)),
+  return {...shape,exactRoot,roleIds:unique(selected.filter(e=>e.sourceTypeId).map(e=>e.roleId)),reachableNodeIds:nodes.map(n=>n.id),unknownRelations:missing,maxChildren:Math.max(0,...nodes.map(n=>links.filter(e=>e.from===n.id).length)),
     sharedChildren:nodes.filter(n=>links.filter(e=>e.to===n.id).length>1),
     status:missing.length||selected.some(e=>!['in-bounds','null'].includes(e.status)||e.to&&!ids.has(e.to))?'partial':'observed'};
 }
@@ -225,15 +230,15 @@ export function recommendStructureViews(trace,{target,afterExecutionId,roleIds=n
       if(!state?.alive)continue;
       familyRoles=s.roleIds;familyNodeCount=state.nodes.length;
       const begin=candidates.length;shape(s,state.topology,[...proof,...state.evidenceExecutionIds],s.roleIds);
-      for(const c of candidates.slice(begin)){c.variant=s.mode;if(c.view==='tree'||c.view==='forest')c.strength=4;}
+      for(const c of candidates.slice(begin)){c.variant=s.mode;if(c.status==='supported'&&(c.view==='tree'||c.view==='forest'))c.strength=4;}
     }else if(s.kind==='storage-reference-graph'){
       // Allocation/alias topology alone does not prove a container relation.
       // Typed traversal projections below can supply the missing role evidence.
-      const t=graphSnapshot(s,ctx,roleIds,selected);
+      const begin=candidates.length,t=graphSnapshot(s,ctx,roleIds,selected);
       familyRoles=t.roleIds;familyNodeCount=t.nodeCount;
       if(t.nodeCount>0){
         const traversed=(s.roleProjections??[]).filter(p=>p.roleIds.some(id=>t.roleIds.includes(id))).flatMap(p=>p.supportingExecutionIds.filter(ctx.occurred));
-        const c=offer(s,'graph',t.edgeCount&&t.roleIds.length?(traversed.length?3:2):1,[...(s.changes??[]).filter(c=>ctx.occurred(c.afterExecutionId)).slice(-1).map(c=>c.afterExecutionId),...traversed],roleIds);
+        const c=offer(s,'graph',t.edgeCount&&t.roleIds.length?2:1,[...(s.changes??[]).filter(c=>ctx.occurred(c.afterExecutionId)).slice(-1).map(c=>c.afterExecutionId),...traversed],roleIds);
         if(c){c.representedNodeCount=t.nodeCount;c.memberNodeIds=t.reachableNodeIds;}
       }
       for(const p of s.roleProjections??[]){
@@ -245,6 +250,7 @@ export function recommendStructureViews(trace,{target,afterExecutionId,roleIds=n
         // still unknown, so topology is a suggestion, never an invariant proof.
         if(t.nodeCount>0&&t.edgeCount>0)shape(s,t,p.supportingExecutionIds,p.roleIds);
       }
+      if(t.exactRoot)for(const c of candidates.slice(begin))c.exactRoot=true;
     }else if(['dynamic-array','separate-array-structure'].includes(s.kind)){
       if(state?.active)offer(s,'dynamic-array',state.status==='consistent'?4:1,proof,null,state.status==='consistent'?'supported':'partial');
     }else if(s.kind==='array-structure'){
@@ -351,7 +357,7 @@ export function recommendStructureViews(trace,{target,afterExecutionId,roleIds=n
   const omission=c=>c.coverage.familyNodeCount>0&&c.coverage.omittedNodeCount!==null?c.coverage.omittedNodeCount/c.coverage.familyNodeCount:null;
   const order=(a,b)=>Number(b.exactRoot)-Number(a.exactRoot)||Number(a.containedRoot)-Number(b.containedRoot)||(a.coverage.omittedNodeCount>0)-(b.coverage.omittedNodeCount>0)||
     (omission(a)!==null&&omission(b)!==null?omission(a)-omission(b):0)||(a.coverage.omittedStorageBytes>0)-(b.coverage.omittedStorageBytes>0)||
-    b.strength-a.strength||Number(a.coverage.excludedRoleIds.length>0)-Number(b.coverage.excludedRoleIds.length>0)||sites(b)-sites(a)||compare(a.view,b.view)||compare(a.candidateId,b.candidateId)||compare(JSON.stringify(a.roleIds),JSON.stringify(b.roleIds));
+    b.strength-a.strength||Number(a.status==='partial')-Number(b.status==='partial')||Number(a.coverage.excludedRoleIds.length>0)-Number(b.coverage.excludedRoleIds.length>0)||sites(b)-sites(a)||compare(a.view,b.view)||compare(a.candidateId,b.candidateId)||compare(JSON.stringify(a.roleIds),JSON.stringify(b.roleIds));
   candidates.sort(order);const views=new Map();for(const c of candidates){if(!views.has(c.view))views.set(c.view,{...c,alternatives:[]});views.get(c.view).alternatives.push(c);}
   return [...views.values()].slice(0,STRUCTURE_RECOMMENDATION_LIMIT).map((c,i)=>({...c,rank:i+1,origin:'inferred',intent:'unconfirmed',rankingPolicy:'exact-root-selection-node-storage-role-coverage-behavior-stable-id-v8'}));
 }

@@ -1,4 +1,6 @@
 export const examples = {
+  'pathfinding-astar':{name:'A* · 충돌 검사 경로 탐색 (8개 정점)',file:'examples/c/pathfinding/astar.c',stdin:'3\n'},
+  'pathfinding-lwa-star':{name:'LWA* · 지연 충돌 검사 경로 탐색 (8개 정점)',file:'examples/c/pathfinding/lwa_star.c',stdin:'3\n'},
   'structure-tree':{name:'자료구조 · 트리 삽입·순회',file:'examples/c/structure-views/tree.c'},
   'structure-indexed-graph':{name:'자료구조 · 인덱스 그래프',file:'examples/c/structure-views/indexed-graph.c'},
   'structure-pointer-graph':{name:'자료구조 · 포인터 그래프',file:'examples/c/structure-views/pointer-graph.c'},

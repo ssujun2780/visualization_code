@@ -20,8 +20,13 @@ function graphLayers(nodes,edges,previous){
   }
   if(Math.max(...levels.values())>6)return null;
   const rows=new Map();for(const n of nodes){const row=rows.get(levels.get(n.id))??[];row.push(n.id);rows.set(levels.get(n.id),row);}
-  const widest=Math.max(...[...rows.values()].map(r=>r.length)),positions=new Map();
-  for(const [level,row]of rows)row.forEach((id,i)=>{let point=previous.get(id)??{x:20+level*156,y:i*120+(widest-row.length)*60};while([...positions.values()].some(p=>Math.abs(p.x-point.x)<80&&Math.abs(p.y-point.y)<80))point={x:point.x,y:point.y+120};positions.set(id,point);});
+  const widest=Math.max(...[...rows.values()].map(r=>r.length)),wide=widest>3,positions=new Map();
+  for(const [level,row]of rows)row.forEach((id,i)=>{
+    let point=previous.get(id)??(wide?{x:20+i*156+(widest-row.length)*78,y:level*112}
+      :{x:20+level*156,y:i*120+(widest-row.length)*60});
+    while([...positions.values()].some(p=>Math.abs(p.x-point.x)<80&&Math.abs(p.y-point.y)<80))point=wide?{x:point.x+156,y:point.y}:{x:point.x,y:point.y+120};
+    positions.set(id,point);
+  });
   return positions;
 }
 export function layoutStructure(shape,previous=new Map()){

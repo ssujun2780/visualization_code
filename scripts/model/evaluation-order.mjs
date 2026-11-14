@@ -184,6 +184,26 @@ export function orderEvaluationLLVM(llvm,observations,nodes,{evaluationOrder='le
         for(const use of rhs.matchAll(new RegExp(llvmLocal,'g'))){const producer=definitions.get(use[0]);
           if(producer!==undefined&&producer!==k&&!g.constraints.some(c=>c.before===producer&&c.after===k&&c.value===use[0]))
             g.constraints.push({before:producer,after:k,value:use[0],kind:'ssa-dependency'});}}
+      // SSA use-def edges do not include memory dependencies. In particular an
+      // ABI coercion load may be labelled at the callee token even though its
+      // compound literal must be initialized by a later source operand first.
+      const memoryRoot=(value,seen=new Set())=>{
+        if(!value||seen.has(value))return null;seen.add(value);
+        const item=items[producers.get(value)],o=item?.op;
+        if(!item)return value;
+        if(o?.action==='address')return memoryRoot(o.pointer?.value,seen);
+        if(o?.action==='convert'&&['bitcast','addrspacecast'].includes(o.opcode))return memoryRoot(o.inputs?.[0]?.value,seen);
+        return value;
+      };
+      const memory=[];
+      for(const k of actual)for(const item of regions.get(k).chunk){const o=item.op;
+        if(!['load','store'].includes(o?.action))continue;
+        const root=memoryRoot(o.pointer?.value);if(!root)continue;
+        for(const prior of memory)if(prior.root===root&&prior.owner!==k&&(prior.write||o.action==='store')&&
+          !g.constraints.some(c=>c.before===prior.owner&&c.after===k&&c.value===root))
+          g.constraints.push({before:prior.owner,after:k,value:root,kind:'memory-dependency'});
+        memory.push({root,owner:k,write:o.action==='store'});
+      }
       const wanted=dependencyOrder(preferred,g.constraints);
       if(!wanted){preserve('cyclic-region-dependencies');g.unresolvedDependencies=g.constraints;g.constraints=[];g.effectiveOrder=null;continue;}
       g.effectiveOrder=withRuntimeOrder(g.order,wanted);
