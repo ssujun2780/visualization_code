@@ -55,7 +55,10 @@ export async function execute(module, args, fs, traceImport, stdin = "") {
   };
   const wasi = new WASI({ args, fs, stdout: append("stdout"), stderr: append("stderr") });
   const imports = wasi.getImportObject();
-  const input = new TextEncoder().encode(stdin);
+  // A live execution may supply a synchronous reader from its worker. Blocking
+  // that worker retains the same WASM instance, stack and libc input buffer.
+  const inputReader = typeof stdin?.read === 'function' ? stdin : null;
+  const input = inputReader ? null : new TextEncoder().encode(stdin);
   let inputOffset = 0;
   for (const namespace of Object.values(imports)) {
     if(namespace.fd_write&&traceImport?.outputBytes){
@@ -81,25 +84,42 @@ export async function execute(module, args, fs, traceImport, stdin = "") {
     namespace.fd_read = (fd, iovs, count, resultPointer) => {
       if (fd !== 0) return originalRead(fd, iovs, count, resultPointer);
       const view = new DataView(wasi.memory.buffer);
-      let total = 0;const startOffset=inputOffset;
+      let capacity = 0;
+      for (let i = 0; i < count; i++) capacity += view.getUint32(iovs + i * 8 + 4, true);
+      if (!capacity) { view.setUint32(resultPointer, 0, true); return 0; }
+      const supplied = inputReader ? inputReader.read(capacity) : input.subarray(inputOffset);
+      if (!(supplied instanceof Uint8Array) || supplied.length > capacity && inputReader) throw new Error('입력 공급자의 바이트 범위가 잘못되었습니다.');
+      let suppliedOffset = 0;
+      let total = 0;const startOffset=inputOffset,regions=[];
       for (let i = 0; i < count; i++) {
         const pointer = view.getUint32(iovs + i * 8, true);
         const capacity = view.getUint32(iovs + i * 8 + 4, true);
-        const amount = Math.min(capacity, input.length - inputOffset);
-        new Uint8Array(wasi.memory.buffer, pointer, amount).set(input.subarray(inputOffset, inputOffset + amount));
+        const amount = Math.min(capacity, supplied.length - suppliedOffset);
+        new Uint8Array(wasi.memory.buffer, pointer, amount).set(supplied.subarray(suppliedOffset, suppliedOffset + amount));
         if(amount)traceImport?.nativeMemory?.(2,pointer,amount);
+        if(amount)regions.push({address:pointer,size:amount,streamOffset:inputOffset});
         inputOffset += amount;
+        suppliedOffset += amount;
         total += amount;
       }
       view.setUint32(resultPointer, total, true);
-      if(total)traceImport?.input?.(input.subarray(startOffset,inputOffset),startOffset);
+      if(total)traceImport?.input?.(supplied.subarray(0,total),startOffset,regions);
       return 0;
     };
   }
   if (traceImport) imports.cvtrace = typeof traceImport === "function" ? { emit: traceImport } :
     { emit: traceImport.emit, ...(traceImport.stdioOutput?{stdio_output:traceImport.stdioOutput}:{}) };
+  // --allow-undefined permits observer imports, but must not hide unresolved C
+  // definitions. Check the actual imports supplied to this execution.
+  const unresolved=WebAssembly.Module.imports(module).filter(i=>imports[i.module]?.[i.name]===undefined);
+  if(unresolved.length){
+    const external=unresolved.every(i=>i.module==='env');
+    throw Object.assign(new Error(`${external?'C 링크 실패: 외부 정의를 찾을 수 없습니다':'실행 모듈 가져오기 실패'}: ${unresolved.map(i=>`${i.name} (${i.module})`).join(', ')}`),
+      {stage:external?'link':'instantiate',unresolvedImports:unresolved});
+  }
   const instance = await WebAssembly.instantiate(module, imports);
   traceImport?.setMemory?.(instance.exports.memory ?? wasi.memory);
+  traceImport?.setStaticDataEnd?.(instance.exports.__data_end?.value);
   let result;
   try { result = wasi.start({ module, instance }); }
   catch (error) {
@@ -141,19 +161,20 @@ export async function runLLVM(llvm, observer, { stdin = "" } = {}) {
       '/trace-stdio-runtime.o':file('/trace-stdio-runtime.o',stdioRuntimeObject(tools.fs['/sys/lib/wasm32-wasi/libc.a'].content))};
     stdioObjects=['/trace-stdio.o','/trace-stdio-runtime.o'];
   }
-  const linked = await execute(tools.linker, ["wasm-ld", "--no-threads", "--export-dynamic", "--allow-undefined",
+  const globalBase=1024;
+  const linked = await execute(tools.linker, ["wasm-ld", "--no-threads", "--export-dynamic", "--allow-undefined",`--global-base=${globalBase}`,...(observer?.nativeMemory?['--export=__data_end']:[]),
     "-z", "stack-size=1048576", "--max-memory=134217728", "-L/sys/lib/wasm32-wasi",
     "/sys/lib/wasm32-wasi/crt1.o", "/main.o",...stdioObjects,"-lc", "-o", "/main.wasm"], linkedFs);
-  if (linked.exitCode !== 0) throw new Error(`C 링크 실패:\n${linked.stderr}`);
+  if (linked.exitCode !== 0) throw Object.assign(new Error(`C 링크 실패:\n${linked.stderr}`),{stage:'link'});
   let binary=linked.fs['/main.wasm'].content;
-  if(observer?.nativeMemory){const observed=observeWasmMemory(binary);binary=observed.bytes;observer.nativeMemoryCoverage=observed.coverage;}
+  if(observer?.nativeMemory){const observed=observeWasmMemory(binary);binary=observed.bytes;observer.nativeMemoryCoverage=observed.coverage;observer.linkedDataRegions=observed.dataRegions;observer.linkedDataBase=globalBase;}
   const module = await WebAssembly.compile(binary);
   return { ...await execute(module, ["main"], {}, observer, stdin), compilerDiagnostics: compiled.stderr + linked.stderr };
 }
 
 const flags = ["-cc1", "-triple", "wasm32-unknown-wasi", "-isysroot", "/sys",
   "-internal-isystem", "/sys/include", "-internal-isystem", "/sys/lib/clang/8.0.1/include",
-  "-std=c11", "-Wall", "-Wextra", "-O0", "-ferror-limit", "10"];
+  "-std=c11", "-Wall", "-Wextra", "-O0", "-fno-common", "-ferror-limit", "10"];
 
 export async function analyze(source) {
   const tools = await getToolchain();

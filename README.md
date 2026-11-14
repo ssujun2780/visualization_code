@@ -2,6 +2,14 @@
 
 C 소스 하나를 입력하고 실제로 컴파일·실행하는 최소 웹입니다.
 
+## 설계 문서
+
+- [애니메이션·시각화·UI 문서 안내](docs/design/presentation.md)
+- [애니메이션](docs/design/animation.md): 명령·사건·시간선과 연출
+- [시각화](docs/design/visualization.md): 공간·상자·연결선·설계도·오류 표현
+- [UI](docs/design/ui.md): 편집·재생·입력·선택과 오류 안내
+- [실행 관찰과 중간언어 연결](docs/design/execution-visualization.md), [공통 C 모델](docs/design/c-model.md)
+
 ## 실행
 
 Node.js 22 이상과 pnpm 11을 사용합니다.
@@ -48,8 +56,8 @@ Worker를 종료합니다. 초기 버전은 단일 파일, C11, wasm32/WASI 환�
 `src/runner.worker.js`는 컴파일·실행을 담당하고 `src/main.js`는 편집·출력 UI를
 담당합니다. `src/code-editor.js`는 Monaco 설정과 C 코드 조각, 컴파일 진단 표시를
 담당합니다. 컴파일 오류 표시는 실행 버튼으로 컴파일한 뒤 갱신됩니다.
-추후 실행 시각화 엔진을 이 경계에 연결할 수 있습니다. 현재 버전은
-단계별 실행·메모리 시각화·캐릭터 애니메이션을 구현하지 않습니다.
+`animation.html`에서는 중간언어 기록의 단계별 재생과 메모리·자료구조 시각화를
+제공합니다. 캐릭터 애니메이션은 아직 구현하지 않습니다.
 
 ## 공통 C 중간언어 기본 모델
 
@@ -63,17 +71,36 @@ pnpm trace:c 코드.c --compile-only --out-dir test-results/ir-only
 pnpm trace:c 코드.c --with-observations --out-dir test-results/ir-debug
 ```
 
-`test-results/c-model`에 원본·계측 LLVM 코드, 중간언어 명령 정의, 실행 JSON/JSONL,
-객체·프레임·참조와 구조 표현 후보를 저장합니다. 함수·재귀·포인터·구조체·배열·
+기본 JSON은 **`definitions.json` 공통 정의 + 참조형 `plan.json`·`trace.json`**으로 저장합니다.
+추론 CLI와 웹 기록 열기는 두 형식을 모두 지원하며, 새 파일을 열 때는 `definitions.json`도 함께 선택합니다.
+기존 펼친 JSON이 필요하면 `--expanded`, 들여쓰기는 `--pretty`를 추가합니다.
+추가 사건 사본 `trace.jsonl`은 `--jsonl`, 원시 관찰은 `--with-observations`로 선택합니다.
+직접 읽는 도구는 `scripts/shared/execution-files.mjs`의 `readExecutionFiles(폴더)`를 사용합니다.
+실행 사건·값·순서와 추론 결과 분리는 유지합니다. [저장 계약](docs/design/execution-storage.md)
+
+`test-results/c-model`에 원본·계측 LLVM 코드, 중간언어 명령 정의, 실행 JSON(선택 시 JSONL),
+객체·프레임·참조를 저장합니다. 함수·재귀·포인터·구조체·배열·
 분기·반복과 동적 할당을 공통 경로로 관찰하며, 정답이나 자료구조의 의미를 미리
 지정하는 인자는 없습니다. 미지원 항목과 미관측 라이브러리 효과는 따로 표시합니다.
 Clang AST를 함께 읽어 C의 부호 정보와 LLVM에서 사라진 동일 폭 정수 변환도
 연결합니다. unsigned는 자료형의 `u` 배지 정보로 기록합니다.
 `--compile-only`는 사용자 C를 실행하지 않습니다. 원시 관찰 자료는
-`--with-observations`로 별도 출력합니다. 애니메이션은 더미로 유지하며,
-이번 변환 구조 변경의 동작 검증은 이후 제공되는 예제로 진행합니다.
+`--with-observations`로 별도 출력합니다. 생성 모델은 애니메이션을 실행하지 않으며,
+별도 시각화 페이지가 이 기록을 읽어 재생합니다.
 
 정확한 지원 범위, 실행 제한, 기록 계약은 [공통 C 중간언어 모델](docs/design/c-model.md)에 있습니다.
+
+자료구조 추론은 별도 단계입니다. 저장된 중간언어를 읽어 `inference.json`만 추가하며,
+C 코드를 다시 실행하거나 `plan.json`·`trace.json`을 수정하지 않습니다.
+
+```sh
+node scripts/trace-model.mjs 코드.c --with-observations --out-dir test-results/my-code
+node scripts/infer-structures.mjs test-results/my-code
+```
+
+추론만 실행할 때는 `pnpm infer:c test-results/my-code`도 사용할 수 있습니다.
+`--with-observations`는 선택 사항이며, 함께 저장하면 런타임 배열과 과거 참조 등
+보조 관찰 근거도 사용할 수 있습니다. API와 오류 격리는 [추론 모델 분리](docs/design/inference-model.md)를 참고하십시오.
 
 ## 초기 최소 계측 시제품
 
@@ -150,3 +177,19 @@ GCC의 함수 진입·복귀 계측과 **이 예제에 명시적으로 선택한
 
 Clang, wasm-ld, sysroot는 Runno가 제공하는 wasm-clang 파일입니다.
 배포되는 도구의 라이선스는 `public/toolchain/LICENSE-*.txt`에 함께 보관합니다.
+## 직접 작성한 코드 시각화
+
+시각화 페이지(`animation.html?source=direct`)에서 **C 코드 직접 입력**을 펼치고 코드를 작성·붙여넣은 뒤 **컴파일·시각화** 또는 **Ctrl+Enter**를 누르세요. **재생**으로 과정을 확인하며, 입력이 필요하면 입력 돗자리에서 기다립니다. 같은 페이지에서 코드를 편집하고 다시 실행할 수 있습니다. 기존 C 작업실의 **현재 코드 시각화 →** 경로도 사용할 수 있습니다.
+
+등록된 예제와 직접 작성한 소스는 같은 실행 세션 API를 사용합니다. 자세한 계약은 [UI 설계](docs/design/ui.md), 검증 내용은 [동적 코드 연결](docs/validation/dynamic-source.md)에 있습니다.
+## 실행 관계 추론기
+
+저장된 `plan.json`·`trace.json`에서 **부모·자식 호출, 관측된 접근 구간, 출처로 확인된 복사 관계**를 읽는 별도 API/CLI입니다. 알고리즘 이름·정확성을 단정하지 않으며 중간언어 생성·자료구조 추론·화면 실행에 자동 연결하지 않습니다.
+
+```sh
+node scripts/infer-execution-relations.mjs test-results/c-model
+```
+
+결과는 `execution-relations.json`에 저장합니다. [설계와 API](docs/design/execution-relations.md), [예상/실제 비교와 구현 대응표](docs/validation/execution-relations-rules.md)를 참고하십시오.
+
+현재 사건에서 함께 볼 배열 구간·지역변수 관찰·연산·호출·코드 위치는 `createExecutionWorkQuery(plan, trace, relations).at(executionId)`로 조회합니다. 살아 있는 대상과 과거 기록을 구별하며 값 재계산·배치·화면 연결은 수행하지 않습니다. [작업 문맥 조회 계약과 검증](docs/validation/execution-work-context.md)을 참고하십시오.

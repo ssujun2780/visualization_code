@@ -1,14 +1,15 @@
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {test} from "node:test";
-import {traceModel as traceSourceModel} from "../scripts/model/index.mjs";
+import {traceModel as traceSourceModel} from '../scripts/model/index.mjs';
+import {traceWithInference} from '../scripts/pipeline/trace-with-inference.mjs';
 import {compileAndRun} from "../scripts/instrumentation/toolchain.mjs";
 import {materializeMemory} from "../scripts/model/memory-state.mjs";
 
 // These backend assertions deliberately inspect raw LLVM observations. The
 // public animation IR contract is tested separately in ir-*.test.js.
-async function traceModel(source,options={}){
-  const r=await traceSourceModel(source,{...options,includeObservations:true});
+async function traceModel(source,{inferRelations=false,...options}={}){
+  const r=await (inferRelations?traceWithInference:traceSourceModel)(source,{...options,includeObservations:true});
   return r.observations?.plan?{...r,plan:r.observations.plan,trace:r.observations.trace}:r;
 }
 
@@ -178,15 +179,16 @@ test("structures passed and returned by value are observed through their ABI cop
 test("pointer cycles and arrays are proposed from actual layout and connections",async()=>{
   const r=await checked(`#include <stdio.h>
   #include <stdlib.h>
-  struct A{int n;struct A*p;};int main(void){struct A*q=calloc(2,sizeof *q);q[0].p=&q[1];q[1].p=q;q[1].n=7;int a[2][3]={{1,2,3},{4,5,6}};printf("%d %d\\n",q->p->n,a[1][2]);free(q);return 0;}`);
-  assert.equal(r.stdout,"7 6\n");assert.ok(r.trace.structures.some(s=>s.cyclic&&s.edgeCount===2));
+  struct A{int n;struct A*p;};int main(void){struct A*q=calloc(2,sizeof *q);q[0].p=&q[1];q[1].p=q;q[1].n=7;int a[2][3]={{1,2,3},{4,5,6}};printf("%d %d\\n",q->p->n,a[1][2]);free(q);return 0;}`,{inferRelations:true});
+  assert.equal(r.stdout,"7 6\n");assert.ok(r.inference.structures.some(s=>s.kind==='record-graph-candidate'&&s.cyclic&&s.edgeCount===2));
   assert.ok(r.trace.views.some(v=>v.kind==="array"&&v.count===2&&v.elementType==="[3 x i32]"));
 });
 
 test("full C identifier and record renaming does not change topology inference",async()=>{
   const make=(t,p,f)=>`#include <stdlib.h>\nstruct ${t}{struct ${t}*${f};};int main(void){struct ${t}*${p}=calloc(2,sizeof *${p});${p}[0].${f}=&${p}[1];${p}[1].${f}=${p};free(${p});return 0;}`;
-  const a=await checked(make("Tree","grid","array")),b=await checked(make("Array","graph","node"));
-  const shape=r=>r.trace.structures.map(s=>({nodes:s.nodeCount,edges:s.edgeCount,cyclic:s.cyclic,views:s.views}));
+  const a=await checked(make("Tree","grid","array"),{inferRelations:true}),b=await checked(make("Array","graph","node"),{inferRelations:true});
+  const shape=r=>r.inference.structures.filter(s=>s.kind==='record-graph-candidate').map(s=>({nodes:s.nodeCount,edges:s.edgeCount,cyclic:s.cyclic,views:s.views}));
+  assert.ok(shape(a).length);assert.ok(shape(b).length);
   assert.deepEqual(shape(a),shape(b));
 });
 
@@ -253,9 +255,12 @@ test("event limit and worker deadline stop infinite execution with a partial tra
 
 test("the same automatic path observes the unchanged 900-line C11 regex program",async()=>{
   const source=await readFile(new URL("../examples/c/regex_equivalence.c",import.meta.url),"utf8");
-  const r=await checked(source,{stdin:"ab\na(b|c)\n",maxEvents:200000,timeoutMs:40000});
+  // Large end-to-end fixture: supply separate recording and inference budgets.
+  // The default 16 MiB / 25 s stop this case; limit behavior is tested separately.
+  const r=await checked(source,{stdin:"ab\na(b|c)\n",maxEvents:200000,maxObservationBytes:64*1024*1024,timeoutMs:40000,inferenceTimeoutMs:120000,inferRelations:true});
   assert.equal(r.stdout,'NOT EQUIVALENT\nWITNESS "ac"\nLENGTH 2\nACCEPTED_BY 2\n');
   assert.ok(r.plan.instructions.length>1000);assert.ok(r.trace.events.length>10000);
   assert.ok(r.trace.events.some(e=>e.action==="call.begin"&&e.indirectAddress));
-  assert.ok(r.trace.structures.some(s=>s.edgeCount>0));
+  assert.equal(r.inference.status,'completed',JSON.stringify(r.inference.diagnostics));
+  assert.ok(r.inference.structures.some(s=>s.kind==='record-graph-candidate'&&s.edgeCount>0));
 });

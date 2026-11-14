@@ -1,4 +1,12 @@
 // Adapter for the bundled LLVM 8 textual format. C syntax is parsed by Clang.
+export const llvmSymbol='(?:[-\\w.$]+|"[^"\\r\\n]+")';
+export const llvmLocal=`%${llvmSymbol}`;
+export function llvmName(text){
+  const value=text?.replace(/^"|"$/g,'');
+  return value?.replace(/(?:\\[0-9a-fA-F]{2})+/g,s=>Buffer.from(s.split('\\').slice(1).map(x=>parseInt(x,16))).toString('utf8'));
+}
+export const llvmDefinition=new RegExp(`^\\s*(${llvmLocal}) = (.*)$`);
+export const llvmFunction=new RegExp(`@(${llvmSymbol})\\(`);
 export function splitTop(text, separator = ",") {
   const result=[];let start=0,depth=0,quoted=false;
   for(let i=0;i<text.length;i++) {
@@ -11,17 +19,36 @@ export function splitTop(text, separator = ",") {
   result.push(text.slice(start).trim());return result;
 }
 
+function typeGroupEnd(text,start){
+  const pairs={'(':')','[':']','{':'}','<':'>'},stack=[];let quoted=false;
+  for(let i=start;i<text.length;i++){
+    const c=text[i];if(quoted&&c==='\\'){i++;continue;}if(c==='"'){quoted=!quoted;continue;}if(quoted)continue;
+    if(pairs[c])stack.push(pairs[c]);else if(')]}>'.includes(c)){
+      if(stack.pop()!==c)break;if(!stack.length)return i+1;
+    }
+  }
+  throw new Error(`LLVM 자료형의 괄호가 올바르지 않습니다: ${text.slice(0,100)}`);
+}
+
+// A type is a primary followed by any number of pointer/function suffixes.
+// The return type can itself be a pointer, including a pointer to a function.
+function typePrefix(text){
+  let end='[{<'.includes(text[0]??'')&&text.length?typeGroupEnd(text,0):
+    /^(?:%"[^"\r\n]+"|%[-\w.$]+|i\d+|void|double|float|half|metadata|label|x86_fp80|fp128|token)/.exec(text)?.[0].length;
+  if(!end)throw new Error(`지원하지 않는 LLVM 자료형: ${text.slice(0,100)}`);
+  let kind='primary',returnType;
+  for(;;){
+    const start=end+(/^\s*/.exec(text.slice(end))[0].length),tail=text.slice(start);
+    if(tail.startsWith('*')){end=start+1;kind='pointer';continue;}
+    const addressSpace=/^addrspace\(\d+\)\s*\*/.exec(tail);
+    if(addressSpace){end=start+addressSpace[0].length;kind='pointer';continue;}
+    if(tail.startsWith('(')){returnType=text.slice(0,end).trim();end=typeGroupEnd(text,start);kind='function';continue;}
+    return {end,kind,returnType};
+  }
+}
+
 export function typed(text) {
-  text=text.trim();let end;
-  if("[{<".includes(text[0])) {
-    const open=text[0],close={"[":"]","{":"}","<":">"}[open];let level=0;
-    for(let i=0;i<text.length;i++) {if(text[i]===open)level++;if(text[i]===close&&!--level){end=i+1;break;}}
-  } else end=/^(?:%"[^"]+"|%[-\w.$]+|i\d+|void|double|float|half|metadata|label|x86_fp80|fp128|token)/.exec(text)?.[0].length;
-  if(!end) throw new Error(`지원하지 않는 LLVM 자료형: ${text.slice(0,100)}`);
-  // Function pointer types contain an argument list before the pointer stars.
-  let tail=text.slice(end),fn=/^\s*\(/.exec(tail);
-  if(fn) {let level=0;for(let i=end;i<text.length;i++){if(text[i]==="(")level++;if(text[i]===")"&&!--level){end=i+1;break;}}}
-  while(text[end]==="*")end++;
+  text=text.trim();const {end}=typePrefix(text);
   return {type:text.slice(0,end).trim(),value:text.slice(end).trim()};
 }
 
@@ -34,7 +61,7 @@ export function operand(text) {
 export function metadata(ir) {
   const nodes=new Map();for(const line of ir.split("\n")) {const m=/^!(\d+) = (.*)/.exec(line);if(m)nodes.set(m[1],m[2]);}
   const field=(id,key)=>new RegExp(`(?:^|[, (])${key}: ("(?:[^"\\\\]|\\\\.)*"|![0-9]+|[^,)]+)`).exec(nodes.get(String(id))??"")?.[1];
-  const clean=v=>v?.replace(/^!/,"").replace(/^"|"$/g,"");
+  const clean=v=>llvmName(v?.replace(/^!/,""));
   const locationCache=new Map();
   function location(id,seen=new Set()) {
     if(!id)return null;id=String(id);
@@ -54,7 +81,7 @@ export function metadata(ir) {
     sizeBits:Number(field(id,"size")??0),offsetBits:Number(field(id,"offset")??0),encoding:field(id,"encoding")??null,
     baseType:/^!\d+$/.test(field(id,"baseType")??'')?`debug:${clean(field(id,"baseType"))}`:null,
     elements:field(id,"elements")? [...(nodes.get(clean(field(id,"elements")))??"").matchAll(/!(\d+)/g)].map(m=>`debug:${m[1]}`):[],
-    flags:field(id,'flags')??null,
+    flags:field(id,'flags')??null,source:location(id),
     ...(field(id,'flags')?.includes('DIFlagBitField')?{bitField:true,storageOffsetBits:Number(/i\d+ (-?\d+)/.exec(field(id,'extraData')??'')?.[1]??0)}:{}),
     evidence:"compiler"}));
   for(const t of types.filter(t=>t.tag==='DW_TAG_enumeration_type')){
@@ -117,5 +144,6 @@ export function parseCall(body) {
   const before=text.slice(0,open).trim(),callee=/([@%](?:[-\w.$]+|"[^"]+"))$/.exec(before)[1];
   let end=open,level=0;for(;end<text.length;end++){if(text[end]==="(")level++;if(text[end]===")"&&!--level)break;}
   const head=before.slice(0,-callee.length).trim().replace(/^(?:(?:fastcc|coldcc|ccc|zeroext|signext|noalias|nonnull)\s+)*/,"");
-  return {callee,returnType:typed(head).type.replace(/\s*\(.*\)$/s,""),args:splitTop(text.slice(open+1,end)).filter(Boolean).map(text=>({...operand(text),sret:/\bsret\b/.test(text),byval:/\bbyval\b/.test(text)}))};
+  const signature=typePrefix(head);
+  return {callee,returnType:signature.kind==='function'?signature.returnType:head.slice(0,signature.end).trim(),args:splitTop(text.slice(open+1,end)).filter(Boolean).map(text=>({...operand(text),sret:/\bsret\b/.test(text),byval:/\bbyval\b/.test(text)}))};
 }

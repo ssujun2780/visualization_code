@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>실행 시각화 · C 작업실</title>
+  </head>
+  <body>
+    <main class="animation-app">
+      <header class="animation-header">
+        <a href="./" class="home-link">C 작업실</a>
+        <div class="animation-heading"><h1>실행을 눈으로 따라가세요.</h1><p>상자에서 값을 읽고, 계산하고, 다시 저장하는 과정</p></div>
+        <div class="example-controls">
+          <label class="demo-control">예제<select id="demo" aria-label="예제"><option value="scalar">변수와 계산</option><option value="functions">함수 호출과 반환</option><option value="comparisons">비교·값의 참거짓</option><option value="logic">논리·단락 평가</option><option value="branches">분기·반복 조건</option><option value="pointers">포인터·재연결·함수</option><option value="pointer-arrays">포인터 배열·구조체</option><option value="pointer-network">대규모 포인터 연결망</option><option value="dynamic-memory">동적 메모리 · 생성·재할당·해제</option><option value="io-library">입출력·복사·문자열 라이브러리</option></select></label>
+          <button id="run-demo" type="button">예제 다시 실행</button>
+          <button id="load-recording" type="button">실행 기록 열기</button>
+          <input id="recording-files" type="file" accept=".json" multiple hidden />
+        </div>
+      </header>
+      <details id="source-editor-panel" class="source-editor-panel">
+        <summary>C 코드 직접 입력</summary>
+        <div class="source-editor-toolbar"><span>main.c</span><span>Ctrl+Enter로 실행</span><button id="run-source" type="button" disabled>컴파일·시각화</button></div>
+        <div id="source-editor" class="source-editor"></div>
+        <p id="source-editor-status" class="source-editor-status" role="status">코드를 작성하거나 붙여넣으세요. 수정한 내용은 다시 실행하면 적용됩니다.</p>
+      </details>
+      <details id="execution-input-panel" class="source-editor-panel execution-input-panel">
+        <summary>실행 전 입력 · 미리 입력하고 전체 실행</summary>
+        <label>입력 방식 <select id="execution-input-mode" aria-label="입력 방식"><option value="batch">전체 입력 후 실행</option><option value="interactive">실행 중 입력</option></select></label>
+        <textarea id="execution-stdin" rows="3" maxlength="16384" aria-label="실행 전 표준 입력" placeholder="프로그램에 전달할 입력 전체를 적으세요. 실행 시 입력 끝(EOF)까지 전달합니다."></textarea>
+        <p>입력·실행·분석을 준비한 뒤 재생합니다. 표준 입력은 UTF-8 16KB까지 지원합니다.</p>
+      </details>
+      <div class="view-options" role="group" aria-label="표시할 화면">
+        <span>보기</span>
+        <label><input id="view-world" type="checkbox" checked aria-controls="world-panel"> 실행 공간</label>
+        <label hidden><input id="work-toggle" type="checkbox" aria-controls="work-context" disabled> 작업 보기</label>
+        <label><input id="view-source" type="checkbox" checked aria-controls="source-panel"> 코드·중간언어</label>
+      </div>
+      <div class="animation-workspace">
+        <section class="scene-panel" aria-label="실행 시각화">
+          <section id="world-panel" class="world-panel" aria-label="실행 공간">
+          <div class="scene-heading"><span>실행 공간</span>
+            <div class="camera-tools"><label><input id="follow-work" type="checkbox" checked>작업 따라가기</label><select id="structure-view" aria-label="선택한 저장소 표현" hidden><option value="auto">자동 표현</option><option value="boxes">원본 상자</option><option value="graph">그래프</option><option value="array">배열</option><option value="grid">격자</option><option value="stack">스택</option><option value="queue">큐</option><option value="circular-queue">원형 큐</option><option value="deque">덱</option><option value="linked-list">연결 리스트</option><option value="circular-list">원형 리스트</option><option value="tree">트리</option><option value="binary-tree">이진 트리</option><option value="bst">BST</option><option value="avl">AVL</option><option value="red-black">Red-black</option><option value="forest">포레스트</option><option value="min-heap">최소 힙</option><option value="max-heap">최대 힙</option><option value="dag">DAG</option><option value="trie">트라이</option><option value="hash-table">해시 테이블</option><option value="disjoint-set">Union-Find</option><option value="segment-tree">구간 트리</option><option value="fenwick-tree">Fenwick 트리</option></select><select id="graph-direction" aria-label="그래프 방향 표시" hidden><option value="recorded">기록된 방향</option><option value="directed">방향 그래프</option><option value="undirected">무방향 그래프</option></select><button id="zoom-out" aria-label="축소">−</button><span id="zoom-label">100%</span><button id="zoom-in" aria-label="확대">+</button><button id="fit-view">전체 보기</button><button id="focus-event">현재 작업</button><button id="reset-layout">배치 초기화</button><button id="toggle-selected" hidden>접기</button></div>
+            <details class="scene-help"><summary>조작법</summary><div class="canvas-hint">▸/▾ 접기·펼치기 · 모서리 드래그로 서랍 크기 · Shift+방향키로 크기 조절<br>상자 내부 좌클릭 드래그로 객체 이동 · 돗자리 제목 드래그 · 빈 공간 드래그/휠 이동<br>Space 재생·일시정지 · Ctrl+휠 확대/축소 · Esc 해제<div class="legend"><span>SPACE</span><span>READ</span><span>CALC</span><span>WRITE</span><span>FLOW</span></div></div></details>
+          </div>
+          <div class="canvas-shell">
+            <canvas id="scene" tabindex="0" aria-label="무한 실행 공간. 상자 내부를 좌클릭 드래그하여 객체를 옮깁니다. 빈 공간 드래그 또는 휠로 화면 이동, Ctrl+휠로 확대와 축소. 스페이스바로 재생과 일시정지, 방향키로 화면 이동, 더하기와 빼기로 확대와 축소."></canvas>
+            <canvas id="transfer-scene" aria-hidden="true"></canvas>
+            <section id="input-field" class="input-field" aria-label="입력 돗자리" hidden>
+              <label id="input-label" for="demo-input" aria-live="polite">실행 중 전달할 입력</label>
+              <textarea id="demo-input" rows="3" spellcheck="false" maxlength="8000" placeholder="Enter로 전송 · Shift+Enter로 줄바꿈&#10;기본 전송은 끝에 줄바꿈을 붙입니다." aria-label="표준 입력" aria-keyshortcuts="Enter Shift+Enter"></textarea>
+              <button id="apply-input" type="button" disabled>입력 단계에서 전송</button>
+              <div class="input-options"><label class="input-eof" title="끄면 입력한 내용 그대로 전송합니다. EOF 전송에는 줄바꿈을 붙이지 않습니다."><input id="input-line-mode" type="checkbox" checked disabled> 줄바꿈 추가</label><label class="input-eof"><input id="input-eof" type="checkbox" disabled> 입력 종료(EOF)</label></div>
+              <span class="input-arrival-label">도착한 입력</span>
+              <pre id="input-observed" aria-label="실행 중 도착한 입력">아직 도착한 입력이 없습니다.</pre>
+            </section>
+            <section id="output-field" class="input-field output-field" aria-label="출력 돗자리" hidden>
+              <div class="output-toolbar"><label for="output-channel">출력 스트림</label><select id="output-channel" aria-label="출력 스트림"><option value="all">전체</option><option value="stdout">stdout</option><option value="stderr">stderr</option></select></div>
+              <pre id="scene-output" tabindex="0" aria-label="해당 시점까지의 전체 출력">아직 출력이 없습니다.</pre>
+            </section>
+            <div id="demo-status" class="demo-status" role="status">현재 모델로 예제를 생성하고 있습니다.</div>
+          </div>
+          <div class="scene-status"><span id="tool-status" class="tool-status" aria-live="polite"></span><span id="selection-status" class="selection-status" role="status"></span></div>
+          <div class="event-detail" role="status" aria-live="polite"><span id="event-kind" class="event-badge">준비</span><div><strong id="event-title">실행 기록을 준비하고 있습니다.</strong><p id="event-description"></p></div><span id="event-count"></span></div>
+          </section>
+          <div id="work-divider" class="work-divider" role="separator" tabindex="0" aria-label="실행 공간과 작업 보기 너비 조절" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40" hidden></div>
+          <section id="work-context" class="work-context" aria-label="현재 작업 연결 보기" hidden></section>
+        </section>
+        <aside id="source-panel" class="source-panel">
+          <div class="source-heading"><span id="source-name">main.c</span><span>실행 위치</span></div>
+          <section id="error-panel" class="error-panel" role="alert" hidden><strong id="error-title"></strong><p id="error-message"></p><p id="error-location"></p><pre id="error-details"></pre></section>
+          <pre id="source-code" tabindex="0" aria-label="실행한 코드"></pre>
+          <section id="condition-panel" class="condition-panel" aria-label="조건 판정" hidden>
+            <strong id="condition-summary"></strong>
+            <p id="condition-expression"></p>
+            <div id="condition-parts"></div>
+          </section>
+          <div class="source-heading"><span>중간언어 과정</span><span id="trace-status"></span></div>
+          <ol id="event-list" aria-label="명령어 실행 목록"></ol>
+        </aside>
+        <p id="view-empty" class="view-empty" role="status" hidden>위의 보기 항목에서 표시할 화면을 선택해 주세요.</p>
+      </div>
+      <footer class="playback-panel">
+        <div class="playback-buttons"><button id="restart" aria-label="처음으로">처음</button><button id="previous-event" aria-label="이전 명령어">이전</button><button id="play" class="play-button" title="재생·일시정지 (Space)">재생</button><button id="next-event" title="다음 명령어 경계로 즉시 이동하고 정지">한 명령어</button><button id="next-line" title="현재 소스 행을 완료하고 정지">한 줄</button></div>
+        <label class="seek-control"><span>진행</span><input id="seek" type="range" min="0" max="0" value="0" step="1" aria-label="실행 시점" /></label>
+        <div class="loop-skip-controls" role="group" aria-label="반복 건너뛰기">
+          <span>반복 건너뛰기</span>
+          <button id="skip-iteration" data-loop-skip="1" aria-label="반복 1회 건너뛰기" disabled>1회</button>
+          <button data-loop-skip="5" aria-label="반복 5회 건너뛰기" disabled>5회</button>
+          <button data-loop-skip="10" aria-label="반복 10회 건너뛰기" disabled>10회</button>
+          <button data-loop-skip="50" aria-label="반복 50회 건너뛰기" disabled>50회</button>
+          <button data-loop-skip="100" aria-label="반복 100회 건너뛰기" disabled>100회</button>
+          <button data-loop-skip="all" aria-label="남은 반복 전체 건너뛰기" disabled>전체</button>
+          <span id="loop-skip-context">반복문 안에서 사용할 수 있습니다.</span>
+        </div>
+        <label class="speed-control"><span>속도</span><span>0.25×</span><input id="speed" type="range" min="0.25" max="10" value="1" step="0.25" aria-label="재생 속도" aria-valuetext="1×" /><span>10×</span><output id="speed-value" for="speed">1×</output></label>
+      </footer>
+      <p id="recording-message" class="recording-message" role="alert">실제 중간언어 기록을 재생합니다.</p>
+    </main>
+    <script type="module" src="/src/animation/main.js"></script>
+  </body>
+</html>

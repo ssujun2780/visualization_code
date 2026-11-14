@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {llvmFunction,llvmName} from './llvm.mjs';
 
 const order=(a,b)=>a.line-b.line||a.column-b.column;
 const encloses=(r,p)=>r&&p&&r.file===p.file&&order(r.start,p)<=0&&order(p,r.end)<=0;
@@ -103,7 +104,7 @@ export function createSourceMap({source,filename,nodes,llvm,metadata,macroTokenP
   // Establish compiler-to-source links before asking for any original tokens.
   let fn=null;
   for(const [lineIndex,line]of llvm.split('\n').entries()){
-    if(line.startsWith('define '))fn=/@([^ (]+)\(/.exec(line)?.[1]??null;
+    if(line.startsWith('define '))fn=llvmName(llvmFunction.exec(line)?.[1])??null;
     const dbg=/!dbg !(\d+)/.exec(line);
     if(fn&&dbg){const location=metadata.location(dbg[1]);sites.push({llvmLine:lineIndex+1,functionName:fn,location,astNodeIds:candidates(location,fn).map(n=>n.id)});}
     if(line==='}')fn=null;

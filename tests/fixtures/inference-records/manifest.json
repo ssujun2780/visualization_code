@@ -1,0 +1,182 @@
+{
+  "constant-leaf-range": {
+    "origin": "test-results/inference-completion-audit-2026-11-12",
+    "executionSha256": "608d3ad0def6df42a0fe9421b4d610d374b329fd51aaf1fdf1e31fa01a0ebf50",
+    "expected": {
+      "id": "constant-leaf-range",
+      "sourceHash": "eea7dd8c46efdd42bda81a03727d950a875a28a57560e4c40efa3a01882f86f7",
+      "stdout": "15\n",
+      "expected": "A built binary range hierarchy exists without an independent input array; expected shape is a segment tree, not a claim about source-array identity."
+    }
+  },
+  "full-flag-ring": {
+    "origin": "test-results/inference-completion-audit-2026-11-12",
+    "executionSha256": "9daeb7785331b750c797f503de760cfafa805e270ebc4e2b77594143b074d6b8",
+    "expected": {
+      "id": "full-flag-ring",
+      "sourceHash": "755b6342e4eb57f02d69ccdf882bf1e7c794f1f2f28022167ce43f3d5cda8ee4",
+      "stdout": "1 2 3 4 5\n",
+      "expected": "A capacity-three FIFO that distinguishes equal cursors using full; full is not empty."
+    }
+  },
+  "or-lazy": {
+    "origin": "test-results/inference-completion-audit-2026-11-12",
+    "executionSha256": "b9ff954c8602af010eaa967bba51ad67ecee1b5c3549af1911e7450dce54d4ee",
+    "expected": {
+      "id": "or-lazy",
+      "sourceHash": "0796148d5c75b43fe54a6408eb3f570797e64ea5403b7f07dfb9be1ddacc005d",
+      "stdout": "63 48 56\n",
+      "expected": "OR pending tags combine to 48; propagation from 1 to 2,3 and from 3 to 6,7; clearing uses zero."
+    }
+  },
+  "pointer-policy-lifetime": {
+    "origin": "test-results/inference-completion-audit-2026-11-12",
+    "executionSha256": "c727106e0a795a631852ea874e0fd7f9212fbedb39e85cd87e1fdf2c4e0a1fd8",
+    "expected": {
+      "id": "pointer-policy-lifetime",
+      "sourceHash": "b81b3ead646f4ceb1c736f154772b7ac070e09cf62e2119a57be46e5b367a5a1",
+      "stdout": "1 1\nend\n",
+      "expected": "Comparator policy may remain historical, but query after free must not say the allocation is alive."
+    }
+  },
+  "string-key-hash": {
+    "origin": "test-results/inference-completion-audit-2026-11-12",
+    "executionSha256": "9cc993e8053f52b4b0805eff260cd46164cd5b4a3383f45839b9e3fcd315ac4b",
+    "expected": {
+      "id": "string-key-hash",
+      "sourceHash": "9cd8afe0669e930806e169a1c4d8aa13d98ccb063053275f795fdf40b126d02f",
+      "stdout": "9 7\n",
+      "expected": "Bucket lookup using key-derived hash and strcmp equality is a hash-table relationship."
+    }
+  },
+  "trie-history": {
+    "origin": "test-results/inference-completion-audit-2026-11-12",
+    "executionSha256": "74e7953c2cd4f9b8b7ddfaec62514d45f92e1e2bd5f375d5c72b12e0b4d0db25",
+    "expected": {
+      "id": "trie-history",
+      "sourceHash": "0d2d6525812110fa3c012e8a992bb813375fd5ed4e4947b5af9268a86d708752",
+      "stdout": "1 0 1\n",
+      "expected": "At checkpoints the observed word is accepted, then not accepted, then accepted. A history budget may omit the middle state, but must signal that gap."
+    }
+  },
+  "xor-even-range": {
+    "origin": "test-results/inference-completion-audit-2026-11-12",
+    "executionSha256": "75bc2774eb73e5d4e093b194f1bc622e28c0417463a0c64d2edc3fc7d39f1aa8",
+    "expected": {
+      "id": "xor-even-range",
+      "sourceHash": "3b1025f22941568aebbce1a6e25e95eeaf2e2aa0d02b4929a1f3acab46ceeb7b",
+      "stdout": "15 16 24\n",
+      "expected": "A pending XOR tag is real even when an even-length XOR aggregate is unchanged; pushes 1 and 3 forward it to both children."
+    }
+  },
+  "returned-list": {
+    "origin": "test-results/inference-common-completion-2026-11-12",
+    "executionSha256": "18d0dfff437ca0d5bc54ecd6f1be28ef571c6d4659cfacbfb45db8cbd3d5ef9f",
+    "expected": {
+      "sourceHash": "1f3e8d0106c8dee95d3ffbc021cb7ec96c3532e1253e12ee8a644f14fd3653ae",
+      "stdout": "21\n"
+    }
+  },
+  "pointer-selected-records": {
+    "origin": "test-results/inference-common-completion-2026-11-12",
+    "executionSha256": "5b5478b9c0fb8746a6e7b123dd59f979e29f1defe720e9875de126fc31cbac0c",
+    "expected": {
+      "sourceHash": "5149a7ac53009552b056d33de99af94b39640c113cae1d00dc7d9897ff32eede",
+      "stdout": "2 4 2\n"
+    }
+  },
+  "persistent-tree": {
+    "origin": "test-results/structure-extensions-2026-11-12",
+    "executionSha256": "7dbbf781cb48d1372bd8d437774a237fb767df03215b815c94930295e76693aa",
+    "expected": {
+      "id": "persistent-tree",
+      "group": "sharing",
+      "stdout": "10 16 ",
+      "expect": {
+        "sharedLeaves": [
+          0,
+          2,
+          3
+        ],
+        "old": 10,
+        "new": 16
+      },
+      "sourceHash": "27d8543d3449de00a05ad351c40fdc26cb464ec275b6a3f109d57cd0127bfcad"
+    }
+  },
+  "pointer-heap": {
+    "origin": "test-results/structure-extensions-2026-11-12",
+    "executionSha256": "00d022885600f633eade0f0c552362e48ddefeacfe14a1ab05646b38232027ac",
+    "expected": {
+      "id": "pointer-heap",
+      "group": "storage",
+      "stdout": "2 2 4 7 ",
+      "expect": {
+        "heap": "min",
+        "count": 4
+      },
+      "sourceHash": "56d3e6446e584ac4e81ff98ab10f0089ba01c1339b5169476b1e0c0e328bffea"
+    }
+  },
+  "range-lazy": {
+    "origin": "test-results/structure-extensions-2026-11-12",
+    "executionSha256": "4719de78dc26d137ac97fc111215887ac1536e881319815863362b94a6d3e5ee",
+    "expected": {
+      "id": "range-lazy",
+      "sourceHash": "d5b4d199454aae7bfbbcfc858d25568b1936fb2b42e5c2867ae75235de91b309",
+      "stdout": "30 5 9 ",
+      "expected": {
+        "sum": 30,
+        "tag": 5,
+        "leaf": 9
+      }
+    }
+  },
+  "selected-edges": {
+    "origin": "test-results/structure-extensions-2026-11-12",
+    "executionSha256": "98e32eaf63cfd6f1ad0b7affd6c48ba423e1d5ccea44a91d13cdc0ab85c0992e",
+    "expected": {
+      "id": "selected-edges",
+      "sourceHash": "077e40cd1696afc34bc1e52191c9b89a4032862048d3c214c3e6e877a6b6c08f",
+      "stdout": "6 3 ",
+      "expected": {
+        "chosen": [
+          0,
+          1,
+          2
+        ],
+        "weight": 6,
+        "components": [
+          [
+            0,
+            1,
+            2,
+            3
+          ]
+        ]
+      }
+    }
+  },
+  "pointer-comparator": {
+    "origin": "test-results/structure-boundaries-2026-11-12",
+    "executionSha256": "b07a4d6aadc9e2c63bb296ab9aaa584386716dd0b213f113d85fb5420c9b101e",
+    "expected": {
+      "id": "pointer-comparator",
+      "sourceHash": "e348b6f53135ad16f8dcd9dc967f585082aeb66482f7a4ca072f763a52080215",
+      "stdout": "2:9 2:5 3:7 4:1 ",
+      "expected": {
+        "keyOrder": [
+          [
+            0,
+            1
+          ],
+          [
+            4,
+            -1
+          ]
+        ],
+        "pointerArguments": true
+      }
+    }
+  }
+}

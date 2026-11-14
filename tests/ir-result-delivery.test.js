@@ -25,7 +25,7 @@ async function inspect(source,exitCode){
   return {...r,events,positions,deliveries};
 }
 
-test('returned values connect directly to assignment or calculation without changing work order',async()=>{
+test('returned values reach the recorded assignment before the function field ends',async()=>{
   const r=await inspect('int f(int x){return x+1;}int main(void){int total=f(1);total=f(2)*3;return total;}',9);
   assert.equal(r.deliveries.length,2);
   const [assignment,calculation]=r.deliveries;
@@ -36,8 +36,12 @@ test('returned values connect directly to assignment or calculation without chan
   for(const d of r.deliveries){
     assert.equal(d.status,'delivered');assert.equal(d.sourceExecutionId,d.returnValueExecutionId);
     assert.equal(r.events.get(d.sourceExpressionExecutionIds[0]).kind,'CALC');
-    const between=r.trace.events.slice(r.positions.get(d.returnExecutionId)+1,r.positions.get(d.resumeExecutionId));
-    assert.ok(between.some(e=>e.action==='frame.end'),'actual cleanup remains before resume');
+    const returned=r.events.get(d.returnExecutionId),transfer=returned.delivery,end=r.events.get(transfer.frameEndExecutionId),
+      receiver=r.events.get(transfer.completionExecutionId);
+    assert.equal(receiver.action,'write');assert.ok(receiver.target.objectId);
+    assert.ok(r.positions.get(receiver.eventId)<r.positions.get(end.eventId));
+    assert.equal(end.cleanupAfterExecutionId,receiver.eventId);
+    assert.ok(end.recordedOrder<receiver.recordedOrder,'raw execution order is retained separately');
   }
 });
 
@@ -86,11 +90,12 @@ test('pointer addresses and aggregate ABI storage remain distinct from direct va
   assert.equal(returned.value.kind,'aggregate');assert.ok(returned.memoryState);
   assert.equal(delivery.sourceExecutionId,returned.eventId);assert.equal(delivery.status,'storage-delivered');assert.equal(delivery.consumer,null);
   const storage=delivery.storageDelivery;
-  assert.equal(storage.target.objectId,returned.sourceObjectId);assert.equal(storage.target.address,returned.sourceAddress);
+  assert.equal(storage.target.objectId,returned.returnStorage.objectId);assert.notEqual(storage.target.objectId,returned.sourceObjectId);
+  assert.equal(storage.target.address,returned.sourceAddress);
   assert.equal(storage.snapshotExecutionId,returned.eventId);assert.equal(storage.availableAtExecutionId,returned.eventId);
   assert.ok(storage.writtenByExecutionIds.length);
   for(const id of storage.writtenByExecutionIds){
-    const write=aggregate.events.get(id);assert.equal(write.kind,'WRITE');assert.equal(write.target.objectId,storage.target.objectId);
+    const write=aggregate.events.get(id);assert.equal(write.kind,'WRITE');assert.equal(write.target.objectId,returned.sourceObjectId);
     assert.ok(aggregate.positions.get(id)<aggregate.positions.get(returned.eventId));
   }
   const noEvidence=structuredClone(aggregate.trace);delete noEvidence.events.find(e=>e.eventId===delivery.callExecutionId).backendArguments;

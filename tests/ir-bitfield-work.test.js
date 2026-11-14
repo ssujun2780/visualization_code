@@ -13,6 +13,18 @@ async function inspect(source,expected){
 }
 const trees=n=>n?[n,...(n.children??[]).flatMap(trees)]:[];
 
+test('designated bit-field initialization preserves user expressions and separated units',async()=>{
+  const r=await inspect(`#include <stdio.h>
+struct Small{unsigned a:3;unsigned :0;unsigned b:5;};
+struct Outer{int marker;struct Small inner;void *next;};
+int calls;unsigned once(void){calls++;return 3;}
+int main(void){unsigned x=5;struct Outer v={.marker=9,.inner={.a=(x<<1)&7,.b=once()+2},.next=0};
+ printf("%u %u %d\\n",v.inner.a,v.inner.b,calls);return 0;}`,'2 5 1\n');
+  assert.equal(r.trace.events.filter(e=>e.action==='call'&&e.callee==='@once').length,1);
+  assert.ok(r.trace.events.some(e=>e.kind==='CALC'&&trees(r.defs.get(e.instructionId)?.expression).some(n=>n.operator==='<<')));
+  assert.deepEqual(r.trace.events.filter(e=>e.kind==='READ'&&e.bitfield).map(e=>e.value.decimal),['2','5']);
+});
+
 test('logical bit-field writes and reads keep exact values, C types, bit ranges and independent provenance',async()=>{
   const r=await inspect(`#include <stdio.h>
 struct Flags {unsigned head:3;unsigned middle:5;unsigned tail:1;};

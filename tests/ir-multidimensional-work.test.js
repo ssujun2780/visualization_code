@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {traceModel} from '../scripts/model/index.mjs';
-import {arrayWorkStructures} from '../scripts/model/array-work.mjs';
+import {traceWithStructureView as traceModel} from './helpers/structure-runner.mjs';
+import {arrayWorkStructures} from '../scripts/inference/array-work.mjs';
 
 const walk=n=>n?[n,...(n.children??[]).flatMap(walk)]:[];
 const unwrap=n=>{while(n&&['ParenExpr','ImplicitCastExpr','CStyleCastExpr'].includes(n.kind))n=n.children?.[0];return n;};

@@ -5,8 +5,10 @@
   "type": "module",
   "packageManager": "pnpm@11.25.0",
   "scripts": {
-    "test": "node --test",
+    "test": "node --test \"tests/*.test.js\"",
     "trace:c": "node scripts/trace-model.mjs",
+    "infer:c": "node scripts/infer-structures.mjs",
+    "infer:relations": "node scripts/infer-execution-relations.mjs",
     "trace:prototype": "node scripts/trace-c.mjs",
     "trace:regex": "node scripts/experiments/regex-equivalence/run.mjs",
     "dev": "vite --host 127.0.0.1",
@@ -17,6 +19,7 @@
   "dependencies": {
     "@runno/wasi": "0.10.0",
     "fflate": "0.8.2",
+    "libavoid-js": "0.5.0-beta.5",
     "monaco-editor": "0.57.0"
   },
   "devDependencies": {

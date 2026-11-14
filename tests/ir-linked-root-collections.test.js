@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {linkedStructures} from '../scripts/model/linked-views.mjs';
-import {linkedRootCollections} from '../scripts/model/linked-root-collections.mjs';
-import {traceModel} from '../scripts/model/index.mjs';
+import {linkedStructures} from '../scripts/inference/linked-views.mjs';
+import {linkedRootCollections} from '../scripts/inference/linked-root-collections.mjs';
+import {traceWithStructureView as traceModel} from './helpers/structure-runner.mjs';
 
 function fixture(){
   const integer={id:'int',kind:'integer',sizeBits:32,signedness:'unsigned'},record={id:'node-alias',kind:'record',recordTypeId:'record-N',sizeBits:64,members:[]},
@@ -72,6 +72,9 @@ test('observed empty roots survive without traversal while untouched capacity st
   assert.equal(range.states.at(-1).observedSlotCount,1);assert.equal(range.states.at(-1).unknownSlotCount,3);
   assert.equal(range.states.at(-1).roots[0].status,'null');assert.equal(range.states.at(-1).status,'partial');
   assert.equal(linked.find(c=>c.root.objectId==='new').roles.length,0);
+  const empty=linked.find(c=>c.root.objectId==='new');
+  assert.deepEqual(empty.candidateRoles.map(r=>r.fieldNodeId),['next']);
+  assert.deepEqual(empty.traversalRoles,[]);
 });
 
 test('renamed aliases and reordered owner fields bind malloc roots through observed modulo indexing',async()=>{

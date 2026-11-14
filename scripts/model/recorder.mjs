@@ -1,24 +1,33 @@
 import {randomUUID} from "node:crypto";
-import {topology} from "./structure.mjs";
 import {MemorySnapshots,filledMemory,initializationOf} from "./memory-state.mjs";
 import {RangeOrigins} from './ranges.mjs';
 import {bitSegments,markBits} from './bitfields.mjs';
 import {FunctionReferences,isFunctionPointer} from './function-references.mjs';
+import {createObservationStorage} from '../shared/observation-storage.mjs';
 
 export class TraceStopped extends Error {}
 const unsigned=(value,bits=64)=>BigInt.asUintN(bits,BigInt(value));
 const hex=(value,width=8)=>`0x${unsigned(value).toString(16).padStart(width,"0")}`;
 
 export class ModelRecorder {
-  constructor(plan,abi,{maxEvents=100000,onEvents}={}) {
-    Object.assign(this,{plan,abi,maxEvents,onEvents});this.runId=randomUUID();this.events=[];this.objects=[];this.frames=[];
+  constructor(plan,abi,{maxEvents=100000,maxObservationBytes=16777216,onEvents}={}) {
+    Object.assign(this,{plan,abi,maxEvents,maxObservationBytes,onEvents});this.observationBytes=0;this.runId=randomUUID();this.events=[];this.objects=[];this.frames=[];
     this.stack=[];this.references=new Map();this.views=[];this.diagnostics=[];this.pendingArguments=new Map();this.sequence=0;this.batch=[];
-    this.coverageGaps=new Set();this.globalsBySymbol=new Map();this.captureErrors=true;
+    this.coverageGaps=new Set();this.globalsBySymbol=new Map();this.constantAddressOrigins=new Map();this.captureErrors=true;
     this.memorySnapshots=new MemorySnapshots();this.streamOffsets={stdout:0,stderr:0};this.stdioOffsets={stdout:0,stderr:0};
     this.nativeOrigins=new RangeOrigins();
+    this.bufferOrigins=new RangeOrigins();this.inputDerivedEvents=new Set();
     this.functionReferences=new FunctionReferences();
+    this.observationStorage=createObservationStorage();
   }
   setMemory=memory=>{this.memory=memory;};
+  setStaticDataEnd=end=>{
+    // The linker includes zero-initialized static storage in __data_end even
+    // when those bytes have no active data segment in the WASM file.
+    const start=Math.max(this.linkedDataBase??end,...this.linkedDataRegions?.map(r=>r.address+r.size)??[]);
+    if(Number.isSafeInteger(end)&&end>start&&end<=this.memory.buffer.byteLength)
+      (this.linkedDataRegions??=[]).push({address:start,size:end-start,evidence:'linker __data_end zero-initialized static tail',objectBounds:'unknown'});
+  };
   output=(channel,text)=>{
     const call=this.frame()?.activeCall,byteLength=Buffer.byteLength(text),streamOffset=this.streamOffsets[channel]??0;
     this.event("WRITE",call?.operation??null,{action:"output",channel,text,byteLength,streamOffset,callEventId:call?.event?.eventId??null,evidence:"observed stream output"});
@@ -50,6 +59,31 @@ export class ModelRecorder {
   nativeMemory=(phase,address,size)=>{
     address>>>=0;size>>>=0;if(!size)return;
     const active=this.frame()?.activeCall,call=active&&(active.operation.external||active.operation.callee.startsWith('%'))?active:null;
+    // Track every observed store range, independently of width, function names
+    // or byte equality. Host arrivals and call-effect ancestry stay distinct.
+    for(const part of this.bufferOrigins.get(address,size))if(part.value){
+      if(phase===1&&call&&part.value.eventId!==call.event.eventId){
+        call.bufferReads??=new Map();const origin=part.value;
+        const key=`${origin.eventId}:${part.start}:${part.end}`;
+        if(origin.inputRelated)call.inputBufferRead=true;
+        call.bufferReads.set(key,{address:hex(part.start),size:part.end-part.start,inputRelated:origin.inputRelated,
+          ...(origin.streamOffset!==undefined?{streamOffset:origin.streamOffset+part.start-origin.address}:{}),
+          bytesHex:Buffer.from(this.memory.buffer,part.start,part.end-part.start).toString('hex'),
+          dataInputs:[...new Set([origin.eventId,origin.callEventId].filter(Boolean))],origin:origin.kind,
+          ...(origin.writeSize?{writerAccessSize:origin.writeSize}:{}),
+          evidence:origin.kind==='stream-arrival'?'observed read at host input byte address':'observed read after library memory write; call-level provenance'});
+      }
+    }
+    if(phase===2){
+      let origin=null;
+      if(call){
+        const inputRelated=!!(call.inputEvents?.length||call.inputBufferRead||call.event.dataInputs?.some(id=>this.inputDerivedEvents.has(id)));
+        call.writeOrigins??=new Map();const key=`${size}:${inputRelated}`;
+        if(!call.writeOrigins.has(key))call.writeOrigins.set(key,{eventId:call.event.eventId,kind:'buffer-write',inputRelated,writeSize:size});
+        origin=call.writeOrigins.get(key);
+      }
+      this.bufferOrigins.set(address,size,origin);
+    }
     if(phase===2)this.nativeOrigins.set(address,size,call);
     if(!call)return;
     call.nativeReads??=new Map();call.nativeWrites??=new Map();
@@ -66,7 +100,7 @@ export class ModelRecorder {
     for(const entry of call.nativeWrites?.values()??[])for(const range of entry.ranges.ranges){
       const object=entry.object,address=object.address+range.start,size=range.end-range.start;
       const e=this.event('WRITE',op,{action:'write.range',target:{objectId:object.id,address:hex(address),offset:range.start,size},
-        memoryState:this.captureMemory(address,size),dataInputs:[...this.nativeReadInputs(call),...(call.event.dataInputs??[]),...(call.inputEvents??[]),...(call.callbackReturnEventIds??[])],
+        memoryState:this.captureMemory(address,size),dataInputs:[...this.nativeReadInputs(call),...(call.event.dataInputs??[]),...(call.inputEvents??[]),call.inputReadEventId,...(call.libraryReadInputs??[]),...(call.callbackReturnEventIds??[])].filter(Boolean),
         readRegions:this.nativeReadRegions(call),callEventId:call.event.eventId,returnEventId:returned?.eventId??null,evidence:'observed linked memory stores'});
       this.mark(object,address,size,e.eventId);this.refreshPointers(object,address,size,e);
     }
@@ -80,18 +114,29 @@ export class ModelRecorder {
       outputOrigin:'stdio',dataInputs:call?.event?.dataInputs??[],evidence:'observed libc formatted bytes accepted by stream'});
     this.stdioOffsets[channel]=streamOffset+bytes.length;
   };
-  input=(bytes,streamOffset)=>{
+  input=(bytes,streamOffset,regions=[])=>{
     const call=this.frame()?.activeCall,event=this.event("READ",call?.operation??null,{action:"input",channel:"stdin",bytesHex:Buffer.from(bytes).toString("hex"),
-      byteLength:bytes.length,streamOffset,callEventId:call?.event?.eventId??null,evidence:"observed stream input"});
+      byteLength:bytes.length,streamOffset,inputStage:'arrival',callEventId:call?.event?.eventId??null,evidence:"observed stream input"});
+    for(const region of regions)this.bufferOrigins.set(region.address,region.size,
+      {eventId:event.eventId,kind:'stream-arrival',inputRelated:true,address:region.address,streamOffset:region.streamOffset});
     if(call)(call.inputEvents??=[]).push(event.eventId);
   };
   event(kind,op,fields={}) {
     if(this.events.length>=this.maxEvents&&kind!=="ERROR")this.fault("trace-limit","실행 기록 제한에 도달했습니다.",op,"limited");
-    const event={schemaVersion:2,runId:this.runId,eventId:`e${++this.sequence}`,instructionId:op?.id??null,
+    let event={schemaVersion:2,runId:this.runId,eventId:`e${++this.sequence}`,instructionId:op?.id??null,
       activationId:this.stack.at(-1)?.id??null,kind,source:op?.source??null,sceneId:op?.sceneId??null,evidence:"observed",...fields};
-    this.events.push(event);this.batch.push(event);if(this.batch.length>=256)this.flush();return event;
+    event=this.observationStorage.append(event,kind==='ERROR'?Infinity:this.maxObservationBytes);
+    if(!event){this.sequence--;
+      this.fault('trace-size-limit','관찰 기록의 바이트 한도에 도달했습니다.',op,'limited');}
+    if(kind==='READ'&&fields.action==='input'||fields.dataInputs?.some(id=>this.inputDerivedEvents.has(id)))this.inputDerivedEvents.add(event.eventId);
+    this.observationBytes=this.observationStorage.summary().observationBytes;this.events.push(event);this.batch.push(event);return event;
   }
-  flush(){if(this.batch.length){this.onEvents?.(this.batch);this.batch=[];}}
+  checkpoint(){return {programId:this.plan.programId,runId:this.runId,backend:this.plan.backend,
+    objects:this.objects.map(({writes,bitWrites,...o})=>({...o,initializationRanges:writes,bitInitializationRanges:bitWrites})),
+    frames:this.frames.map(({definitions,origins,allocations,selects,calls,activeCall,sourceDecisions,stackSaves,...f})=>f),
+    views:this.views,references:[...this.references.values()],diagnostics:this.diagnostics,
+    coverage:{gaps:[...this.coverageGaps],...this.observationStorage.summary(),maxObservationBytes:this.maxObservationBytes}};}
+  flush(){if(this.batch.length){this.onEvents?.(this.batch,this.checkpoint());this.batch=[];}}
   fault(code,message,op,status="fault",details={}) {
     if(!this.diagnostics.length){const e=this.event("ERROR",op,{phase:"fault",diagnostic:{code,message},...details});this.diagnostics.push({...e.diagnostic,eventId:e.eventId,source:e.source});}
     this.status=status;throw new TraceStopped(message);
@@ -114,8 +159,45 @@ export class ModelRecorder {
     return this.objects.findLast(o=>o.lifecycle==="alive"&&address>=o.address&&
       (address<o.address+o.size||!o.size&&address===o.address)&&address+size<=o.address+o.size);
   }
+  linkedStorage(address,op){
+    const existing=this.lookup(address,0);if(existing)return existing;
+    const region=this.linkedDataRegions?.find(r=>address>=r.address&&address<r.address+r.size);if(!region)return null;
+    // A linked data segment proves mapped static bytes, not a C allocation's
+    // precise bounds. Keep that limitation explicit and exclude known objects.
+    let start=region.address,end=start+region.size;
+    for(const o of this.objects.filter(o=>o.lifecycle==='alive')){
+      if(o.address+o.size<=address)start=Math.max(start,o.address+o.size);
+      if(o.address>address)end=Math.min(end,o.address);
+    }
+    const object=this.create(start,end-start,op,{storage:'static',initialized:true});
+    object.storageEvidence={...region,objectBounds:'unknown',source:'linked-data'};
+    return object;
+  }
+  registerVarargs(op,call){
+    const frame=this.frame(),parent=this.stack.at(-2),owner=parent?.activeCall;
+    if(!frame.variadic||frame.varargStorage||!owner||frame.callbackOfCallEventId)return;
+    const args=owner.operation.args.slice(frame.fixedParameterCount),start=new DataView(this.memory.buffer).getUint32(this.address(call.args[0]),true);
+    let end=start;const ranges=[];
+    for(const arg of args){const layout=this.abi.layout(arg.type),alignment=Math.max(4,layout.align);
+      end=Math.ceil(end/alignment)*alignment;
+      const producer=parent.definitions.get(arg.value);
+      ranges.push({start:end-start,end:end-start+layout.size,writer:producer?.eventId??owner.event.eventId});
+      end+=Math.ceil(layout.size/4)*4;
+    }
+    if(!args.length)return;
+    const object=this.create(start,end-start,op,{storage:'automatic',initialRanges:ranges});
+    object.storageEvidence={source:'wasm32 variadic ABI',callEventId:owner.event.eventId,argumentTypes:args.map(a=>a.type)};
+    frame.varargStorage=object.id;
+  }
   inputEvent(input) {if(!input)return null;if(input.value?.startsWith("%"))return this.frame()?.definitions.get(input.value);return null;}
-  origin(input) {if(!input)return null;return this.frame()?.origins.get(input.value)??this.globalsBySymbol.get(input.value);}
+  origin(input) {if(!input)return null;const known=this.frame()?.origins.get(input.value)??this.globalsBySymbol.get(input.value);if(known)return known;
+    // LLVM constant address expressions have no SSA event. Retain their one
+    // compiler-named global base; the offset still comes from observed bits.
+    const value=input.value??'',cached=this.constantAddressOrigins.get(value);if(cached)return cached;
+    if(!/^(?:getelementptr|bitcast|addrspacecast)\b/.test(value))return null;
+    const symbols=[...new Set(value.match(/@(?:"(?:[^"\\]|\\.)*"|[-a-zA-Z$._0-9]+)/g)??[])];
+    const origin=symbols.length===1?this.globalsBySymbol.get(symbols[0]):null;if(origin)this.constantAddressOrigins.set(value,origin);return origin??null;
+  }
   inputs(op) {let inputs=op.inputs??[];if(op.action==="merge")inputs=op.incoming.filter(i=>i.block===this.frame()?.previousBlock);
     if(op.action==="select"){const chosen=this.frame()?.selects.get(op.id);inputs=[inputs[0],inputs[chosen?1:2]];}
     return inputs.map(i=>this.inputEvent(i)?.eventId).filter(Boolean);
@@ -143,12 +225,17 @@ export class ModelRecorder {
     for(const r of object.writes){if(r.end<=at)continue;if(r.start>=end)break;if(r.start>at)result.push({start:at,end:Math.min(r.start,end),writer:null});const a=Math.max(at,r.start),b=Math.min(end,r.end);if(b>a)result.push({start:a,end:b,writer:r.writer});at=Math.max(at,b);if(at>=end)break;}
     if(at<end)result.push({start:at,end,writer:null});return result;
   }
-  mark(object,address,size,writer,bitfield=null) {
+  mark(object,address,size,writer,bitfield=null,mirror=true) {
     if(!object||!size)return;const start=address-object.address,end=start+size,result=[];
     for(const r of object.writes){if(r.end<=start||r.start>=end)result.push(r);else {if(r.start<start)result.push({...r,end:start});if(r.end>end)result.push({...r,start:end});}}
     result.push({start,end,writer});object.writes=result.sort((a,b)=>a.start-b.start);
     object.bitWrites=markBits(object.bitWrites,start*8+(bitfield?.shift??0),bitfield?.width??size*8,writer);
+    delete object.valueProducedBy;
     for(const [key,r]of this.references)if(r.objectId===object.id&&r.offset<end&&r.offset+4>start)this.references.delete(key);
+    if(mirror){const root=object.storageAlias?.rootObjectId??object.id;
+      for(const other of this.objects)if(other!==object&&other.lifecycle==='alive'&&(other.storageAlias?.rootObjectId??other.id)===root&&
+        address>=other.address&&address+size<=other.address+other.size)this.mark(other,address,size,writer,bitfield,false);
+    }
   }
   bytes(address,size){return [...new Uint8Array(this.memory.buffer,address,Math.min(size,64))].map(b=>b.toString(16).padStart(2,"0")).join("");}
   snapshot(address,size,type) {
@@ -193,6 +280,7 @@ export class ModelRecorder {
     const onePast=!!destination&&offset===destination.size;let width=0;
     try{width=this.abi.layout(type.slice(0,-1)).size;}catch{}
     return {targetObjectId:destination?.id??null,targetOffset:offset,onePast,
+      ...(destination?.storageEvidence?.objectBounds==='unknown'?{objectBounds:'unknown',boundsEvidence:'mapped linked-data bytes; C object bounds unknown'}:{}),
       status:!value?'null':!destination?'unknown':destination.lifecycle!=='alive'?'ended':onePast?'one-past':offset<0||offset>=destination.size?'out-of-bounds':'in-bounds',
       dereferenceable:!!destination&&destination.lifecycle==='alive'&&width>0&&offset>=0&&offset+width<=destination.size,
       evidence:origin?'observed pointer origin':'address lookup'};
@@ -203,6 +291,11 @@ export class ModelRecorder {
     if(destination)this.view(destination,value,base);
     this.references.set(`${object.id}:${address-object.address}`,{objectId:object.id,offset:address-object.address,...(isFunctionPointer(type)?{}:{address:value}),
       ...target,type,eventId:event.eventId});
+    const root=object.storageAlias?.rootObjectId??object.id;
+    for(const other of this.objects)if(other!==object&&other.lifecycle==='alive'&&(other.storageAlias?.rootObjectId??other.id)===root&&
+      address>=other.address&&address+4<=other.address+other.size){
+      this.references.set(`${other.id}:${address-other.address}`,{...this.references.get(`${object.id}:${address-object.address}`),objectId:other.id,offset:address-other.address});
+    }
     if(event.value&&event.target?.objectId===object.id&&event.target.address===hex(address))event.value.reference=target;
   }
   copyPointerOrigins(objectId,offset,size,destination){
@@ -239,6 +332,9 @@ export class ModelRecorder {
     if(op.flags?.nuw){const n=calculate(ua,ub);if(n!==null&&(n<0||n>=(1n<<BigInt(bits))))this.fault("unsigned-poison","컴파일러의 정수 연산 전제 조건을 위반했습니다.",op);}
   }
   emit=(index,phase,address,size,x,y)=>{
+    // Send only between hooks: the preceding hook's object and value changes
+    // must be complete before its events and state are transferred together.
+    if(this.batch.length>=256)this.flush();
     if(index===-1){this.nativeMemory(phase,address,size);return;}
     const op=this.plan.instructions[index-1];if(!op)throw new Error(`알 수 없는 명령 ${index}`);
     x=unsigned(x);y=unsigned(y);address>>>=0;size>>>=0;
@@ -255,6 +351,7 @@ export class ModelRecorder {
       }
       if(pending?.nativeWrites?.size)this.recordNativeWrites(pending.operation,pending,null);
       const parent=this.frame(),frame={id:`f${this.frames.length+1}`,functionId:op.functionId,functionName:op.functionName,parent:parent?.id??null,
+        variadic:op.variadic,fixedParameterCount:op.fixedParameterCount,
         ended:false,definitions:new Map(),origins:new Map(),allocations:new Map(),selects:new Map(),calls:new Map(),sourceDecisions:new Map(),block:op.block??"entry"};
       if(pending?.operation.external)frame.callbackOfCallEventId=pending.event.eventId;
       this.frames.push(frame);this.stack.push(frame);this.event("SPACE",op,{action:"frame.begin",frameId:frame.id,callbackOfCallEventId:frame.callbackOfCallEventId});this.event("FLOW",op,{action:"enter",frameId:frame.id});return;
@@ -285,13 +382,16 @@ export class ModelRecorder {
       if(p.byval){const address=this.address(x),type=p.type.slice(0,-1),size=this.abi.layout(type).size,sourceAddress=call?this.address(call.args[p.index]):null,source=call&&this.lookup(sourceAddress,size),offset=source?sourceAddress-source.address:0;
         const initialRanges=source?this.segments(source,offset,size).map(r=>({...r,start:r.start-offset,end:r.end-offset})):[{start:0,end:size,writer:"unobserved"}];
         const origins=source?this.copyPointerOrigins(source.id,offset,size,address):null;
+        const dataInputs=[...new Set(initialRanges.map(r=>r.writer).filter(id=>id&&id!=='unobserved'))];
         const object=this.create(address,size,op,{storage:"automatic",name:op.local?.name,type,cType:op.cType,debugTypeId:op.local?.debugTypeId,
-          initialRanges,copiedFrom:source?{objectId:source.id,offset,size}:null});
+          initialRanges,copiedFrom:source?{objectId:source.id,offset,size,dataInputs,valueObservationId:source.valueProducedBy??null}:null});
+        e.dataInputs=[...dataInputs,...source?.valueProducedBy?[source.valueProducedBy]:[]];
         this.refreshPointers(object,address,size,e,origins);
         if(!source)this.coverageGaps.add("byval-initialization-source-unobserved");
         frame.origins.set(p.value,object);
       }else if(p.type.endsWith("*")){
-        const origin=call&&(parent.origins.get(argument?.value)??this.globalsBySymbol.get(argument?.value));
+        const reference=call?.event?.arguments[p.index]?.reference,
+          origin=call&&(parent.origins.get(argument?.value)??this.globalsBySymbol.get(argument?.value)??this.objects.find(o=>o.id===reference?.targetObjectId));
         if(!isFunctionPointer(p.type))frame.origins.set(p.value,origin??this.lookup(this.address(x),0));
         e.value.reference=this.pointerTarget(this.address(x),p.type,origin);
       }
@@ -322,6 +422,16 @@ export class ModelRecorder {
       const object=frame.origins.get(op.pointer.value)??this.lookup(address,0);
       this.event("SPACE",op,{action:"declaration",objectId:object?.id??null,address:hex(address),
         evidence:"observed source declaration"});return;
+    }
+    if(op.action==='source.alias'){
+      const backing=this.lookup(address,size);
+      if(!backing)this.fault('source-storage-binding','지역 객체와 반환 저장소를 연결하지 못했습니다.',op);
+      const object=this.create(address,size,op,{storage:'automatic',name:op.local.name,type:op.type,cType:op.cType,debugTypeId:op.local.debugTypeId});
+      object.storageAlias={objectId:backing.id,rootObjectId:backing.storageAlias?.rootObjectId??backing.id,address:hex(address),size,
+        offset:address-backing.address,
+        evidence:'compiler dbg.declare on sret parameter; shared physical storage, distinct source lifetime'};
+      this.events.at(-1).storageAlias=object.storageAlias;
+      frame.origins.set(op.pointer.value,object);return;
     }
     if(op.action==="call"){this.call(op,phase,x);return;}
     if(op.action==="load"||op.action==="store") {
@@ -355,7 +465,8 @@ export class ModelRecorder {
           const memoryState=previous?.target?.address===hex(address)&&previous.target.size===size&&previous.memoryState||
             this.captureMemory(address,size,segments.map(s=>({...s,start:s.start-offset,end:s.end-offset})));
           aggregate={value:{kind:'aggregate',type:info.type,cType:info.cType,byteLength:size,evidence:'observed return storage'},memoryState,
-            sourceObjectId:object.id,sourceAddress:hex(address),sourceOffset:offset,sourceSize:size,dataInputs:writers};
+            sourceObjectId:object.id,sourceAddress:hex(address),sourceOffset:offset,sourceSize:size,dataInputs:writers,
+            ...(object.storageAlias?{returnStorage:object.storageAlias}:{})};
         }else this.coverageGaps.add('aggregate-return-storage-unobserved');
       }
       const returned=aggregate||op.type!=="void"?this.event("WRITE",op,{action:"return.value",
@@ -366,6 +477,8 @@ export class ModelRecorder {
         if(frame.callbackOfCallEventId)(parent.activeCall.callbackReturnEventIds??=[]).push(returned.eventId);
         else {parent.activeCall.returnEventId=returned.eventId;if(op.type.endsWith('*'))parent.activeCall.returnOrigin=this.origin(op.inputs[0]);}
       }
+      if(aggregate){const physical=this.objects.find(o=>o.id===(aggregate.returnStorage?.objectId??aggregate.sourceObjectId));
+        if(physical)physical.valueProducedBy=returned.eventId;}
       this.event("FLOW",op,{action:"return",frameId:frame.id});for(const o of this.objects.filter(o=>o.frameId===frame.id))this.end(o,op,"function-return");
       this.event("SPACE",op,{action:"frame.end",frameId:frame.id});frame.ended=true;this.stack.pop();return;
     }
@@ -449,7 +562,8 @@ export class ModelRecorder {
       call.event=this.event("FLOW",op,{action:"call.begin",callee:op.callee,indirectAddress:op.callee[0]==="%"?hex(x):null,
         ...(indirect?{indirectTableIndex:this.address(x),functionTarget,calleeInputs,
           resolvedFunctionId:functionTarget.functionId,resolvedFunctionName:functionTarget.functionName}:{}),
-        arguments:op.args.map((a,i)=>this.semanticValue(this.scalar(a.type,call.args[i]??0n),a.cType??this.inputEvent(a)?.value?.cType)),
+        arguments:op.args.map((a,i)=>{const bits=call.args[i]??0n,value=this.semanticValue(this.scalar(a.type,bits),a.cType??this.inputEvent(a)?.value?.cType);
+          if(a.type.endsWith('*'))value.reference=this.pointerTarget(this.address(bits),a.type,this.origin(a));return value;}),
         dataInputs:[...new Set([...this.inputs(op),...calleeInputs])],controlInputs:frame.sourceDecisions.get(op.id)??[],external:op.external});
       frame.sourceDecisions.delete(op.id);
       frame.activeCall=call;
@@ -466,8 +580,19 @@ export class ModelRecorder {
       if(op.external&&["strcpy","strncpy","strcat"].includes(name))call.stringEffect=this.prepareStringEffect(op,call,name);
       return;
     }
+    const bufferReads=[...(call.bufferReads?.values()??[])],streamReads=bufferReads.filter(r=>r.origin==='stream-arrival'),
+      libraryReads=bufferReads.filter(r=>r.origin!=='stream-arrival');
+    call.libraryReadInputs=[...new Set(libraryReads.flatMap(r=>r.dataInputs))];
+    const consumed=streamReads.length?this.event('READ',op,{action:'input',inputStage:'buffer-read',channel:'stdin',
+      streamReadRegions:streamReads,dataInputs:[...new Set(streamReads.flatMap(r=>r.dataInputs))],callEventId:call.event.eventId,
+      evidence:'observed stream-backed memory reads; not a guessed logical token length'}):null;
+    call.inputReadEventId=consumed?.eventId;
     const e=this.event("FLOW",op,{action:"call.end",callee:op.callee,value:this.semanticValue(this.scalar(op.returnType,x),op.cType),callEventId:call.event.eventId,
-      dataInputs:[call.returnEventId,...(call.callbackReturnEventIds??[]),...this.nativeReadInputs(call)].filter(Boolean),readRegions:this.nativeReadRegions(call)});
+      dataInputs:[call.returnEventId,...(call.callbackReturnEventIds??[]),...this.nativeReadInputs(call),...(call.inputEvents??[]),consumed?.eventId,...call.libraryReadInputs].filter(Boolean),
+      readRegions:this.nativeReadRegions(call),...(libraryReads.length?{libraryReadRegions:libraryReads}:{})});
+    // Later buffer reads depend on the completed writer's observed effects as
+    // well as its arguments. A call-begin alone cannot link newly arrived data.
+    for(const origin of call.writeOrigins?.values()??[]){origin.eventId=e.eventId;origin.callEventId=call.event.eventId;}
     if(op.result)frame.definitions.set(op.result,e);
     const a=i=>this.address(call.args[i]??0n),returned=this.address(x),allocates=["malloc","calloc","realloc"].includes(name);
     if(allocates) {
@@ -491,22 +616,37 @@ export class ModelRecorder {
     } else if(name==="memset"||name.startsWith("llvm.memset")) {
       const object=this.lookup(a(0),a(2)),event=this.event("WRITE",op,{action:"fill",target:{objectId:object?.id??null,address:hex(a(0)),offset:object?a(0)-object.address:null,size:a(2)},
         byte:a(1)&255,memoryState:filledMemory(a(2),a(1)&255),evidence:"library API effect"});this.mark(object,a(0),a(2),event.eventId);
-    } else if(name.startsWith("llvm.va_start")) {const object=this.lookup(a(0));if(object)this.mark(object,a(0),object.address+object.size-a(0),e.eventId);}
+    } else if(name.startsWith("llvm.va_start")) {const object=this.lookup(a(0));if(object)this.mark(object,a(0),object.address+object.size-a(0),e.eventId);this.registerVarargs(op,call);}
     else if(["scanf","__isoc99_scanf","sscanf","fscanf"].includes(name)&&!this.nativeMemoryCoverage)this.scanf(op,call,x);
     else if(name==="fgets"&&returned) {
       const object=this.lookup(returned),s=this.cstring(returned,Math.min(a(1),object?object.address+object.size-returned:a(1))),size=s.length+(s.terminated?1:0);
       this.check(returned,size,op,{write:true});const written=this.event("WRITE",op,{action:"input",target:{objectId:object?.id??null,address:hex(returned),offset:object?returned-object.address:null,size},
-        memoryState:this.captureMemory(returned,size),dataInputs:call.inputEvents??[],callEventId:call.event.eventId,evidence:"library API effect"});this.mark(object,returned,size,written.eventId);
+        memoryState:this.captureMemory(returned,size),dataInputs:[...(call.inputEvents??[]),consumed?.eventId].filter(Boolean),callEventId:call.event.eventId,evidence:"library API effect"});this.mark(object,returned,size,written.eventId);
     }
     else if(this.nativeMemoryCoverage){
       this.recordNativeWrites(op,call,e);
-      if(op.returnType.endsWith('*')&&!isFunctionPointer(op.returnType)&&returned&&!call.returnOrigin&&!this.lookup(returned,0)){
+      if(op.returnType.endsWith('*')&&!isFunctionPointer(op.returnType)&&returned&&!call.returnOrigin&&!this.lookup(returned,0)&&!this.linkedStorage(returned,op)){
         this.coverageGaps.add('external-return-storage-untracked');e.uncertainRegions=[{address:hex(returned),reason:'returned storage has no observed allocation contract'}];
       }
     }
     else if(op.external&&!name.startsWith("llvm.")&&!["free","strlen","strcmp","strncmp","memcmp","printf","fprintf","puts","fputs","putchar","fputc","fgetc","getchar","clock","ferror","fflush","vfprintf","exit","abort"].includes(name)){
       this.coverageGaps.add(`external-effects:${name}`);e.uncertainRegions=[];
       for(const [index,arg]of op.args.entries())if(arg.type.endsWith("*")){const address=a(index),object=this.lookup(address);if(object&&!object.constant){const size=object.address+object.size-address;this.mark(object,address,size,"unobserved");e.uncertainRegions.push({objectId:object.id,address:hex(address),size});}}
+    }
+    if(call.returnEventId){const value=this.events[Number(call.returnEventId.slice(1))-1];
+      if(value?.value?.kind==='aggregate'){const physical=this.objects.find(o=>o.id===(value.returnStorage?.objectId??value.sourceObjectId));
+        if(physical)physical.valueProducedBy=e.eventId;}
+    }
+    if(op.external){const slot=op.args.findIndex(a=>a.sret);
+      if(slot>=0){const address=a(slot),type=op.args[slot].type.slice(0,-1),size=this.abi.layout(type).size,object=this.lookup(address,size);
+        if(object){const offset=address-object.address,segments=this.segments(object,offset,size);
+          e.backendValue=e.value;e.value={kind:'aggregate',type,cType:op.cType,byteLength:size,evidence:'observed external return storage'};
+          Object.assign(e,{memoryState:this.captureMemory(address,size,segments.map(r=>({...r,start:r.start-offset,end:r.end-offset}))),
+            sourceObjectId:object.id,sourceAddress:hex(address),sourceOffset:offset,sourceSize:size,
+            dataInputs:[...new Set(segments.map(r=>r.writer).filter(id=>id&&id!=='unobserved'))]});
+          object.valueProducedBy=e.eventId;
+        }
+      }
     }
     // A call-site SSA name is reused on each loop iteration. Its current
     // return must replace the prior invocation's origin, including null and
@@ -538,15 +678,13 @@ export class ModelRecorder {
     }}catch(error){if(!(error instanceof TraceStopped))throw error;}
     const status=this.status??"completed";
     this.flush();
-    const edges=[...this.references.values()],groups=[];
-    for(const type of new Set(this.views.filter(v=>v.kind==="record").map(v=>v.type))){const nodes=this.views.filter(v=>v.type===type),links=[];
-      for(const edge of edges){const from=nodes.find(v=>v.objectId===edge.objectId&&edge.offset>=v.offset&&edge.offset+4<=v.offset+v.size),to=nodes.find(v=>v.objectId===edge.targetObjectId&&v.address===edge.address);if(from&&to)links.push({from:from.id,to:to.id,offset:edge.offset});}
-      groups.push({type,nodes:nodes.map(v=>v.id),edges:links,...topology(nodes,links),snapshot:"last observed references, including ended objects"});}
+    const edges=[...this.references.values()];
     return {schemaVersion:2,programId:this.plan.programId,runId:this.runId,backend:this.plan.backend,status,exitCode:execution.exitCode,
       events:this.events,objects:this.objects.map(({writes,bitWrites,...o})=>({...o,initializationRanges:writes,bitInitializationRanges:bitWrites})),
-      frames:this.frames.map(({definitions,origins,allocations,selects,calls,activeCall,sourceDecisions,stackSaves,...f})=>f),views:this.views,references:edges,structures:groups,
+      frames:this.frames.map(({definitions,origins,allocations,selects,calls,activeCall,sourceDecisions,stackSaves,...f})=>f),views:this.views,references:edges,structures:[],
       diagnostics:this.diagnostics,coverage:{...this.plan.coverage,
         ...(this.nativeMemoryCoverage?{linkedMemory:this.nativeMemoryCoverage,memory:'user LLVM accesses and linked WASM scalar accesses to tracked objects; allocation contracts remain explicit',libraryInternals:'linked scalar memory reads/stores observed; library arithmetic and source frames are not instrumented'}:{}),
+        ...this.observationStorage.summary(),maxObservationBytes:this.maxObservationBytes,
         memorySnapshots:this.memorySnapshots.summary(),gaps:[...this.coverageGaps]}};
   }
 }

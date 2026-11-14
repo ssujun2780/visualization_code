@@ -1,34 +1,68 @@
 import {Worker} from "node:worker_threads";
-import {recordIR} from "./ir-record.mjs";
+import {partialResult} from "./partial-result.mjs";
 import {validateSource} from "./compile.mjs";
 export {describeLogicalWork} from './presentation-contract.mjs';
 
-export function traceModel(source,options={}){return runWorker(source,options,"trace");}
+export function traceModel(source,{inference,...options}={}){
+  if(inference===true)throw new Error('자료구조 추론은 scripts/inference/index.mjs에서 별도로 실행하거나 traceWithInference를 사용하십시오.');
+  return runWorker(source,options,"trace");
+}
 export function compileCToIR(source,options={}){return runWorker(source,options,"compile");}
 
 function runWorker(source,{timeoutMs=25000,...options}={},mode) {
   validateSource(source);
   if(!Number.isInteger(timeoutMs)||timeoutMs<100||timeoutMs>120000)throw new Error("시간 제한은 100~120000ms여야 합니다.");
   if(options.maxEvents!==undefined&&(!Number.isInteger(options.maxEvents)||options.maxEvents<1||options.maxEvents>1000000))throw new Error("사건 제한은 1~1000000개여야 합니다.");
+  if(options.maxObservationBytes!==undefined&&(!Number.isInteger(options.maxObservationBytes)||options.maxObservationBytes<65536||options.maxObservationBytes>67108864))throw new Error('관찰 기록 바이트 제한은 65536~67108864여야 합니다.');
   return new Promise((resolve,reject)=>{
     const worker=new Worker(new URL("./worker.mjs",import.meta.url),{workerData:{source,options,mode},execArgv:[]});
-    let prepared={},events=[],done=false;
+    let prepared={},events=[],state={},replayCheckpoint=null,completedExecution=null,done=false,interrupted=false;
     const finish=(result,interrupt=false)=>{if(done)return;done=true;clearTimeout(timer);if(interrupt)void worker.terminate();resolve(result);};
     const fail=error=>{if(done)return;done=true;clearTimeout(timer);void worker.terminate();reject(error);};
+    const finishExecution=message=>{
+      const {type,...execution}=completedExecution,{type:preparedType,observationPlan,...inputs}=prepared;
+      finish({...inputs,...execution,recordingNotice:{stage:'result-delivery',message}},true);
+    };
     const timer=setTimeout(()=>{
       try {
-      const diagnostic={code:"time-limit",message:"컴파일·실행 시간 제한에 도달했습니다. 기록은 마지막 전달된 사건까지 보존됩니다."};
+      interrupted=true;void worker.terminate();
+      if(completedExecution){
+        finishExecution('최종 결과 전달 시간 제한에 도달했습니다. 확정된 실행 기록은 보존됩니다.');
+        return;
+      }
+      const diagnostic={code:"time-limit",message:"컴파일·실행·중간언어 변환 시간 제한에 도달했습니다. 기록은 마지막 전달된 사건까지 보존됩니다."};
       const event={schemaVersion:2,eventId:`e${events.length+1}`,kind:"ERROR",phase:"fault",diagnostic,evidence:"observer"};
-      const observedTrace={schemaVersion:2,status:"limited",exitCode:null,events:[...events,event],diagnostics:[diagnostic],objects:[],frames:[],coverage:{termination:"worker deadline",tail:"up to 255 observations may be unflushed"}};
-      const trace=prepared.plan?recordIR(prepared.plan,prepared.observationPlan,observedTrace):
-        {...observedTrace,schemaVersion:3,events:[{...event,schemaVersion:3,eventId:"x1",executionId:"x1",action:"fault",phase:"failed"}]};
-      const {observationPlan,type,...info}=prepared;
-      finish({...info,stdout:"",stderr:"",compilerDiagnostics:"",trace,...(options.includeObservations?{observations:{plan:observationPlan??null,trace:observedTrace}}:{})},true);
+      const observedTrace={schemaVersion:2,objects:[],frames:[],...state,status:"limited",exitCode:null,events:[...events,event],
+        diagnostics:[...state.diagnostics??[],{...diagnostic,eventId:event.eventId}],coverage:{...state.coverage,termination:"worker deadline",tail:"last complete observer checkpoint",finalizationBudgetMs:2000}};
+      if(!prepared.plan){finish(partialResult(prepared,observedTrace,options));return;}
+      // Partial IR conversion also runs off the main thread, with its own
+      // bounded finalization budget. A timeout must not start an unbounded sync
+      // conversion in the caller or discard already delivered stream bytes.
+      const prefix=replayCheckpoint&&events.length>replayCheckpoint.count?replayCheckpoint:null;
+      const replay=prefix?{...observedTrace,...prefix.state,events:[...events.slice(0,prefix.count),{...event,eventId:`e${prefix.count+1}`}],
+        diagnostics:[{...diagnostic,eventId:`e${prefix.count+1}`}],coverage:{...observedTrace.coverage,irPrefixObservations:prefix.count,retainedObservations:events.length,
+          irTail:'retained in observations; bounded deadline finalization'}}:observedTrace;
+      const recovery=new Worker(new URL('./recovery-worker.mjs',import.meta.url),{workerData:{prepared,raw:replay,
+        options:{...options,...(prefix?{retainedRaw:observedTrace}:{})}},execArgv:[]});
+      const fallback=()=>{void recovery.terminate();finish(partialResult(prepared,observedTrace,{...options,skipConversion:true}));};
+      const recoveryTimer=setTimeout(fallback,2000);
+      recovery.once('message',result=>{clearTimeout(recoveryTimer);finish(result);});
+      recovery.once('error',()=>{clearTimeout(recoveryTimer);fallback();});
       }catch(error){fail(error);}
     },timeoutMs);
-    worker.on("message",message=>{if(message.type==="prepared")prepared=message;if(message.type==="observations")events.push(...message.events);
-      if(message.type==="result")finish(message.result);if(message.type==="failure")fail(new Error(message.message));});
-    worker.on("error",fail);
-    worker.on("exit",code=>{if(!done)fail(new Error(`계측 작업이 예기치 않게 종료됐습니다 (${code}).`));});
+    worker.on("message",message=>{if(interrupted||done)return;if(message.type==="prepared"){
+      prepared=message;replayCheckpoint={count:0,state:{objects:[],frames:[],views:[],references:[]}};
+    }if(message.type==="observations"){
+      events.push(...message.events);state=message.state??state;
+      if(events.length<=8192&&(state.coverage?.observationBytes??0)<=4194304)replayCheckpoint={count:events.length,state};
+    }
+      if(message.type==='execution')completedExecution=message;
+      if(message.type==="result")finish(message.result);if(message.type==="failure"){
+        if(completedExecution)finishExecution(message.message);
+        else{const {type,...details}=message;fail(Object.assign(new Error(message.message),details));}
+      }});
+    worker.on("error",error=>{if(!interrupted){if(completedExecution)finishExecution(error.message);else fail(error);}});
+    worker.on("exit",code=>{if(!done&&!interrupted){const message=`계측 작업이 예기치 않게 종료됐습니다 (${code}).`;
+      if(completedExecution)finishExecution(message);else fail(new Error(message));}});
   });
 }

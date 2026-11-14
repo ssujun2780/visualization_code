@@ -18,7 +18,8 @@ export function createAddressBoundaryTest(plan,nodes){
   };
 }
 export function bindGuardConditions(plan,observations,{nodes,nearest,types,sourceMap,tree,add}){
-  const needsAddress=createAddressBoundaryTest(plan,nodes),ownership=createExpressionOwnership(observations,nearest,nodes);
+  const needsAddress=createAddressBoundaryTest(plan,nodes),ownership=createExpressionOwnership(observations,nearest,nodes),
+    byNode=new Map(nodes.map(n=>[n.id,n]));
   const materialized=new Set(Object.values(plan.bindings).filter(b=>['result','folded'].includes(b.evaluation?.role)).map(b=>b.evaluation.nodeId)),
     producers=new Map(observations.instructions.filter(o=>o.result).map(o=>[`${o.functionId}:${o.result}`,o]));
   plan.conditionGuards=[];plan.conditionConsumers=[];
@@ -39,7 +40,21 @@ export function bindGuardConditions(plan,observations,{nodes,nearest,types,sourc
         (nearest(o,n=>n===root)||nearest(producers.get(`${o.functionId}:${o.inputs[0]?.value}`)??o,n=>n===root)));
       for(const o of tests){
         const b=plan.bindings[o.id];if(b.administrative)continue;
-        const fields={operator:'truth',sourceNodeId:root.id,expression:tree(root),cType:types.spelling('int'),grouping:'expression',conditionTest:true},
+        // A source expression already computes the numeric value tested by
+        // this compiler-only conversion. Keep that CALC (including its type
+        // and value), and let FLOW consume the observed truth conversion.
+        const sourceCalc=plan.instructions.find(d=>d.kind==='CALC'&&d.sourceNodeId===root.id&&d.operator&&d.operator!=='truth');
+        if(sourceCalc){
+          b.administrative=true;delete b.group;
+          for(const consumer of observations.instructions.filter(c=>c.functionId===o.functionId&&c.action==='branch'&&c.inputs?.[0]?.value===o.result))
+            plan.bindings[consumer.id].sourceCondition={invert:false,cType:types.spelling('int')};
+          continue;
+        }
+        // Reused CALCs can still point at the LLVM operand's token (e.g. p).
+        // Keep the semantic AST expression and its full display range together.
+        const source=sourceMap.range(root.source,{text:true}),
+          fields={operator:'truth',sourceNodeId:root.id,expression:tree(root),cType:types.spelling('int'),grouping:'expression',conditionTest:true,
+            ...(source?{source}:{})},
           existing=plan.instructions.find(d=>d.id===b.roles.CALC&&d.kind==='CALC'&&!d.operator),
           calc=existing?Object.assign(existing,fields):add(`condition:truth:${root.id}`,'CALC','expression',o,root,fields);
         b.group=calc.id;b.roles.CALC=calc.id;b.expressionNodeId=root.id;b.sourceOperator='truth';
@@ -73,9 +88,25 @@ export function bindGuardConditions(plan,observations,{nodes,nearest,types,sourc
       tree:shape(root),invert,pure,source:sourceMap.range(root.source),rightSource:sourceMap.range(root.children[1].source),cType:types.spelling('int'),blocks:[...blocks],
       ...(conditional?{conditionalNodeId:owner.id}:{})};
     plan.conditionGuards.push(spec);
-    const leafAt=(n,p)=>{n=unwrap(n);if(!operator(n))return n;const child=n.children.find(c=>inside(c.source,p));return child?leafAt(child,p):null;};
+    const leaves=n=>{n=unwrap(n);return operator(n)?n.children.flatMap(leaves):[n];},leafNodes=leaves(root);
+    const contains=(parent,node)=>{for(let at=node;at;at=at.parent)if(at===parent)return true;return false;};
+    const leafAt=(o)=>{
+      // Macro expansion locations can cover both operands. Follow the
+      // compiler's semantic identity and SSA producer before source ranges.
+      let current=o;const seen=new Set();
+      while(current&&!seen.has(current.id)){
+        seen.add(current.id);const semantic=byNode.get(current.semanticNodeId);
+        if(semantic){const matches=leafNodes.filter(n=>contains(n,semantic));if(matches.length===1)return matches[0];}
+        const binding=plan.bindings[current.id],node=byNode.get(binding?.expressionNodeId);
+        if(node){const matches=leafNodes.filter(n=>contains(n,node));if(matches.length===1)return matches[0];}
+        if(!['icmp','fcmp','zext','sext','trunc'].includes(current.opcode))break;
+        current=producers.get(`${current.functionId}:${current.inputs?.[0]?.value}`);
+      }
+      const matches=leafNodes.filter(n=>inside(n.source,o?.source));
+      return matches.length===1?matches[0]:null;
+    };
     for(const o of branches){
-      const p=producers.get(`${o.functionId}:${o.inputs[0]?.value}`),leaf=leafAt(root,p?.source??o.source),b=plan.bindings[o.id];
+      const p=producers.get(`${o.functionId}:${o.inputs[0]?.value}`),leaf=leafAt(p??o),b=plan.bindings[o.id];
       if(!leaf)continue;
       b.guardDecision={nodeId:root.id,leafNodeId:leaf.id,completeTargets:o.destinations.filter(d=>!blocks.has(d))};
       b.evaluation={nodeId:root.id,role:'decision'};b.administrative=true;

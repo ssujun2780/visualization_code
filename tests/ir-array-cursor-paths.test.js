@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {arrayCursorPathStructures,validateArrayCursorPaths} from '../scripts/model/array-cursor-paths.mjs';
+import {arrayCursorPathStructures,validateArrayCursorPaths} from '../scripts/inference/array-cursor-paths.mjs';
 const value=n=>({decimal:String(n)}),scalar={sizeBits:32,signedness:'signed'},row={kind:'array',count:4,sizeBits:128,elementType:scalar};
 function fixture(){
   const events=[],instructions=[],objects=[{id:'a',size:48,createdBy:'a0',endedBy:'end'}];

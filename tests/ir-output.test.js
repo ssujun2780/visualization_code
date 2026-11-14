@@ -10,7 +10,7 @@ function fixture(){
   ],bindings:{printf:{roles:{'FLOW:call.begin':'call','FLOW:call.end':'resume'}}},
     processInstructions:{'WRITE:output':'output','ERROR:fault':'error'},coverage:{}};
   const observations={instructions:[{id:'printf',action:'call',callee:'@printf',args:[],inputs:[],result:'%result'}]};
-  const raw={events:[],status:'completed',coverage:{}},offsets={stdout:0,stderr:0};
+  const raw={events:[],objects:[],frames:[],status:'completed',coverage:{}},offsets={stdout:0,stderr:0};
   let callEventId=null;
   const add=(kind,action,fields={})=>{
     const e={eventId:'e'+(raw.events.length+1),instructionId:'printf',activationId:'f1',kind,action,...fields};
@@ -20,7 +20,7 @@ function fixture(){
     call:()=>{const e=add('FLOW','call.begin',{callee:'@printf',arguments:[]});callEventId=e.eventId;return e;},
     output:(text,fields={})=>{
       const channel=fields.channel??'stdout',byteLength=Buffer.byteLength(text),streamOffset=offsets[channel];
-      const e=add('WRITE','output',{text,channel,byteLength,streamOffset,callEventId,...fields});
+      const e=add('WRITE','output',{text,bytesHex:Buffer.from(text).toString('hex'),channel,byteLength,streamOffset,callEventId,...fields});
       offsets[channel]=e.streamOffset+e.byteLength;return e;
     },
     resume:fields=>add('FLOW','call.end',{callEventId,value:{signed:'0'},...fields}),

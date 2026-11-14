@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {traceModel} from '../scripts/model/index.mjs';
-import {arrayValueDependencies,validateArrayValueDependencies} from '../scripts/model/array-value-dependencies.mjs';
+import {traceWithStructureView as traceModel} from './helpers/structure-runner.mjs';
+import {arrayValueDependencies,validateArrayValueDependencies} from '../scripts/inference/array-value-dependencies.mjs';
 
 async function inspect(source,exitCode){
   const r=await traceModel(source);assert.equal(r.trace.status,'completed',JSON.stringify(r.trace.diagnostics));

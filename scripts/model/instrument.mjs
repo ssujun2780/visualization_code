@@ -1,9 +1,9 @@
 import {createHash} from "node:crypto";
-import {splitTop,typed,operand,metadata,layouts,parseCall} from "./llvm.mjs";
+import {splitTop,typed,operand,metadata,layouts,parseCall,llvmSymbol,llvmLocal,llvmDefinition,llvmName} from "./llvm.mjs";
 import {semanticModel} from "./c-semantics.mjs";
 import {buildIRPlan} from "./ir-plan.mjs";
 
-const symbol="(?:[-\\w.$]+|\"[^\"]+\")";
+const symbol=llvmSymbol;
 export class UnsupportedC extends Error { constructor(message,source){super(message);this.name="UnsupportedC";this.source=source;} }
 
 export function instrumentLLVM(ir,source,{filename="main.c",ast="",parsedNodes,macroTokens,recordLayouts}={}) {
@@ -24,10 +24,11 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast="",parsedNodes,m
   const functions=[];
   for(let i=0;i<lines.length;i++)if(lines[i].startsWith("define ")){
     const m=new RegExp(`@(${symbol})\\(`).exec(lines[i]);if(!m)throw new UnsupportedC("LLVM 함수 정의를 해석하지 못했습니다.");
-    const fn={id:`fn${functions.length+1}`,name:m[1].replace(/^"|"$/g,""),symbol:`@${m[1]}`,start:i,locals:new Map(),allocations:new Map(),pointerAliases:new Map(),lifetimeRoots:new Set()};
+    const fn={id:`fn${functions.length+1}`,name:llvmName(m[1]),symbol:`@${m[1]}`,start:i,locals:new Map(),allocations:new Map(),pointerAliases:new Map(),lifetimeRoots:new Set()};
     const open=m.index+m[0].length;let end=open,level=1;for(;end<lines[i].length;end++){if(lines[i][end]==="(")level++;if(lines[i][end]===")"&&!--level)break;}
     fn.parameters=splitTop(lines[i].slice(open,end)).filter(p=>p&&p!=="...").map((p,index)=>({...operand(p),index,byval:/\bbyval\b/.test(p),sret:/\bsret\b/.test(p)}));
     const header=lines[i].slice(0,m.index).trim();let returnType;
+    fn.llvmLinkage=/^define\s+(private|internal|available_externally|linkonce_odr|linkonce|weak_odr|weak|common|appending|extern_weak|external)\b/.exec(header)?.[1]??'external';
     for(const start of [0,...[...header.matchAll(/\s+/g)].map(m=>m.index+m[0].length)]){
       try{const p=typed(header.slice(start));if(!p.value){returnType=p.type;break;}}catch{}
     }
@@ -37,12 +38,12 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast="",parsedNodes,m
       const d=/@llvm\.dbg\.declare\(metadata (.*?), metadata !(\d+),/.exec(lines[i]);
       if(d){const p=operand(d[1]),argument=Number(meta.field(d[2],"arg")??0);fn.locals.set(p.value,{name:meta.clean(meta.field(d[2],"name")),debugTypeId:`debug:${meta.clean(meta.field(d[2],"type"))}`,scopeId:meta.clean(meta.field(d[2],"scope")),source:meta.location(d[2]),sourceParameterIndex:argument?argument-1:null,
         compilerGenerated:/\bDIFlagArtificial\b/.test(meta.nodes.get(d[2])??'')});}
-      const cast=/^\s*(%[-\w.$]+) = bitcast .*? (%[-\w.$]+) to /.exec(lines[i]);
+      const cast=new RegExp(`^\\s*(${llvmLocal}) = bitcast .*? (${llvmLocal}) to `).exec(lines[i]);
       if(cast)fn.pointerAliases.set(cast[1],fn.pointerAliases.get(cast[2])??cast[2]);
-      const lifetime=/@llvm\.lifetime\.start[^\s(]*\(i64 [^,]+, i8\* (%[-\w.$]+)/.exec(lines[i]);
+      const lifetime=new RegExp(`@llvm\\.lifetime\\.start[^\\s(]*\\(i64 [^,]+, i8\\* (${llvmLocal})`).exec(lines[i]);
       if(lifetime)fn.lifetimeRoots.add(fn.pointerAliases.get(lifetime[1])??lifetime[1]);
     }
-    fn.end=i;functions.push(fn);plan.functions.push({id:fn.id,name:fn.name,symbol:fn.symbol});
+    fn.end=i;functions.push(fn);plan.functions.push({id:fn.id,name:fn.name,symbol:fn.symbol,llvmLinkage:fn.llvmLinkage});
   }
   if(!functions.some(f=>f.name==="main"))throw new UnsupportedC("main 함수 정의가 필요합니다.");
   const add=(kind,fields={})=>{const op={id:`m${plan.instructions.length+1}`,index:plan.instructions.length+1,kind,...fields};plan.instructions.push(op);return op;};
@@ -81,7 +82,7 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast="",parsedNodes,m
     if(definitions.has(i)) {fn=definitions.get(i);block="entry";entry=true;out.push(line);continue;}
     if(!fn){out.push(line);continue;}
     if(line==="}"){flushPhi();out.push(line);fn=null;continue;}
-    const label=/^([-\w.$]+):/.exec(line);
+    const label=new RegExp(`^(${symbol}):`).exec(line);
     if(label){flushPhi();block=label[1];out.push(line);continue;}
     const trimmed=line.trim();if(!trimmed||trimmed.startsWith(";")){out.push(line);continue;}
     if(entry) {
@@ -93,7 +94,8 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast="",parsedNodes,m
         for(const global of plan.globals){const op=add("SPACE",{action:"global.begin",global});out.push(...emit(op,1,{pointer:{type:`${global.type}*`,value:global.symbol},size:global.size}));}
         out.push(...emit(add("SPACE",{action:"globals.ready"}),1));
       }
-      const enter=add("FLOW",{action:"function.enter",functionId:fn.id,functionName:fn.name});
+      const enter=add("FLOW",{action:"function.enter",functionId:fn.id,functionName:fn.name,fixedParameterCount:fn.parameters.length,
+        variadic:fn.pointerType.includes('...')});
       out.push(...emit(enter,1));entry=false;
       for(const parameter of fn.parameters){let local=fn.locals.get(parameter.value);
         if(!local)for(const candidate of lines.slice(fn.start+1,fn.end)){
@@ -103,7 +105,7 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast="",parsedNodes,m
         const op=add("WRITE",{action:"function.argument",functionId:fn.id,parameter,local,cType:semantics.types.debug(local?.debugTypeId)}),code=[];
         emit(op,1,{x:pack(parameter.type,parameter.value,code)},code);out.push(...code);}
     }
-    const m=/^(%[-\w.$]+) = (.*)$/.exec(trimmed),result=m?.[1],body=m?.[2]??trimmed;
+    const m=llvmDefinition.exec(trimmed),result=m?.[1],body=m?.[2]??trimmed;
     const opcode=/^(?:(?:tail|musttail|notail) )?(\w+)/.exec(body)?.[1];
     if(/\b(?:volatile|atomic|asm)\b/.test(body)||["atomicrmw","cmpxchg","fence","invoke","landingpad","indirectbr","callbr"].includes(opcode))
       throw new UnsupportedC(`기본 모델의 미지원 연산입니다: ${opcode}`,meta.location(/!dbg !(\d+)/.exec(line)?.[1]));
@@ -116,6 +118,7 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast="",parsedNodes,m
     if(opcode!=="phi")flushPhi();
     if(opcode==="alloca") {
       const parts=splitTop(clean.slice(7)),p=typed(parts[0]),layout=abi.layout(p.type),count=parts[1]&&!parts[1].startsWith("align")?operand(parts[1]):{type:"i32",value:"1"};
+      if(p.value)throw new UnsupportedC(`LLVM 할당 자료형을 끝까지 해석하지 못했습니다: ${parts[0]}`,common.source);
       operation=op("SPACE",{action:"object.begin",type:p.type,size:layout.size,local:fn.locals.get(result),count});
       operation.lifetimeManaged=fn.lifetimeRoots.has(result);
       fn.allocations.set(result,operation);
@@ -141,6 +144,11 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast="",parsedNodes,m
           allocation.declarationObservationId=marker.id;
           out.push(...emit(marker,1,{pointer}),line);continue;
         }
+        if(!allocation&&local?.sourceParameterIndex===null&&!local.compilerGenerated&&fn.parameters.some(p=>p.sret&&p.value===pointer.value)){
+          const type=pointer.type.slice(0,-1),marker=op('SPACE',{action:'source.alias',result:undefined,pointer,local,type,
+            cType:semantics.types.debug(local.debugTypeId),size:abi.layout(type).size});
+          out.push(...emit(marker,1,{pointer,size:marker.size}),line);continue;
+        }
       }
       const call=parseCall(clean);
       if(call.callee.startsWith("@llvm.dbg.")){out.push(line);continue;}
@@ -161,7 +169,7 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast="",parsedNodes,m
       }
       operation=op("FLOW",{action:"call",...call,type:call.returnType,inputs:call.args});
       for(const [index,arg] of call.args.entries())emit(operation,10+index,{x:pack(arg.type,arg.value,pre)},pre);
-      const calleeName=call.callee.slice(1).replace(/^"|"$/g,"");operation.external=call.callee[0]==="@"&&!functions.some(f=>f.name===calleeName);
+      const calleeName=llvmName(call.callee.slice(1));operation.external=call.callee[0]==="@"&&!functions.some(f=>f.name===calleeName);
       emit(operation,0,{x:call.callee.startsWith("%")?pack(`${call.returnType} (${call.args.map(a=>a.type).join(", ")})*`,call.callee,pre):"0"},pre);
       if(call.returnType!=="void"&&result)emit(operation,1,{x:pack(call.returnType,result,post)},post);else emit(operation,1,{},post);
     } else if(opcode==="ret") {
@@ -173,8 +181,8 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast="",parsedNodes,m
       emit(operation,1,{x:p?pack(p.type,p.value,pre):"0"},pre);
     } else if(opcode==="switch") {
       const p=operand(clean.slice(7)),first=p.value.indexOf(","),value=p.value.slice(0,first),rest=p.value.slice(first+1);
-      operation=op("FLOW",{action:"switch",inputs:[{type:p.type,value}],destinations:[...rest.matchAll(/label %([-\w.$]+)/g)].map(m=>m[1]),
-        cases:[...rest.matchAll(/i\d+ (-?\d+), label %([-\w.$]+)/g)].map(m=>({value:m[1],destination:m[2]}))});
+      operation=op("FLOW",{action:"switch",inputs:[{type:p.type,value}],destinations:[...rest.matchAll(new RegExp(`label %(${symbol})`,'g'))].map(m=>m[1]),
+        cases:[...rest.matchAll(new RegExp(`i\\d+ (-?\\d+), label %(${symbol})`,'g'))].map(m=>({value:m[1],destination:m[2]}))});
       emit(operation,1,{x:pack(p.type,value,pre)},pre);
     } else if(opcode==="unreachable") {operation=op("FLOW",{action:"unreachable"});emit(operation,1,{},pre);}
     else if(opcode==="getelementptr") {
@@ -196,7 +204,7 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast="",parsedNodes,m
       const p=typed(clean.slice(opcode.length)),at=p.value.lastIndexOf(" to "),input={type:p.type,value:p.value.slice(0,at)},type=p.value.slice(at+4);
       operation=op("CALC",{action:"convert",type,inputs:[input]});emit(operation,1,{x:pack(type,result,post)},post);
     } else if(opcode==="phi") {
-      const p=typed(clean.slice(4)),incoming=[...p.value.matchAll(/\[\s*(.*?), %([-\w.$]+)\s*\]/g)].map(m=>({value:m[1],block:m[2],type:p.type}));
+      const p=typed(clean.slice(4)),incoming=[...p.value.matchAll(new RegExp(`\\[\\s*(.*?), %(${symbol})\\s*\\]`,'g'))].map(m=>({value:m[1],block:m[2],type:p.type}));
       operation=op("CALC",{action:"merge",type:p.type,incoming,inputs:incoming});emit(operation,1,{x:pack(p.type,result,post)},post);
     } else if(opcode==="select") {
       const inputs=splitTop(clean.slice(7)).map(operand);operation=op("CALC",{action:"select",type:inputs[1].type,inputs});

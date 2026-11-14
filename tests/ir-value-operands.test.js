@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {traceModel} from '../scripts/model/index.mjs';
-import {createValueFlow} from '../scripts/model/observed-value-flow.mjs';
+import {createValueFlow} from '../scripts/inference/observed-value-flow.mjs';
 
 async function inspect(source){
   const r=await traceModel(source);assert.equal(r.trace.status,'completed');

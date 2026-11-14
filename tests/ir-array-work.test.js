@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {traceModel} from '../scripts/model/index.mjs';
-import {bindArrayWork,arrayWorkStructures} from '../scripts/model/array-work.mjs';
+import {traceWithStructureView as traceModel} from './helpers/structure-runner.mjs';
+import {bindArrayWork,arrayWorkStructures} from '../scripts/inference/array-work.mjs';
 
 async function inspect(source,stdout){
   const r=await traceModel(source);assert.equal(r.trace.status,'completed',JSON.stringify(r.trace.diagnostics));
@@ -9,7 +9,11 @@ async function inspect(source,stdout){
   assert.equal(r.trace.coverage.memorySnapshots.programReadEventsAdded,0);
   assert.deepEqual(r.trace.coverage.observationAccounting.unexplained,[]);
   const before={objects:r.trace.objects.length,events:r.trace.events.length};
-  bindArrayWork(r.plan);const [work]=arrayWorkStructures(r.plan,r.trace);assert.ok(work);
+  // Consumer views are immutable. Binding helpers operate on an independent
+  // plan, while the returned inference must remain equal to the consumer view.
+  const bindingPlan=structuredClone(r.plan),originalPlan=structuredClone(r.plan);
+  bindArrayWork(bindingPlan);const [work]=arrayWorkStructures(bindingPlan,r.trace);assert.ok(work);
+  assert.deepEqual(r.plan,originalPlan);
   assert.deepEqual(r.trace.structures.find(s=>s.kind==='array-work'),work);
   assert.deepEqual({objects:r.trace.objects.length,events:r.trace.events.length},before);
   for(const a of work.arrays){const existing=r.trace.structures.find(s=>s.id===a.arrayId);assert.ok(existing);assert.deepEqual(a.range,existing.range);}

@@ -1,4 +1,4 @@
-import {operand} from './llvm.mjs';
+import {operand,llvmFunction,llvmName} from './llvm.mjs';
 import {aggregateSources} from './aggregate-bindings.mjs';
 import {compilerInteger} from './source-map.mjs';
 
@@ -13,7 +13,7 @@ export function readAccessBindings({ir,meta,nodes,types,sourceMap,abi}){
   const unwrap=n=>{while(n&&['ParenExpr','ImplicitCastExpr','CStyleCastExpr'].includes(n.kind)&&n.children.length===1)n=n.children[0];return n;};
   const typeOf=n=>n&&types.spelling(n.type,n.canonical);
   const fieldPart=p=>({kind:'member',index:p.index,offsetBits:p.offsetBits,typeId:p.typeId});
-  const append=(base,part,cType)=>base&&({...base,path:[...base.path,part],cType});
+  const append=(base,part,cType)=>base?.rootNodeId&&Array.isArray(base.path)?({...base,path:[...base.path,part],cType}):null;
   const dereference=(base,cType)=>append(base,{kind:'indirect'},cType);
   const update=n=>n?.kind==='UnaryOperator'&&/(?:prefix|postfix) '(?:\+\+|--)'/.test(n.details);
   function access(raw){
@@ -31,7 +31,7 @@ export function readAccessBindings({ir,meta,nodes,types,sourceMap,abi}){
       // The compiler may commute i[p]. The pointer/array operand's type tells
       // us which child produces the address, independently of operand order.
       const child=n.children.find(c=>['pointer','array'].includes(typeOf(c)?.kind));
-      return child?{...pointerValue(child),cType:typeOf(n)}:null;
+      const base=child&&pointerValue(child);return base?{...base,cType:typeOf(n)}:null;
     }
     if(n.kind==='UnaryOperator'&&/prefix '\*'/.test(n.details))return pointerValue(n.children[0]);
     return null;
@@ -108,7 +108,7 @@ export function readAccessBindings({ir,meta,nodes,types,sourceMap,abi}){
   // that identity; user names and LLVM temporary spellings are not classifiers.
   let fn=null;
   for(const line of ir.split('\n')){
-    if(line.startsWith('define '))fn=/@([^ (]+)\(/.exec(line)?.[1]??null;
+    if(line.startsWith('define '))fn=llvmName(llvmFunction.exec(line)?.[1])??null;
     const declaration=/@llvm\.dbg\.declare\(metadata (.*?), metadata !(\d+),/.exec(line);
     if(fn&&declaration){
       const pointer=operand(declaration[1]),argument=Number(meta.field(declaration[2],'arg')??0),
@@ -146,6 +146,20 @@ export function readAccessBindings({ir,meta,nodes,types,sourceMap,abi}){
   }
   function resolve(op,functionName,candidates,preferred){
     if(op.action!=='load')return null;
+    // va_arg's cursor load and payload load share one debug location. Follow
+    // the payload address back through ABI alignment to the cursor load.
+    const vaCandidates=candidates.filter(n=>n.kind==='VAArgExpr');
+    const origins=new Set(),pending=vaCandidates.length?[op.pointer.value]:[],seen=new Set();
+    while(pending.length){const value=pending.pop();if(seen.has(value))continue;seen.add(value);
+      const producer=producers.get(key(functionName,value));if(!producer)continue;
+      if(producer.action==='load'){const base=paths.get(key(functionName,producer.pointer.value));if(base)origins.add(base);
+        const node=byNode.get(producer.semanticNodeId);if(node)origins.add(access(node));}
+      else if(['address','convert','calculate'].includes(producer.action))pending.push(...producer.inputs.map(i=>i.value));
+    }
+    const variadic=vaCandidates.filter(n=>[...origins].some(o=>equal(o,access(n.children[0]))));
+    if(variadic.length===1){const node=variadic[0],type=typeOf(node),layout=type?.kind==='pointer'?op.type.endsWith('*'):
+      type?.encoding==='DW_ATE_float'?op.type===(type.sizeBits===32?'float':'double'):op.type===`i${type?.sizeBits}`;
+      if(layout)return {node,candidates:variadic,cType:type,rootNodeId:node.id};}
     const pointer=paths.get(key(functionName,op.pointer.value));if(!pointer||pointer.backendType!==op.type)return null;
     const matches=candidates.filter(n=>{
       const target=n.kind==='ImplicitCastExpr'&&n.details.includes('<LValueToRValue>')?n.children[0]:

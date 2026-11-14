@@ -27,7 +27,12 @@ export function astNodes(dump) {
       childSlots:[],functionName:parent?.functionName,declarationPoint:{...current},
       spellingRange:points.length?{start:points[0],end:points.at(-1)}:null,
       source:points.length&&points.every(p=>p.file===points[0].file)?{file:points[0].file,start:points[0],end:points.at(-1)}:null};
-    if(node.kind==="FunctionDecl")node.functionName=/\s([^\s']+)\s+'/.exec(details)?.[1];
+    if(node.kind==="FunctionDecl"){
+      node.functionName=/\s([^\s']+)\s+'/.exec(details)?.[1];
+      node.previousDeclarationASTId=/\bprev (0x[0-9a-f]+)\b/.exec(details)?.[1]??null;
+      const specifiers=details.slice(details.lastIndexOf("'")+1);
+      node.functionSpecifiers={inline:/\binline\b/.test(specifiers),storageClass:/\b(static|extern)\b/.exec(specifiers)?.[1]??null};
+    }
     if(node.kind==='MemberExpr'){
       const field=/ (\.|->)(\S*) (0x[0-9a-f]+)(?:\s|$)/.exec(details);
       if(field){node.fieldASTId=field[3];node.memberName=field[2]||null;node.memberAccess=field[1];}

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {arrayStructures} from '../scripts/model/array-views.mjs';
-import {embeddedArrayStructures} from '../scripts/model/embedded-array-views.mjs';
-import {linkedStructures} from '../scripts/model/linked-views.mjs';
+import {arrayStructures} from '../scripts/inference/array-views.mjs';
+import {embeddedArrayStructures} from '../scripts/inference/embedded-array-views.mjs';
+import {linkedStructures} from '../scripts/inference/linked-views.mjs';
 
 const integer={id:'i32',sizeBits:32,signedness:'signed'},record={kind:'record',recordTypeId:'record',sizeBits:96,members:[]},
   pointer={id:'ptr',kind:'pointer',sizeBits:32,pointee:integer};

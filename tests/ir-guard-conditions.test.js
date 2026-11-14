@@ -45,3 +45,33 @@ int main(void){int a=1,b=0,x=0;if(!(a&&b))x=3;printf("%d %d\\n",x,f(2));return 0
   assert.equal(outer.value.decimal,'0');assert.equal(branch.condition.decimal,'1');
   assert.equal(new Set(r.guards.filter(e=>e.activationId!=='f1').map(e=>e.activationId)).size,2);
 });
+
+test('overlapping NULL macro ranges bind each pointer leaf and emit its source branch',async()=>{
+  const r=await inspect(`#include <stdio.h>
+#include <stddef.h>
+int missing(const int *p,const int *q){if(p==NULL||q==NULL)return 1;return 0;}
+int main(void){int a=2,b=3;printf("%d %d %d %d\\n",missing(&a,&b),missing(NULL,&b),missing(&a,NULL),missing(NULL,NULL));return 0;}`,'0 1 1 1\n');
+  assert.deepEqual(r.guards.map(e=>e.value.decimal),['0','1','1','1']);
+  assert.deepEqual(r.guards.map(e=>e.evaluation.right),['evaluated','skipped','evaluated','skipped']);
+  assert.deepEqual(r.branches.map(e=>e.selectedOutcome),['false','true','true','true']);
+  for(const e of r.branches)assert.equal(r.trace.events.find(x=>x.eventId===e.dataInputs[0]).kind,'CALC');
+});
+
+test('numeric conditions retain one source calculation and consume observed truth in FLOW',async()=>{
+  const r=await inspect(`#include <stdio.h>
+#include <stdint.h>
+int masked(uint64_t mask,int shift){if(mask & (UINT64_C(1)<<shift))return 1;return 0;}
+int number(int a,int b){if(a+b)return 1;return 0;}
+int real(double a,double b){if(a*b)return 1;return 0;}
+int main(void){printf("%d %d %d %d %d %d\\n",masked(8,3),masked(8,2),number(3,-1),number(3,-3),real(2,3),real(2,0));return 0;}`,'1 0 1 0 1 0\n');
+  for(const [name,values]of [['masked',['8','0']],['number',['2','0']],['real',null]]){
+    const frames=r.trace.frames.filter(f=>f.functionName===name);
+    for(const [index,frame]of frames.entries()){
+      const work=r.trace.events.filter(e=>e.activationId===frame.id),calcs=work.filter(e=>e.kind==='CALC');
+      assert.equal(calcs.length,1);assert.notEqual(calcs[0].operator,'truth');
+      if(values)assert.equal(calcs[0].value.decimal,values[index]);
+      const branch=work.find(e=>e.action==='branch');assert.ok(branch.dataInputs.includes(calcs[0].eventId));
+      assert.ok(work.indexOf(calcs[0])<work.indexOf(branch));assert.equal(branch.condition.decimal,index?'0':'1');
+    }
+  }
+});

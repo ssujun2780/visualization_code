@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {traceModel} from '../scripts/model/index.mjs';
-import {linkedStructures} from '../scripts/model/linked-views.mjs';
-import {indexedGraphStructures} from '../scripts/model/indexed-graph-views.mjs';
-import {validateStructureOverlays} from '../scripts/model/structure-overlay-contract.mjs';
+import {traceWithStructureView as traceModel} from './helpers/structure-runner.mjs';
+import {linkedStructures} from '../scripts/inference/linked-views.mjs';
+import {indexedGraphStructures} from '../scripts/inference/indexed-graph-views.mjs';
+import {validateStructureOverlays} from '../scripts/inference/structure-overlay-contract.mjs';
 
 async function inspect(source){
   const r=await traceModel(source);

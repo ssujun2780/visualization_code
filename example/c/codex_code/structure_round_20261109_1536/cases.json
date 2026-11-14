@@ -1,0 +1,6571 @@
+{
+  "cases": [
+    {
+      "id": "tree_pool_3",
+      "family": "tree-representations",
+      "style": "pool",
+      "stdout": "5\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "b58373db3c675c3b20cca5fa86249112e144465f41d2dcab84dafa24fd1cbed6",
+      "predictedAt": "2026-11-09T06:42:31.592Z",
+      "fixtureRevision": {
+        "priorSha256": "86e3b1027083ba9e1a06a5a16084e3419b63135220cbcd331ecb3d653a941721",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_fragmented_3",
+      "family": "tree-representations",
+      "style": "fragmented",
+      "stdout": "5\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "33d695b31983c1687ec8ba362b190358983a5da584cb81ff41ac51d53dca8f8b",
+      "predictedAt": "2026-11-09T06:42:31.597Z",
+      "fixtureRevision": {
+        "priorSha256": "2d1ce92c2564c58e2857ba0b9741e262d8fb1b5d3d7e034aa72fe1871b34e806",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_pointer_slots_3",
+      "family": "tree-representations",
+      "style": "pointer_slots",
+      "stdout": "5\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "8d34764eaa1df02086645ac37bb49e7a35b67526e6c477b481032d029f837fa1",
+      "predictedAt": "2026-11-09T06:42:31.600Z",
+      "fixtureRevision": {
+        "priorSha256": "e326a37bb4ed2ad3ee41499a093207a9f8c3a6f414cd5236c97936a7c3fcf589",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_parent_links_3",
+      "family": "tree-representations",
+      "style": "parent_links",
+      "stdout": "5\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "a468a79852107a8c434fd7e723bf69c3a4b555fb86b06a95b530b2d1499143f0",
+      "predictedAt": "2026-11-09T06:42:31.604Z",
+      "fixtureRevision": {
+        "priorSha256": "550e51d340c575e3bd478e6e4ecf708a0a630ae5c85e3b490c3a9e8d9593db3f",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_record_index_3",
+      "family": "tree-representations",
+      "style": "record_index",
+      "stdout": "5\n",
+      "targets": [
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "edeb48b28038b3bbf29d8b6bc6ce021d6e44b8ad7701c45a7c17b4d2f1d49f51",
+      "predictedAt": "2026-11-09T06:42:31.608Z",
+      "fixtureRevision": {
+        "priorSha256": "e18025d873a1faf02b54aab0d529538aca122fc04511ac2ff2d567249459b7df",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_record_slots_3",
+      "family": "tree-representations",
+      "style": "record_slots",
+      "stdout": "5\n",
+      "targets": [
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "58e898919233dcf5641db85678fdda8591caf37e97f12c8a221ebae36df02245",
+      "predictedAt": "2026-11-09T06:42:31.611Z",
+      "fixtureRevision": {
+        "priorSha256": "00cac706a8fa2994030a680049e7f2825903e7f39a54bfb78add5c312b095bee",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_soa_iter_3",
+      "family": "tree-representations",
+      "style": "soa_iter",
+      "stdout": "5\n",
+      "targets": [
+        "left",
+        "values"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "820d05ec1b561c92e69dd2bc49f40033f8a3ecb0a1614743be6e14979f3ebe91",
+      "predictedAt": "2026-11-09T06:42:31.613Z",
+      "fixtureRevision": {
+        "priorSha256": "4eeab3220d666d0dd8f0d35a83276d41367e6f053ada797163f51f90598a0f90",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_index_offset_3",
+      "family": "tree-representations",
+      "style": "index_offset",
+      "stdout": "5\n",
+      "targets": [
+        "a",
+        "val"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "5245fdd6e036ebfb2a3b01833205a910276736854f8e020d2fb34fe75f23e3f2",
+      "predictedAt": "2026-11-09T06:42:31.616Z",
+      "fixtureRevision": {
+        "priorSha256": "57758a38dc3a693bd2bd642d94112b22302be9faacc06476d869763e3dcd5257",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_lcrs_3",
+      "family": "tree-representations",
+      "style": "lcrs",
+      "stdout": "5\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "9768b3f580a77984cba0b6fe01ac5fefd763bf00b97b20149c8db15cff943f2f",
+      "predictedAt": "2026-11-09T06:42:31.620Z",
+      "fixtureRevision": {
+        "priorSha256": "8f05c985c67f5f0c497bd5afef9f979c0d7286282a015ad4cba972969b014da2",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_byte_offset_3",
+      "family": "tree-representations",
+      "style": "byte_offset",
+      "stdout": "5\n",
+      "targets": [
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "3e25f24e0afebd77743331cbade51f11c2ea862273df27cb1f46f023229caf8f",
+      "predictedAt": "2026-11-09T06:42:31.623Z",
+      "fixtureRevision": {
+        "priorSha256": "0f94117c3e15a9d963c10b918767832ac52362f0aa369bd30f4aab75ce6711d1",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_pool_6",
+      "family": "tree-representations",
+      "style": "pool",
+      "stdout": "34\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 6,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "e905e69141976fcfb0bf8561dee9f3175869244f658f99db195c40b4d3e6e3e8",
+      "predictedAt": "2026-11-09T06:42:31.627Z",
+      "fixtureRevision": {
+        "priorSha256": "0519bca719d67dbe7988e0d5839080d1ff695da5a539a8d989bb1916c35cc98d",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_fragmented_6",
+      "family": "tree-representations",
+      "style": "fragmented",
+      "stdout": "34\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 6,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "8b8354cd067efd7663e32d0f3cf22af22cba3d91d8a15d839be50a32f2da7d6c",
+      "predictedAt": "2026-11-09T06:42:31.631Z",
+      "fixtureRevision": {
+        "priorSha256": "6d4d856537864749672b44ec121dc60b22966df0ac5f1a61fef102e50649b733",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_pointer_slots_6",
+      "family": "tree-representations",
+      "style": "pointer_slots",
+      "stdout": "34\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 6,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "19414ca20d2d24003e76ca947338f1e9baefbdc1fa147b2aaf732bc38754ee7c",
+      "predictedAt": "2026-11-09T06:42:31.635Z",
+      "fixtureRevision": {
+        "priorSha256": "26ec46543d39a6e910819b93b04a1cbf61ad7f0da757e0ec370d6fa10e3ee4a5",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_parent_links_6",
+      "family": "tree-representations",
+      "style": "parent_links",
+      "stdout": "34\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 6,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "62ae35d0eb901e4efb25586da8beb76bf78348178463afea118d1c28f89ab184",
+      "predictedAt": "2026-11-09T06:42:31.637Z",
+      "fixtureRevision": {
+        "priorSha256": "9076c26eb44633f705658bf03a3304a21c9f72849f830142db55b7704453be5d",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_record_index_6",
+      "family": "tree-representations",
+      "style": "record_index",
+      "stdout": "34\n",
+      "targets": [
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 6,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "1cb899c4209509e27fe22cbf5b27d74c88db261a8d0e422516c524fb1fb63a6d",
+      "predictedAt": "2026-11-09T06:42:31.640Z",
+      "fixtureRevision": {
+        "priorSha256": "ab6f7b46593ccddf83e0f8a841831335c50b1f686375b77ac3c91baca3ef8b2c",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_record_slots_6",
+      "family": "tree-representations",
+      "style": "record_slots",
+      "stdout": "34\n",
+      "targets": [
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 6,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "fba3903f70af1774367c05985666f3873f84d18420a1c35d30336efda9f22368",
+      "predictedAt": "2026-11-09T06:42:31.643Z",
+      "fixtureRevision": {
+        "priorSha256": "10711e9ac827fff6281acca54d41b547b5525c17d7bf6398406d36398d4129c7",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_soa_iter_6",
+      "family": "tree-representations",
+      "style": "soa_iter",
+      "stdout": "34\n",
+      "targets": [
+        "left",
+        "values"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 6,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "60e59f7ebffb08d336ce96496176e13d6a9be26096affdd231deb1e7095d9029",
+      "predictedAt": "2026-11-09T06:42:31.646Z",
+      "fixtureRevision": {
+        "priorSha256": "d4c978ad9486a3f9de1724be16c62bb75b2aea4bf72c51c1a6f73d536d38f111",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_index_offset_6",
+      "family": "tree-representations",
+      "style": "index_offset",
+      "stdout": "34\n",
+      "targets": [
+        "a",
+        "val"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 6,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "1df8bde168c911c6530469fe6228eb500899ec4494305e764cd3e7efe00afb5b",
+      "predictedAt": "2026-11-09T06:42:31.651Z",
+      "fixtureRevision": {
+        "priorSha256": "6ad3b6695317f769e20caa816505e6dacc645f9a17d572095eaaf4752e70d7ee",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_lcrs_6",
+      "family": "tree-representations",
+      "style": "lcrs",
+      "stdout": "34\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 6,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "f011fcee788e90ff9a3096849c9114e2f1c1f9f47a752501832963e6f9a5c2ab",
+      "predictedAt": "2026-11-09T06:42:31.654Z",
+      "fixtureRevision": {
+        "priorSha256": "55c9c3bd696d38f6455c66721e1f27cad5e73faa747cc067c1084a1108f91142",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_byte_offset_6",
+      "family": "tree-representations",
+      "style": "byte_offset",
+      "stdout": "34\n",
+      "targets": [
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 6,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "105d2532fb3d3cd32d835b7a9d4eae80615ecaed4f55202736b5a0734acba3e9",
+      "predictedAt": "2026-11-09T06:42:31.656Z",
+      "fixtureRevision": {
+        "priorSha256": "671aba96299e704f268937b0c8121759f8676fbda05aeaad3da86e8dd7c70747",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_pool_10",
+      "family": "tree-representations",
+      "style": "pool",
+      "stdout": "48\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "55664f5c6410c409d51f1eceab55c3b86b21e41e159486a572b20b06f0a27ba1",
+      "predictedAt": "2026-11-09T06:42:31.660Z",
+      "fixtureRevision": {
+        "priorSha256": "1de9fe8096384149d26c069633345d2074e8977c2ae28e70c9c4a1fb793f979b",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_fragmented_10",
+      "family": "tree-representations",
+      "style": "fragmented",
+      "stdout": "48\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "13d0c90b738426595e4b0da75816e760a9413205f2848deb8594a5548acc4738",
+      "predictedAt": "2026-11-09T06:42:31.663Z",
+      "fixtureRevision": {
+        "priorSha256": "66dca1331e78ad2d8805e9af8a634eecdcaf3b43f776f1f62801e44f7d1ab555",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_pointer_slots_10",
+      "family": "tree-representations",
+      "style": "pointer_slots",
+      "stdout": "48\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "8f2e73beda90d66b4612fa40baab5728faf462296328cb4517b18583ec00e2d8",
+      "predictedAt": "2026-11-09T06:42:31.666Z",
+      "fixtureRevision": {
+        "priorSha256": "c07dab11eb33b635110119e50f87d1caca081bb9bd24b0184c70e74e4cfae888",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_parent_links_10",
+      "family": "tree-representations",
+      "style": "parent_links",
+      "stdout": "48\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "832f0869269d16d1adc69366cd6ab144b06e45f384d62ace2e79d0942210d9f6",
+      "predictedAt": "2026-11-09T06:42:31.669Z",
+      "fixtureRevision": {
+        "priorSha256": "0a4c6f5355e8f96cb85b9f7f09afe255a32e554c45b37d1f2e285906bc8b3316",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_record_index_10",
+      "family": "tree-representations",
+      "style": "record_index",
+      "stdout": "48\n",
+      "targets": [
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "eb0b246fd3fabb9fd70f4e70fa3a25ed61c74a2dec82c3436c01962c999a69b3",
+      "predictedAt": "2026-11-09T06:42:31.672Z",
+      "fixtureRevision": {
+        "priorSha256": "c5d83814d87dea49da76b2aae78df0e99e5a2919523cbb743cd84a424bc614df",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_record_slots_10",
+      "family": "tree-representations",
+      "style": "record_slots",
+      "stdout": "48\n",
+      "targets": [
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "8ae042bf57d8eead0fbe27ca5958517aa33c77ef7942d3d3761254b24701a04d",
+      "predictedAt": "2026-11-09T06:42:31.677Z",
+      "fixtureRevision": {
+        "priorSha256": "ab9243680d0c4787f902c59389f2d9c065a46c8ba41579465e6a50fa1f443b44",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_soa_iter_10",
+      "family": "tree-representations",
+      "style": "soa_iter",
+      "stdout": "48\n",
+      "targets": [
+        "left",
+        "values"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "c930e5afa97ed233a789bf2f9f8685e2333d19523862c885985a7b871cf92e56",
+      "predictedAt": "2026-11-09T06:42:31.680Z",
+      "fixtureRevision": {
+        "priorSha256": "158963da93d8cf9744052230eab7c73670f8fbc72db923901d48fa7c3a9dec4a",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_index_offset_10",
+      "family": "tree-representations",
+      "style": "index_offset",
+      "stdout": "48\n",
+      "targets": [
+        "a",
+        "val"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "147cde6429b4ea61475732e1a30d4f6c78d5a4a0b468e635e17ebcbac3f19490",
+      "predictedAt": "2026-11-09T06:42:31.684Z",
+      "fixtureRevision": {
+        "priorSha256": "55a447c5778d87a5d3f8b97d6cbffdf9446f7051d7bb7547c7d0bd96b5f70f8f",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_lcrs_10",
+      "family": "tree-representations",
+      "style": "lcrs",
+      "stdout": "48\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "dc921d2ea6030eac862af5e5a0194ba4953ecda8402dd6bd346fb9124d5c62e6",
+      "predictedAt": "2026-11-09T06:42:31.688Z",
+      "fixtureRevision": {
+        "priorSha256": "726876820aa0190096a650fc54c8a5c417f052a7714d35739d23246a1dcf11d5",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_byte_offset_10",
+      "family": "tree-representations",
+      "style": "byte_offset",
+      "stdout": "48\n",
+      "targets": [
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "9ff1ad164d9e3a760dcef9631959e66e6e1a45b525ca1aedb18ac0eac6598aae",
+      "predictedAt": "2026-11-09T06:42:31.694Z",
+      "fixtureRevision": {
+        "priorSha256": "72f3d67c5704aa00138448e67f3b500f372407fe375554e6f9faca2e5ac4f8f5",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_pool_17",
+      "family": "tree-representations",
+      "style": "pool",
+      "stdout": "108\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 17,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          5,
+          12
+        ],
+        [
+          6,
+          13
+        ],
+        [
+          6,
+          14
+        ],
+        [
+          7,
+          15
+        ],
+        [
+          7,
+          16
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "32a99cfff24816d549a83f3ef29d451a59e7a7634e53e06d33b3b15bec28b9be",
+      "predictedAt": "2026-11-09T06:42:31.698Z",
+      "fixtureRevision": {
+        "priorSha256": "1798c86df615862e223af8cb0fc80a9503c4099ea4153a524e07cce476f555fa",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_fragmented_17",
+      "family": "tree-representations",
+      "style": "fragmented",
+      "stdout": "108\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 17,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          5,
+          12
+        ],
+        [
+          6,
+          13
+        ],
+        [
+          6,
+          14
+        ],
+        [
+          7,
+          15
+        ],
+        [
+          7,
+          16
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "df23686df7576d25c619014fe886336038dfa54190bac348c34f0009785b97d5",
+      "predictedAt": "2026-11-09T06:42:31.702Z",
+      "fixtureRevision": {
+        "priorSha256": "ff49b380e0fc21e8f50cca8f016ff35ef2c4eaf7c24407856ecef50e4d6327fd",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_pointer_slots_17",
+      "family": "tree-representations",
+      "style": "pointer_slots",
+      "stdout": "108\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 17,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          5,
+          12
+        ],
+        [
+          6,
+          13
+        ],
+        [
+          6,
+          14
+        ],
+        [
+          7,
+          15
+        ],
+        [
+          7,
+          16
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "57c458470830085e92502355e623bab669872588b9f7cce1876087be78d3a5fd",
+      "predictedAt": "2026-11-09T06:42:31.706Z",
+      "fixtureRevision": {
+        "priorSha256": "243e2569df7372cc9aa6a51b25123900d07b7b028d05f257f1006a5020c6ab26",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_parent_links_17",
+      "family": "tree-representations",
+      "style": "parent_links",
+      "stdout": "108\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 17,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          5,
+          12
+        ],
+        [
+          6,
+          13
+        ],
+        [
+          6,
+          14
+        ],
+        [
+          7,
+          15
+        ],
+        [
+          7,
+          16
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "bce2441443ef1d4f5b03cc1f277955d5f9b93324c583348b99d75700ed306c1c",
+      "predictedAt": "2026-11-09T06:42:31.710Z",
+      "fixtureRevision": {
+        "priorSha256": "cb7af808cbae260a5a19fceb43bd6752d7dc4fff8bfe018c7848ecd187591da5",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_record_index_17",
+      "family": "tree-representations",
+      "style": "record_index",
+      "stdout": "108\n",
+      "targets": [
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 17,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          5,
+          12
+        ],
+        [
+          6,
+          13
+        ],
+        [
+          6,
+          14
+        ],
+        [
+          7,
+          15
+        ],
+        [
+          7,
+          16
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "177cee7aeb998e91fd1d126ecfe421d5605034e304ba42d2063374533b6467d9",
+      "predictedAt": "2026-11-09T06:42:31.712Z",
+      "fixtureRevision": {
+        "priorSha256": "58bf3c77772988022d11727bd631a7d886f9c7a34000b422ca34320ace06006c",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_record_slots_17",
+      "family": "tree-representations",
+      "style": "record_slots",
+      "stdout": "108\n",
+      "targets": [
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 17,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          5,
+          12
+        ],
+        [
+          6,
+          13
+        ],
+        [
+          6,
+          14
+        ],
+        [
+          7,
+          15
+        ],
+        [
+          7,
+          16
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "4bd3f27e519db40ecab0c619298d3ba670d13c6a8f53c812790a137b8eb7d216",
+      "predictedAt": "2026-11-09T06:42:31.716Z",
+      "fixtureRevision": {
+        "priorSha256": "091426b89476a6cc744286e8c2dc512a8bacf88f3d8bdef6c04d05811db8bcc1",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_soa_iter_17",
+      "family": "tree-representations",
+      "style": "soa_iter",
+      "stdout": "108\n",
+      "targets": [
+        "left",
+        "values"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 17,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          5,
+          12
+        ],
+        [
+          6,
+          13
+        ],
+        [
+          6,
+          14
+        ],
+        [
+          7,
+          15
+        ],
+        [
+          7,
+          16
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "c7da527628ba15b634f3df6dd2249218f41b2a0a50414f66c56716708576e168",
+      "predictedAt": "2026-11-09T06:42:31.719Z",
+      "fixtureRevision": {
+        "priorSha256": "415276abfefefe72c186baf115def8efaa55a14b2f06a5ff6022d5e4a12dbba1",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_index_offset_17",
+      "family": "tree-representations",
+      "style": "index_offset",
+      "stdout": "108\n",
+      "targets": [
+        "a",
+        "val"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 17,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          5,
+          12
+        ],
+        [
+          6,
+          13
+        ],
+        [
+          6,
+          14
+        ],
+        [
+          7,
+          15
+        ],
+        [
+          7,
+          16
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "61215938379535f5a2e546a59af29a365c635425b323b8bd254d2cc0d46b2c86",
+      "predictedAt": "2026-11-09T06:42:31.723Z",
+      "fixtureRevision": {
+        "priorSha256": "2cd24acb5b094726b3adb2a03cc9f757a36d93732bef6b49eaa23b77f994e00d",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_lcrs_17",
+      "family": "tree-representations",
+      "style": "lcrs",
+      "stdout": "108\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 17,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          5,
+          12
+        ],
+        [
+          6,
+          13
+        ],
+        [
+          6,
+          14
+        ],
+        [
+          7,
+          15
+        ],
+        [
+          7,
+          16
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "93d4c91181f56ff1d1f925b04afa254a2c7a5e39e86e7fe927a9d40c61591131",
+      "predictedAt": "2026-11-09T06:42:31.725Z",
+      "fixtureRevision": {
+        "priorSha256": "617dda66cfa6e00b7bff4412d57f8f9e73eb6524ede598b587300947e6d41a29",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "tree_byte_offset_17",
+      "family": "tree-representations",
+      "style": "byte_offset",
+      "stdout": "108\n",
+      "targets": [
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 17,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          11
+        ],
+        [
+          5,
+          12
+        ],
+        [
+          6,
+          13
+        ],
+        [
+          6,
+          14
+        ],
+        [
+          7,
+          15
+        ],
+        [
+          7,
+          16
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "sha256": "4c1c6a02777bb97ea61d892947a601f4dd90507280aeca89ce71ce5020dd388b",
+      "predictedAt": "2026-11-09T06:42:31.727Z",
+      "fixtureRevision": {
+        "priorSha256": "9e4016e4fb13f971f913733f2923ed171380eedd1b132a57f3bad5c37b1c313d",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_sum_mod_fixed_4",
+      "family": "queue-positions",
+      "style": "sum_mod",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "2571f4641710b632e9af25dd515b5cd1bd038f39fc6ec05c492363645cec518a",
+      "predictedAt": "2026-11-09T06:42:31.731Z",
+      "fixtureRevision": {
+        "priorSha256": "71bd75d750451b9fff994dfe3ba61dc2e37b6e47fd2793edc616946eb09c39d5",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_sum_mod_heap_4",
+      "family": "queue-positions",
+      "style": "sum_mod",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "ae3837775350fedeca0e341e940e2b05ed56cfb1e5b186d368a1924a6944e814",
+      "predictedAt": "2026-11-09T06:42:31.735Z",
+      "fixtureRevision": {
+        "priorSha256": "c13edd737ccbe566cb3da0ac4c51ef6e642aeafa1706cbfcb17bce10899fcf8b",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_mod_fixed_4",
+      "family": "queue-positions",
+      "style": "tail_mod",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "75ef52cad8610ddd52cf9bdff635bec22497ede5acad1c299e67c923ad61ab03",
+      "predictedAt": "2026-11-09T06:42:31.738Z",
+      "fixtureRevision": {
+        "priorSha256": "5d35658e9c9331b6227464b0a1b9d0dff4357688c74b43d2c6ee700219979af8",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_mod_heap_4",
+      "family": "queue-positions",
+      "style": "tail_mod",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "491f98f4d479f90df91865d11c9879110e2b6f13f0a44f6ba7a69b544a05aac5",
+      "predictedAt": "2026-11-09T06:42:31.740Z",
+      "fixtureRevision": {
+        "priorSha256": "41d249f5fdf559355881ee5eb16eefb50f6973483b1db350eab2670b2efe38dc",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_conditional_fixed_4",
+      "family": "queue-positions",
+      "style": "tail_conditional",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "8535f688059b6fdbdaacefb3d9afec4c77bbc0a8bddf400567405ae8eb4a39a3",
+      "predictedAt": "2026-11-09T06:42:31.742Z",
+      "fixtureRevision": {
+        "priorSha256": "ffda8208543462c7fd68a3bc01506d6d95609a7a7bc3d77fbdad93c40c636d0d",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_conditional_heap_4",
+      "family": "queue-positions",
+      "style": "tail_conditional",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "1ab2d4671b1cf115a67a64a9ebc43ff4db4fe406a80bda2315f8dec929949640",
+      "predictedAt": "2026-11-09T06:42:31.746Z",
+      "fixtureRevision": {
+        "priorSha256": "da245a869799dcfc215cb6f16518023c882ee046f379dec454fdc93d448befd8",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_mask_fixed_4",
+      "family": "queue-positions",
+      "style": "tail_mask",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "842492e42a8a530dd53d98d085fdcdc41e3399a85a4530fe4bd34f5d611a2e09",
+      "predictedAt": "2026-11-09T06:42:31.748Z",
+      "fixtureRevision": {
+        "priorSha256": "8cf54e763bff595db8fe92e3a040c79411bb744949fe2fe14052fd7e91cf6b0f",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_mask_heap_4",
+      "family": "queue-positions",
+      "style": "tail_mask",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "d7429a0c8546cc5bf115d5e6ea3e656574543fff24b8229f674ed6c08ab74896",
+      "predictedAt": "2026-11-09T06:42:31.750Z",
+      "fixtureRevision": {
+        "priorSha256": "dd3f46d43394bea9ce33ca9c5b683a332cf0721e67d741ffbfb5455ac85966f9",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_monotonic_fixed_4",
+      "family": "queue-positions",
+      "style": "monotonic",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "0cfa0f68bda84e3e62d33591311531bdad213f2ecf5985168981aca57155bd9f",
+      "predictedAt": "2026-11-09T06:42:31.755Z",
+      "fixtureRevision": {
+        "priorSha256": "a9ff5180adb6871d1aa8d5ab0b1f273a60a340bd7d4f5654b854150e35144cc3",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_monotonic_heap_4",
+      "family": "queue-positions",
+      "style": "monotonic",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "f3e47612857d3e2f4eb121716000870d9b4f14a598f5e711cbf7bed39d66a4a9",
+      "predictedAt": "2026-11-09T06:42:31.759Z",
+      "fixtureRevision": {
+        "priorSha256": "9683bfadedccce63eff32a9614d51d7c2219908063bde5003c04f1e122e2ebf4",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_pointer_cursor_fixed_4",
+      "family": "queue-positions",
+      "style": "pointer_cursor",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "2a073cd0348e42065d2c92834d9dc525d34f074fe5dc8cd703560f870fae95f1",
+      "predictedAt": "2026-11-09T06:42:31.763Z",
+      "fixtureRevision": {
+        "priorSha256": "57f7fef1b37ff33b8d78dec489e7e47d59418437d53b00c93c1be07ec7a84d20",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_pointer_cursor_heap_4",
+      "family": "queue-positions",
+      "style": "pointer_cursor",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "28be4e10baa71233ae55026786327d0d886fd9ed2d5c2b7872ac5d44945c8165",
+      "predictedAt": "2026-11-09T06:42:31.765Z",
+      "fixtureRevision": {
+        "priorSha256": "7c9d57f46a621ca3330a3d0a33559c6c98cb8849940a853f905d87828c7234fb",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_sum_mod_fixed_8",
+      "family": "queue-positions",
+      "style": "sum_mod",
+      "stdout": "300 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 8,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "af9b23f8eaef666ef4082459e8b857188af791708789625ef85df87e5edf290f",
+      "predictedAt": "2026-11-09T06:42:31.768Z",
+      "fixtureRevision": {
+        "priorSha256": "2082ca0e319b6111b20df04f10513218be05c39793229fdc6160b1e194695695",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_sum_mod_heap_8",
+      "family": "queue-positions",
+      "style": "sum_mod",
+      "stdout": "300 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 8,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "0fdb2e6ec8d4f859fa2bf276b0b3c2ad619bf82406585325ed21de4024cd79f3",
+      "predictedAt": "2026-11-09T06:42:31.772Z",
+      "fixtureRevision": {
+        "priorSha256": "38332d1052801301e84c610a04aa3836b4efd201f7364a55b00fe5b0b2cdf1b7",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_mod_fixed_8",
+      "family": "queue-positions",
+      "style": "tail_mod",
+      "stdout": "300 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 8,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "202777aa303ea520216a2aaef4c113338ba3f6a0b080875aaf20d9ce8077cb7f",
+      "predictedAt": "2026-11-09T06:42:31.775Z",
+      "fixtureRevision": {
+        "priorSha256": "703b5620be3ac7e7cccd8b5d4a1c1b9564e96d07c89bca92962d3714fc29aab0",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_mod_heap_8",
+      "family": "queue-positions",
+      "style": "tail_mod",
+      "stdout": "300 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 8,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "a200dc5f87f6f1586961f18186849c3aab0d4d9575d0ae57ee98dda77bdcb215",
+      "predictedAt": "2026-11-09T06:42:31.777Z",
+      "fixtureRevision": {
+        "priorSha256": "39bea8092fbbfdcf5e7f2ef06a766e4359b696265d1ddc541875b5e87de39fc5",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_conditional_fixed_8",
+      "family": "queue-positions",
+      "style": "tail_conditional",
+      "stdout": "300 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 8,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "625e2806de49397ee581f31923942c9731004ae1f5507fee00094a0ab939aeb5",
+      "predictedAt": "2026-11-09T06:42:31.781Z",
+      "fixtureRevision": {
+        "priorSha256": "6059d864b779521893a54ce061593a4faf20fac9613ea79749ca296bf13d85ba",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_conditional_heap_8",
+      "family": "queue-positions",
+      "style": "tail_conditional",
+      "stdout": "300 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 8,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "96d81a1e2ebe770f25fcf4b169ff90c140e6153ae9dedb99a6e43bdae6a21196",
+      "predictedAt": "2026-11-09T06:42:31.784Z",
+      "fixtureRevision": {
+        "priorSha256": "94917d710c67c841e89035eb3b183d2364b8a509f232193cbdbd7d46ee564b11",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_mask_fixed_8",
+      "family": "queue-positions",
+      "style": "tail_mask",
+      "stdout": "300 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 8,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "d0b45cfff3e71beb6bc85bb56d8babfe862c640a42298f95a102aa2151ce3dae",
+      "predictedAt": "2026-11-09T06:42:31.788Z",
+      "fixtureRevision": {
+        "priorSha256": "d9bfd8d08ca6dc0501f922eea0888341e0621e9c805a4eecbc873c2f605b399e",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_mask_heap_8",
+      "family": "queue-positions",
+      "style": "tail_mask",
+      "stdout": "300 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 8,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "67db6f3b14d0ede9cca5edfd1c1f38aa908308be532780813b969b0556ba509d",
+      "predictedAt": "2026-11-09T06:42:31.790Z",
+      "fixtureRevision": {
+        "priorSha256": "b29ae7345d42d2b3e7f5e0492969db4c4568c7e0c3a3823b019e4328c2c30d4b",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_monotonic_fixed_8",
+      "family": "queue-positions",
+      "style": "monotonic",
+      "stdout": "300 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 8,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "f0b76c1eaa7c1ca56b8c6689969f958e886a4c1bf79fa9c2139af8afd43d81f9",
+      "predictedAt": "2026-11-09T06:42:31.794Z",
+      "fixtureRevision": {
+        "priorSha256": "e908e159d8fd4a9047c8df729cc1569d55cb8c6c7af657997a5ba8d67977e8a8",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_monotonic_heap_8",
+      "family": "queue-positions",
+      "style": "monotonic",
+      "stdout": "300 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 8,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "f1ad37973ef6975c3cf26476df8132f1238c179954ebbc742035374208ca536a",
+      "predictedAt": "2026-11-09T06:42:31.797Z",
+      "fixtureRevision": {
+        "priorSha256": "3faed3fe4920ff021ebbf475cd5261990ed745caf9fc865f01beb8cb2c2212f3",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_pointer_cursor_fixed_8",
+      "family": "queue-positions",
+      "style": "pointer_cursor",
+      "stdout": "300 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 8,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "1480529e4f3f0ac481f6377a5e080efbaf93e819ca545c8bc7a9ae8dcb3b828a",
+      "predictedAt": "2026-11-09T06:42:31.800Z",
+      "fixtureRevision": {
+        "priorSha256": "8990e184c61ad976dba7f61ed552e539786fb2f57d69f5cc75aec46df45818f4",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_pointer_cursor_heap_8",
+      "family": "queue-positions",
+      "style": "pointer_cursor",
+      "stdout": "300 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 8,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "8f8d362ee357b0ec0d42429778eb7cf40a18802339946874f702e0618b62ab05",
+      "predictedAt": "2026-11-09T06:42:31.803Z",
+      "fixtureRevision": {
+        "priorSha256": "cfe599d7f94e36e6b0d7d55c02e2a995aea5c0ccb64c93361467099de21e2b4e",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_sum_mod_fixed_16",
+      "family": "queue-positions",
+      "style": "sum_mod",
+      "stdout": "1176 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 16,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "66d963f2a26c800c74731a49d54c90cf8443f5c22a74ca594cfa2c7cdfea7288",
+      "predictedAt": "2026-11-09T06:42:31.806Z",
+      "fixtureRevision": {
+        "priorSha256": "e4338b682c3f14e94b498f8cafda61fd2e8604558e156d8a11aa58f026b95041",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_sum_mod_heap_16",
+      "family": "queue-positions",
+      "style": "sum_mod",
+      "stdout": "1176 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 16,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "7f68e96dc880f111064045c2ada99ddb3391bea0353b480b40e0193e697ef396",
+      "predictedAt": "2026-11-09T06:42:31.810Z",
+      "fixtureRevision": {
+        "priorSha256": "95b9a78a34f6deba2afd7ba5d5725173ceb7ecd8f443a329ff524d5ba8fa47fe",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_mod_fixed_16",
+      "family": "queue-positions",
+      "style": "tail_mod",
+      "stdout": "1176 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 16,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "2525058d963ce7d1825eda4c3a69d0eff31dff69027f381fc94f8fc179ce226d",
+      "predictedAt": "2026-11-09T06:42:31.814Z",
+      "fixtureRevision": {
+        "priorSha256": "f07ab84e5c4521bd89a8623fac23e3b5e9cd3e8c927610f837b3426de6acece2",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_mod_heap_16",
+      "family": "queue-positions",
+      "style": "tail_mod",
+      "stdout": "1176 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 16,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "174ef0772da7bab2352baf4401e22cee932073460931b04c6422fd47a966c591",
+      "predictedAt": "2026-11-09T06:42:31.816Z",
+      "fixtureRevision": {
+        "priorSha256": "b2161e212109355554a50032fea18ec7b24ccdf87aa9028ebacf378cd3e0f916",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_conditional_fixed_16",
+      "family": "queue-positions",
+      "style": "tail_conditional",
+      "stdout": "1176 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 16,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "385ad1e830794440e61c5b4c6fd2083ef4ee168f3c78676bce46a561e958df2a",
+      "predictedAt": "2026-11-09T06:42:31.820Z",
+      "fixtureRevision": {
+        "priorSha256": "4ef92cf4b31ce9d6459bc832b1357b2c2a18568e3ec391b16b14327992007b89",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_conditional_heap_16",
+      "family": "queue-positions",
+      "style": "tail_conditional",
+      "stdout": "1176 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 16,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "1e58813213bd8cfa0af512a3c8fee2cd26fac19f246ab04707b87ccdff6b79b8",
+      "predictedAt": "2026-11-09T06:42:31.823Z",
+      "fixtureRevision": {
+        "priorSha256": "bbc74773ee505ac882bc79228c0bbf8e1af2cd94291e85d6501f9f4c38279169",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_mask_fixed_16",
+      "family": "queue-positions",
+      "style": "tail_mask",
+      "stdout": "1176 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 16,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "7af876a38ddb302cb025b56196f850a690007f97145ad4b6c749793c034a2476",
+      "predictedAt": "2026-11-09T06:42:31.828Z",
+      "fixtureRevision": {
+        "priorSha256": "deb6bc75e1154105d85e8bfda97aaea6e58a6e5103ceb9653f9939a68a027a80",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_tail_mask_heap_16",
+      "family": "queue-positions",
+      "style": "tail_mask",
+      "stdout": "1176 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 16,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "a0cb55bd585283efe17b0095bc4896aa909c3c99f90739a088e18d73a13bfd8a",
+      "predictedAt": "2026-11-09T06:42:31.831Z",
+      "fixtureRevision": {
+        "priorSha256": "0801cf858e25f988a59af5bb824b5825a313e2444ded02bb09a03ccd16d91be3",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_monotonic_fixed_16",
+      "family": "queue-positions",
+      "style": "monotonic",
+      "stdout": "1176 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 16,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "98834303253f0ee412e14f3a4f65c127edbdd50e479459625752a7251ccf0893",
+      "predictedAt": "2026-11-09T06:42:31.836Z",
+      "fixtureRevision": {
+        "priorSha256": "e635febd1d040fbd2168ca8d037b28d207b6179a697f970fa564ffed174af8eb",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_monotonic_heap_16",
+      "family": "queue-positions",
+      "style": "monotonic",
+      "stdout": "1176 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 16,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "a081425cca3de1ac8f0d440e2ad24ed049d52ddaf4a8c2db0ab72687e7c66be1",
+      "predictedAt": "2026-11-09T06:42:31.839Z",
+      "fixtureRevision": {
+        "priorSha256": "122f30c037e37dbfd3e427a3170c895ee5a26ff86ecf7416036dde9db4dd4a84",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_pointer_cursor_fixed_16",
+      "family": "queue-positions",
+      "style": "pointer_cursor",
+      "stdout": "1176 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 16,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "c195d0ea9660d0f9ce105c7016bc4317939743a4b7de2d50ad67da97d0582ce4",
+      "predictedAt": "2026-11-09T06:42:31.842Z",
+      "fixtureRevision": {
+        "priorSha256": "3851c0741597402a217cf626af937c42a618a0c0ab73815053c03eaf3ec62552",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "queue_pointer_cursor_heap_16",
+      "family": "queue-positions",
+      "style": "pointer_cursor",
+      "stdout": "1176 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 16,
+      "heap": true,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "sha256": "9ae097c68773877779e2f4fc5ebde41b1f999308146838d1e88d5d3c83662d3d",
+      "predictedAt": "2026-11-09T06:42:31.845Z",
+      "fixtureRevision": {
+        "priorSha256": "be5818b610cd49e658a0395f5497312141acd8955118a57209878d10325f94c4",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_csr_bfs_4",
+      "family": "graph-domain-transport",
+      "style": "csr_bfs",
+      "stdout": "4\n",
+      "targets": [
+        "row",
+        "col"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 4,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          3,
+          0,
+          3
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "52df39cacf1522b034cf95686c5781b8dd5ef388c7497ade9aa63804b15fa92b",
+      "predictedAt": "2026-11-09T06:42:31.847Z",
+      "fixtureRevision": {
+        "priorSha256": "0d56b9f41831d3aff5374f431e52a21bc5558aa7ff27a47112d5962d6a75e0eb",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_csr_relax_4",
+      "family": "graph-domain-transport",
+      "style": "csr_relax",
+      "stdout": "0 0 0 2 \n",
+      "targets": [
+        "row",
+        "col",
+        "cost"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 4,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          3,
+          0,
+          3
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "b4880fd80edd125e48ed7559f7ccd4b6ae1a37b70610faa97c33c09b3731f1c1",
+      "predictedAt": "2026-11-09T06:42:31.853Z",
+      "fixtureRevision": {
+        "priorSha256": "a7175f355e76832d3852a19fcc427c84682efda96fc026e22738364f4bc33a2e",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_coo_records_4",
+      "family": "graph-domain-transport",
+      "style": "coo_records",
+      "stdout": "0 0 0 2 \n",
+      "targets": [
+        "edges"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 4,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          3,
+          0,
+          3
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "fd746666266df30c94d3ed5c738ad674111708744890280b9a8446897cb536f4",
+      "predictedAt": "2026-11-09T06:42:31.857Z",
+      "fixtureRevision": {
+        "priorSha256": "ca1780b30bb42448ec4ad6e0f6c0d217f159a285c49ce45627ac66f41280df4c",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_coo_arrays_4",
+      "family": "graph-domain-transport",
+      "style": "coo_arrays",
+      "stdout": "0 0 0 2 \n",
+      "targets": [
+        "from",
+        "to",
+        "cost"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 4,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          3,
+          0,
+          3
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "ca1e26fdb3dcd2a17fe41a72b61eb7b8871b11be9e1986691f6552db96cfc643",
+      "predictedAt": "2026-11-09T06:42:31.861Z",
+      "fixtureRevision": {
+        "priorSha256": "7040b663597d3352927276c028f66ce1666684d7bc810e61a99174459fa3d59a",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_adj_link_4",
+      "family": "graph-domain-transport",
+      "style": "adj_link",
+      "stdout": "0 0 0 2 \n",
+      "targets": [
+        "heads",
+        "pool"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 4,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          3,
+          0,
+          3
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "afa73a0a310b295d5438c5d9e4441c925c22744ac46bc4666078364c8401b973",
+      "predictedAt": "2026-11-09T06:42:31.864Z",
+      "fixtureRevision": {
+        "priorSha256": "92c089a3d9679701d263ac7505b035547b73923261ec8e64fb092171068421e9",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_matrix_presence_4",
+      "family": "graph-domain-transport",
+      "style": "matrix_presence",
+      "stdout": "0 0 0 2 \n",
+      "targets": [
+        "w",
+        "present"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 4,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          3,
+          0,
+          3
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "7571dc0672307b2fe39b330003831f8cc510677a0ddd6dccf49ce47e6f1ba9af",
+      "predictedAt": "2026-11-09T06:42:31.867Z",
+      "fixtureRevision": {
+        "priorSha256": "f8e67e900bf973387dbd4446562b075e2da67f28e3fa8d6b6e31eb33d702f67b",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_csr_bfs_7",
+      "family": "graph-domain-transport",
+      "style": "csr_bfs",
+      "stdout": "7\n",
+      "targets": [
+        "row",
+        "col"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 7,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          2,
+          4,
+          6
+        ],
+        [
+          3,
+          4,
+          3
+        ],
+        [
+          3,
+          5,
+          2
+        ],
+        [
+          4,
+          5,
+          0
+        ],
+        [
+          4,
+          6,
+          5
+        ],
+        [
+          5,
+          6,
+          1
+        ],
+        [
+          6,
+          0,
+          2
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "98a3b0d3287a0e719aa44ad583a98ffdcc70ca6bcdae78568a4d97010b37e3a2",
+      "predictedAt": "2026-11-09T06:42:31.870Z",
+      "fixtureRevision": {
+        "priorSha256": "b3b162046d622e9a9b8709f6eba95bdf327e48f855bfbd29b3a4803d5a48d458",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_csr_relax_7",
+      "family": "graph-domain-transport",
+      "style": "csr_relax",
+      "stdout": "0 0 0 2 5 4 5 \n",
+      "targets": [
+        "row",
+        "col",
+        "cost"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 7,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          2,
+          4,
+          6
+        ],
+        [
+          3,
+          4,
+          3
+        ],
+        [
+          3,
+          5,
+          2
+        ],
+        [
+          4,
+          5,
+          0
+        ],
+        [
+          4,
+          6,
+          5
+        ],
+        [
+          5,
+          6,
+          1
+        ],
+        [
+          6,
+          0,
+          2
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "d9fc9df6b3d6e1164a7ab149198a18ea26895a419c3f983ab91b3b8793f2c22b",
+      "predictedAt": "2026-11-09T06:42:31.876Z",
+      "fixtureRevision": {
+        "priorSha256": "055fb503ca9f0cadeac2c9baff76affb38965d7777880faf919bb4e42eb07af5",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_coo_records_7",
+      "family": "graph-domain-transport",
+      "style": "coo_records",
+      "stdout": "0 0 0 2 5 4 5 \n",
+      "targets": [
+        "edges"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 7,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          2,
+          4,
+          6
+        ],
+        [
+          3,
+          4,
+          3
+        ],
+        [
+          3,
+          5,
+          2
+        ],
+        [
+          4,
+          5,
+          0
+        ],
+        [
+          4,
+          6,
+          5
+        ],
+        [
+          5,
+          6,
+          1
+        ],
+        [
+          6,
+          0,
+          2
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "ee28ef02012cd86151f9f67de5e55a84bc678dc5b77474f2b94efccb18dade8f",
+      "predictedAt": "2026-11-09T06:42:31.880Z",
+      "fixtureRevision": {
+        "priorSha256": "511612b2f377eeba5f937a2f9f620c0a3abcd334ac927cbee2242c76a2d3f5aa",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_coo_arrays_7",
+      "family": "graph-domain-transport",
+      "style": "coo_arrays",
+      "stdout": "0 0 0 2 5 4 5 \n",
+      "targets": [
+        "from",
+        "to",
+        "cost"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 7,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          2,
+          4,
+          6
+        ],
+        [
+          3,
+          4,
+          3
+        ],
+        [
+          3,
+          5,
+          2
+        ],
+        [
+          4,
+          5,
+          0
+        ],
+        [
+          4,
+          6,
+          5
+        ],
+        [
+          5,
+          6,
+          1
+        ],
+        [
+          6,
+          0,
+          2
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "2e06a969358a9f85df68c44fb27410e5994be364a9a48eb1efca208929065e5a",
+      "predictedAt": "2026-11-09T06:42:31.884Z",
+      "fixtureRevision": {
+        "priorSha256": "5c8cc44698cbb45013af3c010d039ffd65486703ee3f887bfba48955e606be79",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_adj_link_7",
+      "family": "graph-domain-transport",
+      "style": "adj_link",
+      "stdout": "0 0 0 2 5 4 5 \n",
+      "targets": [
+        "heads",
+        "pool"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 7,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          2,
+          4,
+          6
+        ],
+        [
+          3,
+          4,
+          3
+        ],
+        [
+          3,
+          5,
+          2
+        ],
+        [
+          4,
+          5,
+          0
+        ],
+        [
+          4,
+          6,
+          5
+        ],
+        [
+          5,
+          6,
+          1
+        ],
+        [
+          6,
+          0,
+          2
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "3e0adfde928f1f13f51f3a348a04237228995f62aef188a538aebda960825be1",
+      "predictedAt": "2026-11-09T06:42:31.888Z",
+      "fixtureRevision": {
+        "priorSha256": "b43f5d034263e8446598cb5ccce857644da750d138c8eaab6e20f407e04bf4d7",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_matrix_presence_7",
+      "family": "graph-domain-transport",
+      "style": "matrix_presence",
+      "stdout": "0 0 0 2 5 4 5 \n",
+      "targets": [
+        "w",
+        "present"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 7,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          2,
+          4,
+          6
+        ],
+        [
+          3,
+          4,
+          3
+        ],
+        [
+          3,
+          5,
+          2
+        ],
+        [
+          4,
+          5,
+          0
+        ],
+        [
+          4,
+          6,
+          5
+        ],
+        [
+          5,
+          6,
+          1
+        ],
+        [
+          6,
+          0,
+          2
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "41acc0b33e79d21c22079c3c4c23df806f9c2efce1a47497cba3fbe0ecbe9cb6",
+      "predictedAt": "2026-11-09T06:42:31.890Z",
+      "fixtureRevision": {
+        "priorSha256": "637a47a9e1e9df3fe81e6033a538f0d67ee2944bd07d363176b03b1ebc7e2919",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_csr_bfs_10",
+      "family": "graph-domain-transport",
+      "style": "csr_bfs",
+      "stdout": "10\n",
+      "targets": [
+        "row",
+        "col"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          2,
+          4,
+          6
+        ],
+        [
+          3,
+          4,
+          3
+        ],
+        [
+          3,
+          5,
+          2
+        ],
+        [
+          4,
+          5,
+          0
+        ],
+        [
+          4,
+          6,
+          5
+        ],
+        [
+          5,
+          6,
+          1
+        ],
+        [
+          5,
+          7,
+          1
+        ],
+        [
+          6,
+          7,
+          2
+        ],
+        [
+          6,
+          8,
+          4
+        ],
+        [
+          7,
+          8,
+          3
+        ],
+        [
+          7,
+          9,
+          0
+        ],
+        [
+          8,
+          9,
+          0
+        ],
+        [
+          9,
+          0,
+          1
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "0944215b2ec1fdb0b186b0245751a56aa22c46b0fdb157ae854ab9fe4392a742",
+      "predictedAt": "2026-11-09T06:42:31.895Z",
+      "fixtureRevision": {
+        "priorSha256": "f66ceb0a2e03d12faa796393439079e979ee0c355a855ff596bf7e3c39555b6d",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_csr_relax_10",
+      "family": "graph-domain-transport",
+      "style": "csr_relax",
+      "stdout": "0 0 0 2 5 4 5 5 8 5 \n",
+      "targets": [
+        "row",
+        "col",
+        "cost"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          2,
+          4,
+          6
+        ],
+        [
+          3,
+          4,
+          3
+        ],
+        [
+          3,
+          5,
+          2
+        ],
+        [
+          4,
+          5,
+          0
+        ],
+        [
+          4,
+          6,
+          5
+        ],
+        [
+          5,
+          6,
+          1
+        ],
+        [
+          5,
+          7,
+          1
+        ],
+        [
+          6,
+          7,
+          2
+        ],
+        [
+          6,
+          8,
+          4
+        ],
+        [
+          7,
+          8,
+          3
+        ],
+        [
+          7,
+          9,
+          0
+        ],
+        [
+          8,
+          9,
+          0
+        ],
+        [
+          9,
+          0,
+          1
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "fdc5b7ec5ce890e72899a49f189860382d9fa216d73353c0aedea122338ec146",
+      "predictedAt": "2026-11-09T06:42:31.898Z",
+      "fixtureRevision": {
+        "priorSha256": "c28b73151cc0d193a03f1e674f9ae41c5ea733b8cdeb8737deb2019641176e8c",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_coo_records_10",
+      "family": "graph-domain-transport",
+      "style": "coo_records",
+      "stdout": "0 0 0 2 5 4 5 5 8 5 \n",
+      "targets": [
+        "edges"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          2,
+          4,
+          6
+        ],
+        [
+          3,
+          4,
+          3
+        ],
+        [
+          3,
+          5,
+          2
+        ],
+        [
+          4,
+          5,
+          0
+        ],
+        [
+          4,
+          6,
+          5
+        ],
+        [
+          5,
+          6,
+          1
+        ],
+        [
+          5,
+          7,
+          1
+        ],
+        [
+          6,
+          7,
+          2
+        ],
+        [
+          6,
+          8,
+          4
+        ],
+        [
+          7,
+          8,
+          3
+        ],
+        [
+          7,
+          9,
+          0
+        ],
+        [
+          8,
+          9,
+          0
+        ],
+        [
+          9,
+          0,
+          1
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "a2697f42e838b92e3973c963df39df96c49953c17bbd92895b50fd3cad0c7b20",
+      "predictedAt": "2026-11-09T06:42:31.901Z",
+      "fixtureRevision": {
+        "priorSha256": "fe27eff231beee488e4e5107a76b9a50b4a54d5c5ceb8b3406c5d00c04978d2f",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_coo_arrays_10",
+      "family": "graph-domain-transport",
+      "style": "coo_arrays",
+      "stdout": "0 0 0 2 5 4 5 5 8 5 \n",
+      "targets": [
+        "from",
+        "to",
+        "cost"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          2,
+          4,
+          6
+        ],
+        [
+          3,
+          4,
+          3
+        ],
+        [
+          3,
+          5,
+          2
+        ],
+        [
+          4,
+          5,
+          0
+        ],
+        [
+          4,
+          6,
+          5
+        ],
+        [
+          5,
+          6,
+          1
+        ],
+        [
+          5,
+          7,
+          1
+        ],
+        [
+          6,
+          7,
+          2
+        ],
+        [
+          6,
+          8,
+          4
+        ],
+        [
+          7,
+          8,
+          3
+        ],
+        [
+          7,
+          9,
+          0
+        ],
+        [
+          8,
+          9,
+          0
+        ],
+        [
+          9,
+          0,
+          1
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "05d9b4d0d00fc9098c6dfb068790f2661ed4c1a0a910cde638e803ce26c648e7",
+      "predictedAt": "2026-11-09T06:42:31.905Z",
+      "fixtureRevision": {
+        "priorSha256": "1ed2540584e29343d20fc9e9e96db28075a2b3cb9cc9d7a0742b06e085f15c79",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_adj_link_10",
+      "family": "graph-domain-transport",
+      "style": "adj_link",
+      "stdout": "0 0 0 2 5 4 5 5 8 5 \n",
+      "targets": [
+        "heads",
+        "pool"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          2,
+          4,
+          6
+        ],
+        [
+          3,
+          4,
+          3
+        ],
+        [
+          3,
+          5,
+          2
+        ],
+        [
+          4,
+          5,
+          0
+        ],
+        [
+          4,
+          6,
+          5
+        ],
+        [
+          5,
+          6,
+          1
+        ],
+        [
+          5,
+          7,
+          1
+        ],
+        [
+          6,
+          7,
+          2
+        ],
+        [
+          6,
+          8,
+          4
+        ],
+        [
+          7,
+          8,
+          3
+        ],
+        [
+          7,
+          9,
+          0
+        ],
+        [
+          8,
+          9,
+          0
+        ],
+        [
+          9,
+          0,
+          1
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "8ac4cbe99378933d6e1ad8d35b0813ebafe1ba536ad9b40876932c99db7e8495",
+      "predictedAt": "2026-11-09T06:42:31.908Z",
+      "fixtureRevision": {
+        "priorSha256": "d798d8da8442578096dd5573a18459cd61808b19754d7bd876fc61a42f6e67cc",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "graph_matrix_presence_10",
+      "family": "graph-domain-transport",
+      "style": "matrix_presence",
+      "stdout": "0 0 0 2 5 4 5 5 8 5 \n",
+      "targets": [
+        "w",
+        "present"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 10,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          2,
+          4,
+          6
+        ],
+        [
+          3,
+          4,
+          3
+        ],
+        [
+          3,
+          5,
+          2
+        ],
+        [
+          4,
+          5,
+          0
+        ],
+        [
+          4,
+          6,
+          5
+        ],
+        [
+          5,
+          6,
+          1
+        ],
+        [
+          5,
+          7,
+          1
+        ],
+        [
+          6,
+          7,
+          2
+        ],
+        [
+          6,
+          8,
+          4
+        ],
+        [
+          7,
+          8,
+          3
+        ],
+        [
+          7,
+          9,
+          0
+        ],
+        [
+          8,
+          9,
+          0
+        ],
+        [
+          9,
+          0,
+          1
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "sha256": "c1902e8700f4f2b49b7ec9799b255d25b7676739e4938fd60c2413eaaa0feecd",
+      "predictedAt": "2026-11-09T06:42:31.912Z",
+      "fixtureRevision": {
+        "priorSha256": "1c4a6db83e0ec9f8c23415a77339768a868290b4a7f49dd105c52448e52cad7a",
+        "reason": "C string newline escaping only; expected values unchanged"
+      }
+    },
+    {
+      "id": "transport_inline",
+      "family": "graph-value-transport",
+      "style": "transport_inline",
+      "stdout": "0 2 0 1 3\n",
+      "targets": [
+        "edges",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          3,
+          4,
+          2
+        ],
+        [
+          4,
+          1,
+          1
+        ]
+      ],
+      "intent": "same weighted directed graph; only expression boundaries differ",
+      "sha256": "22640c115945db3960ad22b1d0ee93509a8739711651ad8e8d5776839a2ba6bf",
+      "predictedAt": "2026-11-09T06:44:51.898Z"
+    },
+    {
+      "id": "transport_temporary",
+      "family": "graph-value-transport",
+      "style": "transport_temporary",
+      "stdout": "0 2 0 1 3\n",
+      "targets": [
+        "edges",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          3,
+          4,
+          2
+        ],
+        [
+          4,
+          1,
+          1
+        ]
+      ],
+      "intent": "same weighted directed graph; only expression boundaries differ",
+      "sha256": "3cb34e7b25949d37000b1d1936a7f999fd9ed1bd5ff63e2b65e227fdfc05193e",
+      "predictedAt": "2026-11-09T06:44:51.901Z"
+    },
+    {
+      "id": "transport_cached_values",
+      "family": "graph-value-transport",
+      "style": "transport_cached_values",
+      "stdout": "0 2 0 1 3\n",
+      "targets": [
+        "edges",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          3,
+          4,
+          2
+        ],
+        [
+          4,
+          1,
+          1
+        ]
+      ],
+      "intent": "same weighted directed graph; only expression boundaries differ",
+      "sha256": "fe46ec837a64fa9fcacca38c005c50cbc8426c2a8773ac6ad597ad6bc074259e",
+      "predictedAt": "2026-11-09T06:44:51.902Z"
+    },
+    {
+      "id": "transport_helper_sum",
+      "family": "graph-value-transport",
+      "style": "transport_helper_sum",
+      "stdout": "0 2 0 1 3\n",
+      "targets": [
+        "edges",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          3,
+          4,
+          2
+        ],
+        [
+          4,
+          1,
+          1
+        ]
+      ],
+      "intent": "same weighted directed graph; only expression boundaries differ",
+      "sha256": "df13935b73ccca877c8ade592ecfc508b1dc62327e287b800bd89952dd62a1f8",
+      "predictedAt": "2026-11-09T06:44:51.905Z"
+    },
+    {
+      "id": "transport_helper_update",
+      "family": "graph-value-transport",
+      "style": "transport_helper_update",
+      "stdout": "0 2 0 1 3\n",
+      "targets": [
+        "edges",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          3,
+          4,
+          2
+        ],
+        [
+          4,
+          1,
+          1
+        ]
+      ],
+      "intent": "same weighted directed graph; only expression boundaries differ",
+      "sha256": "48a5975da0b1e21f0e97cbf30d95641e083a3ba812f095d9ea4ab3b1c3936b76",
+      "predictedAt": "2026-11-09T06:44:51.906Z"
+    },
+    {
+      "id": "transport_ternary",
+      "family": "graph-value-transport",
+      "style": "transport_ternary",
+      "stdout": "0 2 0 1 3\n",
+      "targets": [
+        "edges",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          3,
+          4,
+          2
+        ],
+        [
+          4,
+          1,
+          1
+        ]
+      ],
+      "intent": "same weighted directed graph; only expression boundaries differ",
+      "sha256": "a926da1eb63d72b9eefe34e6cac7c4a14d2244e5d32d83bcce26541e1251a980",
+      "predictedAt": "2026-11-09T06:44:51.907Z"
+    },
+    {
+      "id": "transport_reversed",
+      "family": "graph-value-transport",
+      "style": "transport_reversed",
+      "stdout": "0 2 0 1 3\n",
+      "targets": [
+        "edges",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          3,
+          4,
+          2
+        ],
+        [
+          4,
+          1,
+          1
+        ]
+      ],
+      "intent": "same weighted directed graph; only expression boundaries differ",
+      "sha256": "cef8692185efd38bf3a5761437d85faa54cff125385aa132ee5af08df9d3d3b1",
+      "predictedAt": "2026-11-09T06:44:51.909Z"
+    },
+    {
+      "id": "transport_split_assignment",
+      "family": "graph-value-transport",
+      "style": "transport_split_assignment",
+      "stdout": "0 2 0 1 3\n",
+      "targets": [
+        "edges",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          3,
+          4,
+          2
+        ],
+        [
+          4,
+          1,
+          1
+        ]
+      ],
+      "intent": "same weighted directed graph; only expression boundaries differ",
+      "sha256": "4b8b9544388a555878a4718becf160d0f1900ceb352c6fe3fd7d49a677f8d6a6",
+      "predictedAt": "2026-11-09T06:44:51.911Z"
+    },
+    {
+      "id": "transport_unconditional_min",
+      "family": "graph-value-transport",
+      "style": "transport_unconditional_min",
+      "stdout": "0 2 0 1 3\n",
+      "targets": [
+        "edges",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          3,
+          4,
+          2
+        ],
+        [
+          4,
+          1,
+          1
+        ]
+      ],
+      "intent": "same weighted directed graph; only expression boundaries differ",
+      "sha256": "25371632833bcdf9c633df1280407de099691149f89b33d85f864f041be36bac",
+      "predictedAt": "2026-11-09T06:44:51.913Z"
+    },
+    {
+      "id": "children_siblings_null_recursive",
+      "family": "child-sibling-tree",
+      "style": "children_siblings_null_recursive",
+      "stdout": "15\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "intent": "logical children are child then sibling chain; shared sentinel is not a node",
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ]
+      ],
+      "sha256": "af6e32b66a6bcc92918f3d3ceb8d3cc703082f0e7fc225c188fe26d082ab2f1a",
+      "predictedAt": "2026-11-09T06:44:51.914Z"
+    },
+    {
+      "id": "children_siblings_null_iter",
+      "family": "child-sibling-tree",
+      "style": "children_siblings_null_iter",
+      "stdout": "15\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "intent": "logical children are child then sibling chain; shared sentinel is not a node",
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ]
+      ],
+      "sha256": "d9e87cd00ebe58cc2cd7dc125ac95ac78f6337ff333e465ea6d14e40ef4c297d",
+      "predictedAt": "2026-11-09T06:44:51.931Z"
+    },
+    {
+      "id": "children_siblings_sentinel_recursive",
+      "family": "child-sibling-tree",
+      "style": "children_siblings_sentinel_recursive",
+      "stdout": "15\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "intent": "logical children are child then sibling chain; shared sentinel is not a node",
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ]
+      ],
+      "sha256": "3f6e5ee9a8d3e18b1238c41bce81ef2c94d2c2c4c4c2889babed555900d53855",
+      "predictedAt": "2026-11-09T06:44:51.932Z"
+    },
+    {
+      "id": "children_siblings_sentinel_iter",
+      "family": "child-sibling-tree",
+      "style": "children_siblings_sentinel_iter",
+      "stdout": "15\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "intent": "logical children are child then sibling chain; shared sentinel is not a node",
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ]
+      ],
+      "sha256": "5190b08483410ca84e281490ce4f9c57989d7a8547dbe33127e80ea5bef8e89c",
+      "predictedAt": "2026-11-09T06:44:51.934Z"
+    },
+    {
+      "id": "topology_transitions",
+      "family": "temporal-topology",
+      "style": "topology_transitions",
+      "stdout": "4\n4\n4\n4\n",
+      "targets": [
+        "root"
+      ],
+      "views": [],
+      "phaseViews": [
+        [
+          "tree",
+          "binary-tree"
+        ],
+        [
+          "dag",
+          "graph"
+        ],
+        [
+          "graph"
+        ],
+        [
+          "tree",
+          "binary-tree"
+        ]
+      ],
+      "intent": "tree -> shared child DAG -> cycle -> restored tree; bounded safe traversal",
+      "sha256": "ececb0dca6292fa12851b65bd4bb1ff62cea2e85931213b65d4c1a04ab8dc5a9",
+      "predictedAt": "2026-11-09T06:44:51.935Z"
+    },
+    {
+      "id": "heap_capacity_true",
+      "family": "heap-membership",
+      "style": "heap_capacity_true",
+      "stdout": "6\n27\n",
+      "targets": [
+        "h"
+      ],
+      "views": [
+        "min-heap",
+        "tree",
+        "binary-tree"
+      ],
+      "intent": "min heap prefix of six live slots; spare initialized capacity is not membership",
+      "sha256": "70534214f1855fb2ce2eec039861671c4f3f89aa905be74e98d5d2c7b99b2f56",
+      "predictedAt": "2026-11-09T06:44:51.937Z"
+    },
+    {
+      "id": "heap_capacity_false",
+      "family": "heap-membership",
+      "style": "heap_capacity_false",
+      "stdout": "1\n27\n",
+      "targets": [
+        "h"
+      ],
+      "views": [
+        "min-heap",
+        "tree",
+        "binary-tree"
+      ],
+      "intent": "min heap prefix of six live slots; spare initialized capacity is not membership",
+      "sha256": "32c490303ddd1f22d036839cf8aa54f5b778ce190eba997d329b26db81e58be0",
+      "predictedAt": "2026-11-09T06:44:51.938Z"
+    },
+    {
+      "id": "disjoint_parent_true",
+      "family": "disjoint-parent",
+      "style": "disjoint_parent_true",
+      "stdout": "15\n",
+      "targets": [
+        "parent"
+      ],
+      "views": [
+        "forest",
+        "tree"
+      ],
+      "intent": "three rooted components; roots encoded as self or negative index",
+      "expectedEdges": [
+        [
+          1,
+          0
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          5,
+          4
+        ],
+        [
+          6,
+          4
+        ]
+      ],
+      "sha256": "2782a39ce6aef4a15b39c0d760324465cd1cc797d6e7643d6024e44cbb51c81d",
+      "predictedAt": "2026-11-09T06:44:51.940Z"
+    },
+    {
+      "id": "disjoint_parent_false",
+      "family": "disjoint-parent",
+      "style": "disjoint_parent_false",
+      "stdout": "15\n",
+      "targets": [
+        "parent"
+      ],
+      "views": [
+        "forest",
+        "tree"
+      ],
+      "intent": "three rooted components; roots encoded as self or negative index",
+      "expectedEdges": [
+        [
+          1,
+          0
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          5,
+          4
+        ],
+        [
+          6,
+          4
+        ]
+      ],
+      "sha256": "9eb70f17059bd36a192fe3aa77b54fcfc7d22e69558aee9922b441ffaa8b986f",
+      "predictedAt": "2026-11-09T06:44:51.941Z"
+    },
+    {
+      "id": "mutate_parallel_from",
+      "family": "temporal-and-representation-probes",
+      "style": "mutate_parallel_from",
+      "stdout": "20\n20\n300\n",
+      "targets": [
+        "from",
+        "to",
+        "weight",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "edge source mutation invalidates old relation until re-observed",
+      "mutation": {
+        "field": "from[0]",
+        "value": 2
+      },
+      "expectedEdges": [
+        [
+          2,
+          1,
+          5
+        ],
+        [
+          1,
+          2,
+          2
+        ],
+        [
+          2,
+          3,
+          1
+        ]
+      ],
+      "sha256": "d056d3f5f134ffc1a118274b8589a769b81171e53551037f738658c0eeb18624",
+      "predictedAt": "2026-11-09T06:48:28.450Z"
+    },
+    {
+      "id": "mutate_parallel_to",
+      "family": "temporal-and-representation-probes",
+      "style": "mutate_parallel_to",
+      "stdout": "20\n20\n111\n",
+      "targets": [
+        "from",
+        "to",
+        "weight",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "edge source mutation invalidates old relation until re-observed",
+      "mutation": {
+        "field": "to[0]",
+        "value": 2
+      },
+      "expectedEdges": [
+        [
+          0,
+          2,
+          5
+        ],
+        [
+          1,
+          2,
+          2
+        ],
+        [
+          2,
+          3,
+          1
+        ]
+      ],
+      "sha256": "151691b718e57e96aed7a9119f00f28f4a2da6dfc244360977d06bc7115488a4",
+      "predictedAt": "2026-11-09T06:48:28.452Z"
+    },
+    {
+      "id": "mutate_parallel_weight",
+      "family": "temporal-and-representation-probes",
+      "style": "mutate_parallel_weight",
+      "stdout": "20\n20\n8\n",
+      "targets": [
+        "from",
+        "to",
+        "weight",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "edge source mutation invalidates old relation until re-observed",
+      "mutation": {
+        "field": "weight[0]",
+        "value": 1
+      },
+      "expectedEdges": [
+        [
+          0,
+          1,
+          1
+        ],
+        [
+          1,
+          2,
+          2
+        ],
+        [
+          2,
+          3,
+          1
+        ]
+      ],
+      "sha256": "7e423f302093d0d9477bddc0169be2e15084b4fc1fd17f1ae891a591b34a7007",
+      "predictedAt": "2026-11-09T06:48:28.453Z"
+    },
+    {
+      "id": "mutate_record_from",
+      "family": "temporal-and-representation-probes",
+      "style": "mutate_record_from",
+      "stdout": "20\n20\n300\n",
+      "targets": [
+        "edges",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "edge source mutation invalidates old relation until re-observed",
+      "mutation": {
+        "field": "edges[0].u",
+        "value": 2
+      },
+      "expectedEdges": [
+        [
+          2,
+          1,
+          5
+        ],
+        [
+          1,
+          2,
+          2
+        ],
+        [
+          2,
+          3,
+          1
+        ]
+      ],
+      "sha256": "1a4ff4922e19a03904dd8c33fa9bb9dc9c2fb9a8a1e39714ed7eef51ccd2ba23",
+      "predictedAt": "2026-11-09T06:48:28.454Z"
+    },
+    {
+      "id": "mutate_record_to",
+      "family": "temporal-and-representation-probes",
+      "style": "mutate_record_to",
+      "stdout": "20\n20\n111\n",
+      "targets": [
+        "edges",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "edge source mutation invalidates old relation until re-observed",
+      "mutation": {
+        "field": "edges[0].v",
+        "value": 2
+      },
+      "expectedEdges": [
+        [
+          0,
+          2,
+          5
+        ],
+        [
+          1,
+          2,
+          2
+        ],
+        [
+          2,
+          3,
+          1
+        ]
+      ],
+      "sha256": "6eb4c742f50c096771aeec8490463166961888e301d5fac9b29b30fdb5547c96",
+      "predictedAt": "2026-11-09T06:48:28.455Z"
+    },
+    {
+      "id": "mutate_record_weight",
+      "family": "temporal-and-representation-probes",
+      "style": "mutate_record_weight",
+      "stdout": "20\n20\n8\n",
+      "targets": [
+        "edges",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "edge source mutation invalidates old relation until re-observed",
+      "mutation": {
+        "field": "edges[0].w",
+        "value": 1
+      },
+      "expectedEdges": [
+        [
+          0,
+          1,
+          1
+        ],
+        [
+          1,
+          2,
+          2
+        ],
+        [
+          2,
+          3,
+          1
+        ]
+      ],
+      "sha256": "b1c8b14162ca16706db4e4980215087de03bf90a3a33ec3195955b42b6fbab75",
+      "predictedAt": "2026-11-09T06:48:28.458Z"
+    },
+    {
+      "id": "lcrs_probe_multiline",
+      "family": "temporal-and-representation-probes",
+      "style": "lcrs_probe_multiline",
+      "stdout": "5\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "intent": "same exact three-node object graph and output; independent syntax variants",
+      "sha256": "599d84e619bfb0d9f7319cbce5cc98da6b7f52a81a2a1f2008837afe65b0248f",
+      "predictedAt": "2026-11-09T06:48:28.461Z"
+    },
+    {
+      "id": "lcrs_probe_renamed",
+      "family": "temporal-and-representation-probes",
+      "style": "lcrs_probe_renamed",
+      "stdout": "5\n",
+      "targets": [
+        "Hh"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "intent": "same exact three-node object graph and output; independent syntax variants",
+      "sha256": "19c9979a92ec86c6aca83352be06f6f963a54da670e4502fcbbba88216dd6358",
+      "predictedAt": "2026-11-09T06:48:28.462Z"
+    },
+    {
+      "id": "lcrs_probe_addition",
+      "family": "temporal-and-representation-probes",
+      "style": "lcrs_probe_addition",
+      "stdout": "5\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "intent": "same exact three-node object graph and output; independent syntax variants",
+      "sha256": "e19752e6fe655a3c62f3fd4ca7c62ad63f9d7e7f93173d0b3ae2677297ec2647",
+      "predictedAt": "2026-11-09T06:48:28.463Z"
+    },
+    {
+      "id": "lcrs_probe_shift",
+      "family": "temporal-and-representation-probes",
+      "style": "lcrs_probe_shift",
+      "stdout": "5\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "intent": "same exact three-node object graph and output; independent syntax variants",
+      "sha256": "cd52201cdfdbe56ba4240ea8dcb0161fc783e3c9671a92df7b6f5834502809e2",
+      "predictedAt": "2026-11-09T06:48:28.465Z"
+    },
+    {
+      "id": "lcrs_probe_explicit",
+      "family": "temporal-and-representation-probes",
+      "style": "lcrs_probe_explicit",
+      "stdout": "5\n",
+      "targets": [
+        "root"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "intent": "same exact three-node object graph and output; independent syntax variants",
+      "sha256": "409f11e340a6dc68d924538f88baa1c1d3e1f7e09a453db87593499fec2f90d9",
+      "predictedAt": "2026-11-09T06:48:28.466Z"
+    },
+    {
+      "id": "intrusive_false",
+      "family": "mixed-container-representations",
+      "style": "intrusive_false",
+      "stdout": "26 4\n",
+      "targets": [
+        "head",
+        "items"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "intent": "intrusive sentinel list; Link is embedded in Node and payload lies before link",
+      "sha256": "3bb912e8ccec7569f064a6a44eb153ed217fe4552b234c53f853b8340c19ff1f",
+      "predictedAt": "2026-11-09T06:50:27.987Z"
+    },
+    {
+      "id": "intrusive_true",
+      "family": "mixed-container-representations",
+      "style": "intrusive_true",
+      "stdout": "26 4\n",
+      "targets": [
+        "head",
+        "items"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "intent": "intrusive sentinel list; Link is embedded in Node and payload lies before link",
+      "sha256": "697dac38aabf2bd1c0630161cf256c7f4227f77649f64889a4a54b21c6e741a2",
+      "predictedAt": "2026-11-09T06:50:27.989Z"
+    },
+    {
+      "id": "unrolled_list",
+      "family": "mixed-container-representations",
+      "style": "unrolled_list",
+      "stdout": "21\n",
+      "targets": [
+        "root",
+        "blocks"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "intent": "list of variable-length blocks; nested payload arrays are not extra nodes",
+      "sha256": "74b533bca330129fef76f6a889da7abdf27928bcad097678c331af0984d16b03",
+      "predictedAt": "2026-11-09T06:50:27.990Z"
+    },
+    {
+      "id": "queue_realloc_storage",
+      "family": "mixed-container-representations",
+      "style": "queue_realloc_storage",
+      "stdout": "7\n2\n20\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "intent": "inefficient shifting FIFO; live storage replaced by realloc",
+      "sha256": "7c272fe8df4dad172c551e688f97b72997c5ec084a2bea211169177e0e9bf301",
+      "predictedAt": "2026-11-09T06:50:27.991Z"
+    },
+    {
+      "id": "trie_false",
+      "family": "mixed-container-representations",
+      "style": "trie_false",
+      "stdout": "3 8\n",
+      "targets": [
+        "arena"
+      ],
+      "views": [
+        "tree"
+      ],
+      "intent": "three-way trie using index 0 as sentinel except root; unused arena capacity is not nodes",
+      "nodeCount": 8,
+      "sha256": "55d905939d36f25db3215a7e94581d5a1d0b739b80ed3bcbbc1cdbf4f22aa0b2",
+      "predictedAt": "2026-11-09T06:50:27.992Z"
+    },
+    {
+      "id": "trie_true",
+      "family": "mixed-container-representations",
+      "style": "trie_true",
+      "stdout": "4 8\n",
+      "targets": [
+        "arena"
+      ],
+      "views": [
+        "tree"
+      ],
+      "intent": "three-way trie using index 0 as sentinel except root; unused arena capacity is not nodes",
+      "nodeCount": 8,
+      "sha256": "541a03819b84da9a37a1d1a25ba788f33ccaa9363b6be0d33180e7ae1cd1c576",
+      "predictedAt": "2026-11-09T06:50:27.994Z"
+    },
+    {
+      "id": "hash_open_addressing",
+      "family": "mixed-container-representations",
+      "style": "hash_open_addressing",
+      "stdout": "25\n",
+      "targets": [
+        "table"
+      ],
+      "views": [
+        "array"
+      ],
+      "intent": "hash table with collisions and duplicate update; array fallback acceptable, queue inference would be misleading",
+      "sha256": "aeb4748360ac3a2202db60c08914c19894ce3b9dc1e409b7e23809835ce08322",
+      "predictedAt": "2026-11-09T06:50:27.996Z"
+    },
+    {
+      "id": "graph_shifted_domain",
+      "family": "mixed-container-representations",
+      "style": "graph_shifted_domain",
+      "stdout": "14\n",
+      "targets": [
+        "storage",
+        "d",
+        "edges"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "logical vertex domain begins inside a larger allocation; preserve logical vs physical offsets",
+      "expectedEdges": [
+        [
+          0,
+          1,
+          3
+        ],
+        [
+          1,
+          2,
+          2
+        ],
+        [
+          2,
+          3,
+          1
+        ]
+      ],
+      "sha256": "fb37031c528ff5966498016c989b086b74830c9a90cd9af26fad8a748b286fec",
+      "predictedAt": "2026-11-09T06:50:27.998Z"
+    },
+    {
+      "id": "table_decoy",
+      "family": "mixed-container-representations",
+      "style": "table_decoy",
+      "stdout": "32\n",
+      "targets": [
+        "lookup",
+        "values"
+      ],
+      "views": [
+        "array"
+      ],
+      "intent": "permutation lookup without adjacency traversal; numerical coincidence is not a graph proof",
+      "sha256": "7844f52f105fd8416c0ac1f9707a228b926571c8f3a2c634cd6a0b3e82d56f8c",
+      "predictedAt": "2026-11-09T06:50:28.001Z"
+    },
+    {
+      "id": "trie_guard_ne_zero",
+      "family": "boundary-and-lifetime-probes",
+      "style": "trie_guard_ne_zero",
+      "stdout": "3 8\n",
+      "targets": [
+        "arena"
+      ],
+      "views": [
+        "tree"
+      ],
+      "intent": "same eight-node trie and payload; branch spelling / terminal convention vary",
+      "sha256": "84a32134713fc7cfe0c95e8be1481970b04e5ec488e2dff6e1355b312ad233be",
+      "predictedAt": "2026-11-09T06:52:10.715Z"
+    },
+    {
+      "id": "trie_guard_gt_zero",
+      "family": "boundary-and-lifetime-probes",
+      "style": "trie_guard_gt_zero",
+      "stdout": "3 8\n",
+      "targets": [
+        "arena"
+      ],
+      "views": [
+        "tree"
+      ],
+      "intent": "same eight-node trie and payload; branch spelling / terminal convention vary",
+      "sha256": "1e5338aa127f1c20465561df8057f10556e103358f916963e3f0d6211226abad",
+      "predictedAt": "2026-11-09T06:52:10.718Z"
+    },
+    {
+      "id": "trie_guard_eq_continue",
+      "family": "boundary-and-lifetime-probes",
+      "style": "trie_guard_eq_continue",
+      "stdout": "3 8\n",
+      "targets": [
+        "arena"
+      ],
+      "views": [
+        "tree"
+      ],
+      "intent": "same eight-node trie and payload; branch spelling / terminal convention vary",
+      "sha256": "d24e0071f15f4a58aeedce5543d41d67c99128f4f207ca7c1829fe28e5892b56",
+      "predictedAt": "2026-11-09T06:52:10.721Z"
+    },
+    {
+      "id": "trie_guard_not_continue",
+      "family": "boundary-and-lifetime-probes",
+      "style": "trie_guard_not_continue",
+      "stdout": "3 8\n",
+      "targets": [
+        "arena"
+      ],
+      "views": [
+        "tree"
+      ],
+      "intent": "same eight-node trie and payload; branch spelling / terminal convention vary",
+      "sha256": "e02be42630f383ef639690b8a3f8a37b06daaeb147ae4047f4b67c5ce5b8fee6",
+      "predictedAt": "2026-11-09T06:52:10.722Z"
+    },
+    {
+      "id": "trie_guard_le_continue",
+      "family": "boundary-and-lifetime-probes",
+      "style": "trie_guard_le_continue",
+      "stdout": "3 8\n",
+      "targets": [
+        "arena"
+      ],
+      "views": [
+        "tree"
+      ],
+      "intent": "same eight-node trie and payload; branch spelling / terminal convention vary",
+      "sha256": "722ef59a0580bf9646e6e21a4355abc2ce75cd03ff7c14743cfedfc562c5b07f",
+      "predictedAt": "2026-11-09T06:52:10.725Z"
+    },
+    {
+      "id": "trie_guard_negative_sentinel",
+      "family": "boundary-and-lifetime-probes",
+      "style": "trie_guard_negative_sentinel",
+      "stdout": "3 8\n",
+      "targets": [
+        "arena"
+      ],
+      "views": [
+        "tree"
+      ],
+      "intent": "same eight-node trie and payload; branch spelling / terminal convention vary",
+      "sha256": "8b16a3b235c895a28a28bd0f5225d2077cabb4cf2b4d8faad3cbb334f1421d16",
+      "predictedAt": "2026-11-09T06:52:10.728Z"
+    },
+    {
+      "id": "source_change_alias",
+      "family": "boundary-and-lifetime-probes",
+      "style": "source_change_alias",
+      "stdout": "20\n20\n300\n",
+      "targets": [
+        "from",
+        "to",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "same invalidation requirement regardless of write mechanism",
+      "sha256": "cee1852307e584ebc0adf0cdaa66f28b898a7bbc361af0a5ae5189ee55253382",
+      "predictedAt": "2026-11-09T06:52:10.731Z"
+    },
+    {
+      "id": "source_change_helper",
+      "family": "boundary-and-lifetime-probes",
+      "style": "source_change_helper",
+      "stdout": "20\n20\n300\n",
+      "targets": [
+        "from",
+        "to",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "same invalidation requirement regardless of write mechanism",
+      "sha256": "135e9ee52db13def9e48e7682fe65e7a7741fcb22726184755ad182ce36e5cb5",
+      "predictedAt": "2026-11-09T06:52:10.733Z"
+    },
+    {
+      "id": "source_change_memcpy",
+      "family": "boundary-and-lifetime-probes",
+      "style": "source_change_memcpy",
+      "stdout": "20\n20\n300\n",
+      "targets": [
+        "from",
+        "to",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "same invalidation requirement regardless of write mechanism",
+      "sha256": "f76c83d5f8323791390f2c793e7bd96cf8d4595e46a44ff69f8c4244af0c25ce",
+      "predictedAt": "2026-11-09T06:52:10.737Z"
+    },
+    {
+      "id": "source_change_swap",
+      "family": "boundary-and-lifetime-probes",
+      "style": "source_change_swap",
+      "stdout": "20\n20\n300\n",
+      "targets": [
+        "from",
+        "to",
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "same invalidation requirement regardless of write mechanism",
+      "sha256": "818253c581d961b6176bb9b0a9f7313f4aa761d9832e99e98ed87bc1f7b93324",
+      "predictedAt": "2026-11-09T06:52:10.738Z"
+    },
+    {
+      "id": "graph_storage_end_source",
+      "family": "boundary-and-lifetime-probes",
+      "style": "graph_storage_end_source",
+      "stdout": "6\n6\n",
+      "targets": [
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "no use after free; edge evidence must reflect source storage lifetime at second output",
+      "endedRole": "source",
+      "sha256": "05851f952a3e8136213224fd39433292706cfec92ba1c9665bca6a7d5b7f03fe",
+      "predictedAt": "2026-11-09T06:52:10.739Z"
+    },
+    {
+      "id": "graph_storage_end_destination",
+      "family": "boundary-and-lifetime-probes",
+      "style": "graph_storage_end_destination",
+      "stdout": "6\n6\n",
+      "targets": [
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "no use after free; edge evidence must reflect source storage lifetime at second output",
+      "endedRole": "destination",
+      "sha256": "4b15ddc165d987cf4564c2f4931f64654afb722f60e24f8d6e5a677339fb3080",
+      "predictedAt": "2026-11-09T06:52:10.740Z"
+    },
+    {
+      "id": "graph_storage_end_property",
+      "family": "boundary-and-lifetime-probes",
+      "style": "graph_storage_end_property",
+      "stdout": "6\n6\n",
+      "targets": [
+        "d"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "no use after free; edge evidence must reflect source storage lifetime at second output",
+      "endedRole": "property",
+      "sha256": "8fe0318b0dd9de92efc96792c00dde37ab46cd48c5b8cbccc8b924d3a281bd5f",
+      "predictedAt": "2026-11-09T06:52:10.742Z"
+    },
+    {
+      "id": "renamed_transport_temporary",
+      "family": "identifier-independence",
+      "style": "renamed",
+      "stdout": "0 2 0 1 3\n",
+      "targets": [
+        "Xdbf8dbd7c1",
+        "X6dd5b969ae"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 5,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          3,
+          4,
+          2
+        ],
+        [
+          4,
+          1,
+          1
+        ]
+      ],
+      "intent": "same weighted directed graph; only expression boundaries differ",
+      "derivedFrom": "transport_temporary",
+      "sha256": "3f2b31f987a50ef979d79ed50d66c52c637570455ffc59a24d5be50aabd46675",
+      "predictedAt": "2026-11-09T06:54:06.391Z"
+    },
+    {
+      "id": "renamed_mutate_parallel_from",
+      "family": "identifier-independence",
+      "style": "renamed",
+      "stdout": "20\n20\n300\n",
+      "targets": [
+        "Xc5db2bc13f",
+        "X2c62f5600b",
+        "X3d70747f38",
+        "Xb24df35f6e"
+      ],
+      "views": [
+        "graph"
+      ],
+      "intent": "edge source mutation invalidates old relation until re-observed",
+      "mutation": {
+        "field": "from[0]",
+        "value": 2
+      },
+      "expectedEdges": [
+        [
+          2,
+          1,
+          5
+        ],
+        [
+          1,
+          2,
+          2
+        ],
+        [
+          2,
+          3,
+          1
+        ]
+      ],
+      "derivedFrom": "mutate_parallel_from",
+      "sha256": "4bedf0caa3a9117ad60d40750211aaef0282af42aafaf8667edfa9dffd0d2064",
+      "predictedAt": "2026-11-09T06:54:06.394Z"
+    },
+    {
+      "id": "renamed_trie_guard_ne_zero",
+      "family": "identifier-independence",
+      "style": "renamed",
+      "stdout": "3 8\n",
+      "targets": [
+        "X911f77ab21"
+      ],
+      "views": [
+        "tree"
+      ],
+      "intent": "same eight-node trie and payload; branch spelling / terminal convention vary",
+      "derivedFrom": "trie_guard_ne_zero",
+      "sha256": "0cb4a9a4dfe156e267bf02f5ca34ae7eeeee43eeb71d067045c04992298e454f",
+      "predictedAt": "2026-11-09T06:54:06.395Z"
+    },
+    {
+      "id": "renamed_queue_tail_conditional_fixed_4",
+      "family": "identifier-independence",
+      "style": "renamed",
+      "stdout": "78 0\n",
+      "targets": [
+        "X2339c613f0"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "derivedFrom": "queue_tail_conditional_fixed_4",
+      "sha256": "708046c995d0a2fb28b05a370bd975d69468238a3050caae1d9fc57a55b2aef7",
+      "predictedAt": "2026-11-09T06:54:06.397Z"
+    },
+    {
+      "id": "renamed_queue_tail_mod_fixed_4",
+      "family": "identifier-independence",
+      "style": "renamed",
+      "stdout": "78 0\n",
+      "targets": [
+        "X93bc798d82"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "derivedFrom": "queue_tail_mod_fixed_4",
+      "sha256": "58d319bd43ccb85f0e02ddc872150d090c9a3f04d70c5ba30d6bafbd8d2e56c4",
+      "predictedAt": "2026-11-09T06:54:06.401Z"
+    },
+    {
+      "id": "renamed_intrusive_true",
+      "family": "identifier-independence",
+      "style": "renamed",
+      "stdout": "26 4\n",
+      "targets": [
+        "Xc3c8f2d20c",
+        "X16b10e9a19"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "intent": "intrusive sentinel list; Link is embedded in Node and payload lies before link",
+      "derivedFrom": "intrusive_true",
+      "sha256": "44ad4eed2de6395fb12ad790bd2fb1ca522ce946a5b63e2b54cdd40781065329",
+      "predictedAt": "2026-11-09T06:54:06.402Z"
+    },
+    {
+      "id": "renamed_graph_matrix_presence_4",
+      "family": "identifier-independence",
+      "style": "renamed",
+      "stdout": "0 0 0 2 \n",
+      "targets": [
+        "X9d144c0234",
+        "Xe3fae4ef6e"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 4,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          3,
+          0,
+          3
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "derivedFrom": "graph_matrix_presence_4",
+      "sha256": "36a8b03bf802dbe0048bc3d1f621c8a1e30b2dcd2ad896a8f75c03fa920bc050",
+      "predictedAt": "2026-11-09T06:54:06.403Z"
+    },
+    {
+      "id": "renamed_table_decoy",
+      "family": "identifier-independence",
+      "style": "renamed",
+      "stdout": "32\n",
+      "targets": [
+        "X1c50224f82",
+        "Xa8bccfb831"
+      ],
+      "views": [
+        "array"
+      ],
+      "intent": "permutation lookup without adjacency traversal; numerical coincidence is not a graph proof",
+      "derivedFrom": "table_decoy",
+      "sha256": "22da91f0c57e9044ac0bb2a64b45d42deee473b1d149f6f2dcd35e569afd3a35",
+      "predictedAt": "2026-11-09T06:54:06.406Z"
+    },
+    {
+      "id": "csr_inline_control",
+      "family": "causal-control-probes",
+      "style": "csr_relax",
+      "stdout": "0 0 0 2 \n",
+      "targets": [
+        "row",
+        "col",
+        "cost"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 4,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          3,
+          0,
+          3
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "derivedFrom": "graph_csr_relax_4",
+      "sha256": "f20d047070c7bacc3d9970c69723d097837371f238cbc86663fbce116ffe95db",
+      "predictedAt": "2026-11-09T06:55:36.867Z"
+    },
+    {
+      "id": "csr_inline_no_alias",
+      "family": "causal-control-probes",
+      "style": "csr_relax",
+      "stdout": "0 0 0 2 \n",
+      "targets": [
+        "row",
+        "col",
+        "cost"
+      ],
+      "views": [
+        "graph"
+      ],
+      "nodeCount": 4,
+      "expectedEdges": [
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          2
+        ],
+        [
+          3,
+          0,
+          3
+        ]
+      ],
+      "intent": "same directed weighted graph; BFS only checks reachability",
+      "derivedFrom": "graph_csr_relax_4",
+      "sha256": "7423740152174ae751a8ca55d8cc9c522c9fbe8046d000085e0198e5237940db",
+      "predictedAt": "2026-11-09T06:55:36.870Z"
+    },
+    {
+      "id": "trie_direct_field_guard",
+      "family": "causal-control-probes",
+      "style": "trie_false",
+      "stdout": "3 8\n",
+      "targets": [
+        "arena"
+      ],
+      "views": [
+        "tree"
+      ],
+      "intent": "three-way trie using index 0 as sentinel except root; unused arena capacity is not nodes",
+      "nodeCount": 8,
+      "derivedFrom": "trie_false",
+      "sha256": "19da69d12b3adfddba90b5c36e9f425ee408a5a9400500b2b63f6fd9ae051511",
+      "predictedAt": "2026-11-09T06:55:36.872Z"
+    },
+    {
+      "id": "trie_callee_guard",
+      "family": "causal-control-probes",
+      "style": "trie_false",
+      "stdout": "3 8\n",
+      "targets": [
+        "arena"
+      ],
+      "views": [
+        "tree"
+      ],
+      "intent": "three-way trie using index 0 as sentinel except root; unused arena capacity is not nodes",
+      "nodeCount": 8,
+      "derivedFrom": "trie_false",
+      "sha256": "94e05b6ca1f20600f8ccdc8d4d526fa58a6d32891e85693972db7614e494f734",
+      "predictedAt": "2026-11-09T06:55:36.873Z"
+    },
+    {
+      "id": "queue_single_conditional_write",
+      "family": "causal-control-probes",
+      "style": "tail_conditional",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "derivedFrom": "queue_tail_conditional_fixed_4",
+      "sha256": "f366bb8c88d056551b01d0ca108965a10381cd608be68d5ebb23ce1388504f15",
+      "predictedAt": "2026-11-09T06:55:36.876Z"
+    },
+    {
+      "id": "queue_helper_wrapping",
+      "family": "causal-control-probes",
+      "style": "tail_conditional",
+      "stdout": "78 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue"
+      ],
+      "capacity": 4,
+      "heap": false,
+      "intent": "bounded FIFO; no overflow and no underflow",
+      "derivedFrom": "queue_tail_conditional_fixed_4",
+      "sha256": "01425cfc2055c40a464145266774fa954ab766b69dc44cb42ece219d4554fe7c",
+      "predictedAt": "2026-11-09T06:55:36.876Z"
+    },
+    {
+      "id": "relative_tree_temporaries",
+      "family": "causal-control-probes",
+      "style": "index_offset",
+      "stdout": "34\n",
+      "targets": [
+        "a",
+        "val"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "nodeCount": 6,
+      "expectedEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ]
+      ],
+      "intent": "rooted binary tree; spare capacity is not membership",
+      "derivedFrom": "tree_index_offset_6",
+      "sha256": "1fe02ac17d8777f1c53b03558865c97aa51454be9ab4d628729d5619b3d6c23e",
+      "predictedAt": "2026-11-09T06:55:36.879Z"
+    },
+    {
+      "id": "pointer_guard_no_marker",
+      "family": "pointer-boundary-negative-controls",
+      "style": "no_marker",
+      "stdout": "3 0 0\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "intent": "pool[0] is a real node; equality labels it but does not terminate traversal",
+      "sha256": "99685b70ad569a9a86bfd3dd5ed892d74c7de242409cb5d5027108dd98756dbd",
+      "predictedAt": "2026-11-09T06:58:49.691Z"
+    },
+    {
+      "id": "pointer_guard_count_marker",
+      "family": "pointer-boundary-negative-controls",
+      "style": "count_marker",
+      "stdout": "3 1 0\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "intent": "pool[0] is a real node; equality labels it but does not terminate traversal",
+      "sha256": "ff0c6493a5e05a9b3018a815988f0906a4f45e3d927a492d83d6e3b6a7850846",
+      "predictedAt": "2026-11-09T06:58:49.693Z"
+    },
+    {
+      "id": "pointer_guard_payload_marker",
+      "family": "pointer-boundary-negative-controls",
+      "style": "payload_marker",
+      "stdout": "3 1 23\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "intent": "pool[0] is a real node; equality labels it but does not terminate traversal",
+      "sha256": "c9466cfe7475d11cba630db711f0462296338d6995781928e5370cc5f2296ae8",
+      "predictedAt": "2026-11-09T06:58:49.694Z"
+    },
+    {
+      "id": "pointer_guard_continue_marker",
+      "family": "pointer-boundary-negative-controls",
+      "style": "continue_marker",
+      "stdout": "3 1 0\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "intent": "pool[0] is a real node; equality labels it but does not terminate traversal",
+      "sha256": "1821006353f8196dfc3450eb693e8286732c15cae37702b7fd7f7fd5934f9a59",
+      "predictedAt": "2026-11-09T06:58:49.696Z"
+    },
+    {
+      "id": "pointer_guard_address_count_marker",
+      "family": "pointer-boundary-negative-controls",
+      "style": "count_marker",
+      "stdout": "3 1 0\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "intent": "pool[0] is a real node; equality labels it but does not terminate traversal",
+      "sha256": "eb82da6974d78d5ee4d66b41c8458df7d648205a116fb11bd2a7d39aa270b218",
+      "predictedAt": "2026-11-09T06:59:17.934Z",
+      "derivedFrom": "pointer_guard_count_marker"
+    },
+    {
+      "id": "pointer_guard_address_payload_marker",
+      "family": "pointer-boundary-negative-controls",
+      "style": "payload_marker",
+      "stdout": "3 1 23\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "intent": "pool[0] is a real node; equality labels it but does not terminate traversal",
+      "sha256": "58b5805eee3274528d051999eff329658fedaff9afb4840434cc28185c76a0eb",
+      "predictedAt": "2026-11-09T06:59:17.936Z",
+      "derivedFrom": "pointer_guard_payload_marker"
+    },
+    {
+      "id": "pointer_guard_address_continue_marker",
+      "family": "pointer-boundary-negative-controls",
+      "style": "continue_marker",
+      "stdout": "3 1 0\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "intent": "pool[0] is a real node; equality labels it but does not terminate traversal",
+      "sha256": "39db6fbd722caee98ae8affbc27e201186f7442f86ed7db74ca7f6b38e7a3bc1",
+      "predictedAt": "2026-11-09T06:59:17.937Z",
+      "derivedFrom": "pointer_guard_continue_marker"
+    },
+    {
+      "id": "pointer_guard_boolean_count",
+      "family": "pointer-boundary-negative-controls",
+      "style": "count_marker",
+      "stdout": "3 1 0\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "intent": "pool[0] is a real node; equality labels it but does not terminate traversal",
+      "sha256": "7988abcda23039df759bf52fb8ca275115eb8e91c4c94507602028c4499278dd",
+      "predictedAt": "2026-11-09T07:01:10.806Z",
+      "derivedFrom": "pointer_guard_address_count_marker"
+    },
+    {
+      "id": "pointer_guard_alias_anchor",
+      "family": "pointer-boundary-negative-controls",
+      "style": "count_marker",
+      "stdout": "3 1 0\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "intent": "pool[0] is a real node; equality labels it but does not terminate traversal",
+      "sha256": "3322aec6fac3cf27e7ac5441db5a036b1e2db5d2bba00e2d3128665e718cefd4",
+      "predictedAt": "2026-11-09T07:01:10.808Z",
+      "derivedFrom": "pointer_guard_address_count_marker"
+    },
+    {
+      "id": "pointer_guard_neq_marker",
+      "family": "pointer-boundary-negative-controls",
+      "style": "count_marker",
+      "stdout": "3 2 0\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "nodeCount": 3,
+      "expectedEdges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ],
+      "intent": "pool[0] is a real node; equality labels it but does not terminate traversal",
+      "sha256": "1a430056b214b3adae83fcdf857ae02ed23a7267cff9c7f90cbfea175dec4f9b",
+      "predictedAt": "2026-11-09T07:01:10.809Z",
+      "derivedFrom": "pointer_guard_address_count_marker"
+    }
+  ]
+}

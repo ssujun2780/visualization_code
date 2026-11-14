@@ -93,6 +93,14 @@ export function aggregateBindings(observations,{types,nearest,abi,nodes,source=a
       const root=origins.get(key(op,op.pointer?.value??op.inputs[0]?.value));
       if(root)origins.set(key(op,op.result),root);
     }
+    if(op.action==='call'){
+      const pointer=op.args.find(a=>a.sret),allocation=pointer&&origins.get(key(op,pointer.value)),
+        call=byNodeId.get(op.semanticNodeId),cType=call?.kind==='CallExpr'?types.spelling(call.type,call.canonical):null;
+      if(allocation&&!allocation.local&&!allocation.cType&&cType?.kind==='record'&&abi.layout(allocation.type).size*8===cType.sizeBits){
+        if(!temporaryCandidates.has(allocation.id))temporaryCandidates.set(allocation.id,{allocation,nodes:new Map()});
+        temporaryCandidates.get(allocation.id).nodes.set(call.id,{node:call,cType,role:'abi-return-storage',visibility:'implementation'});
+      }
+    }
     const node=nearest(op,n=>n.kind==='CompoundLiteralExpr');if(!node)continue;
     const cType=types.spelling(node.type,node.canonical);if(!(cType?.sizeBits>0))continue;
     const pointers=op.action==='address'||['load','store'].includes(op.action)?[op.pointer]:
@@ -110,8 +118,9 @@ export function aggregateBindings(observations,{types,nearest,abi,nodes,source=a
   }
   for(const {allocation,nodes:candidates}of temporaryCandidates.values()){
     const candidate=candidates.size===1?[...candidates.values()][0]:null;
-    if(!candidate||candidateOwners.get(candidate.node.id).size!==1){temporaryGaps.push({observationId:allocation.id,reason:'ambiguous compound literal allocation'});continue;}
-    const evidence='compiler CompoundLiteralExpr location and observed allocation address uses';
+    if(!candidate||candidateOwners.get(candidate.node.id).size!==1){temporaryGaps.push({observationId:allocation.id,reason:'ambiguous source temporary allocation'});continue;}
+    const evidence=candidate.role==='abi-return-storage'?'compiler sret argument and exact CallExpr return type':
+      'compiler CompoundLiteralExpr location and observed allocation address uses';
     allocation.cType=candidate.cType;
     allocation.sourceTemporary={sourceNodeId:candidate.node.id,source:candidate.node.source,evidence};
     temporaries.set(allocation.id,{...candidate,evidence});
@@ -123,7 +132,7 @@ export function aggregateBindings(observations,{types,nearest,abi,nodes,source=a
   const sret=new Map(observations.instructions.filter(o=>o.action==='function.argument'&&o.parameter.sret).map(o=>[o.functionId,o]));
   for(const op of observations.instructions){
     if(op.action==='object.begin'&&op.result&&op.cType)paths.set(key(op,op.result),{root:op.result,cType:op.cType,backendType:op.type,path:[],
-      initializer:temporaries.get(op.id)?.node.children.at(-1)});
+      initializer:temporaries.get(op.id)?.node.kind==='CompoundLiteralExpr'?temporaries.get(op.id).node.children.at(-1):undefined});
     if(op.action==='function.argument'){
       const p=op.parameter,cType=p.sret?returnTypes.get(functionNames.get(op.functionId)):p.byval?op.cType:op.cType?.pointee;
       if(cType||p.sret)paths.set(key(op,p.value),{root:p.value,cType,backendType:p.type.slice(0,-1),path:[]});
@@ -134,7 +143,8 @@ export function aggregateBindings(observations,{types,nearest,abi,nodes,source=a
         let next=base;
         if(base.cType?.recordKind==='union'){
           const member=nearest(op,n=>n.kind==='MemberExpr'&&source.field(n.fieldASTId,base.cType)),
-            part=source.field(member?.fieldASTId??base.initializer?.selectedFieldASTId,base.cType),
+            init=nearest(op,n=>n.kind==='InitListExpr'&&types.spelling(n.type,n.canonical)?.recordTypeId===base.cType.recordTypeId),
+            part=source.field(member?.fieldASTId??base.initializer?.selectedFieldASTId??init?.selectedFieldASTId,base.cType),
             backendType=op.type.slice(0,-1);
           if(part&&abi.layout(backendType).size*8===part.sizeBits)next={...base,cType:part.cType,backendType,path:[...base.path,part]};
         }
@@ -145,19 +155,31 @@ export function aggregateBindings(observations,{types,nearest,abi,nodes,source=a
       const base=paths.get(key(op,op.pointer.value));let type=base?.cType,backend=op.baseType,path=[...(base?.path??[])],valid=!!base&&base.backendType===op.baseType;
       const indices=op.inputs.slice(1);
       for(const [i,index]of indices.entries()){
-        if(i===0){if(index.value!=='0')path.push({kind:'index',index:index.value});continue;}
+        if(i===0){if(index.value!=='0'){
+          const last=path.at(-1);
+          if(last?.kind==='index')path[path.length-1]={...last,index:/^-?\d+$/.test(last.index??'')&&/^-?\d+$/.test(index.value)?String(BigInt(last.index)+BigInt(index.value)):null};
+          else path.push({kind:'index',index:index.value});
+        }continue;}
         if(type?.kind==='record'&&type.recordKind==='struct'){
           const position=Number(index.value),field=Number.isInteger(position)&&abi.layout(backend).fields?.[position],member=type.members[position];
           // LLVM field numbering is not C member numbering for packed
           // bit-fields. Only attach a member after confirming its layout.
           if(!field||!member||member.offsetBits!==field.offset*8||member.sizeBits!==abi.layout(field.type).size*8){valid=false;break;}
-          path.push({kind:'member',name:member.name,index:position,offsetBits:member.offsetBits,typeId:member.typeId});
+          const declaration=types.recordDeclaration(type)?.children.filter(n=>n.kind==='FieldDecl')[position];
+          path.push({kind:'member',name:member.name,index:position,offsetBits:member.offsetBits,typeId:member.typeId,
+            ...(declaration?{fieldNodeId:declaration.id}:{})});
           type=types.debug(member.typeId);backend=field.type;
         }else if(type?.kind==='array'){
           path.push({kind:'index',index:index.value});type=type.elementType;backend=abi.layout(backend).elementType;
         }else {valid=false;break;}
       }
       if(valid)paths.set(key(op,op.result),{...base,cType:type,backendType:backend,path});
+    }
+    if(op.opcode==='phi'&&op.type?.endsWith('*')){
+      const incoming=(op.inputs??[]).map(v=>paths.get(key(op,v.value))).filter(Boolean),base=incoming[0];
+      if(base?.path.at(-1)?.kind==='index'&&incoming.every(p=>p.root===base.root&&p.backendType===base.backendType&&
+        JSON.stringify(p.path.slice(0,-1))===JSON.stringify(base.path.slice(0,-1))))
+        paths.set(key(op,op.result),{...base,path:[...base.path.slice(0,-1),{kind:'index',index:null,runtime:true}]});
     }
     if(['load','store'].includes(op.action)){
       const pointer=paths.get(key(op,op.pointer.value));
@@ -167,7 +189,7 @@ export function aggregateBindings(observations,{types,nearest,abi,nodes,source=a
           if(initializer?.kind!=='InitListExpr'){initializer=null;break;}
           const union=types.spelling(initializer.type,initializer.canonical)?.recordKind==='union';
           const index=union?(source.field(initializer.selectedFieldASTId,types.spelling(initializer.type,initializer.canonical))?.name===part.name?0:null):
-            part.kind==='member'?part.index:/^\d+$/.test(part.index)?Number(part.index):null;
+            part.kind==='member'?part.index:/^\d+$/.test(part.index??'')?Number(part.index):null;
           initializer=index===null?null:initializer.children[index];
         }
         accesses.set(op.id,{cType:pointer.cType,memberPath:pointer.path.filter(p=>p.kind==='member').map(p=>p.name),
@@ -209,5 +231,5 @@ export function aggregateBindings(observations,{types,nearest,abi,nodes,source=a
     info.cType??=info.sites.map(s=>s.node.children[0]).map(n=>n&&types.spelling(n.type,n.canonical)).find(Boolean)??null;
     op.aggregateReturn={pointer:info.pointer,type:info.backendType,cType:info.cType};
   }
-  return {accesses,returns,argumentsByCall,source,temporaries,temporaryGaps,memoryCalls};
+  return {accesses,returns,argumentsByCall,source,temporaries,temporaryGaps,memoryCalls,paths};
 }

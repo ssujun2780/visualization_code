@@ -1,0 +1,996 @@
+{
+  "createdAt": "2026-11-06T01:40:41.025Z",
+  "cases": [
+    {
+      "id": "01_comma_conditional",
+      "source": "#include <stdio.h>\nint calls=0;\nint next(int x){ calls++; return x+1; }\nint main(void){\n int x=2,y=9;\n int a=(x+=3,x*2); // @write:a\n int b=x<y ? next(x) : next(y); // @write:b\n int c=(x>y && next(40)) || (y>x && next(0)); // @write:c\n int d=(x==5 ? (y+=2,y) : (x+=4,x))+a; // @write:d\n printf(\"%d %d %d %d %d %d %d\\n\",x,y,a,b,c,d,calls);\n return 0;\n}\n",
+      "stdout": "5 11 10 6 1 21 2\n",
+      "process": [
+        "Comma writes x before reading x*2; only selected ternary arm executes.",
+        "Short circuit skips next(40), executes next(0); calls total 2.",
+        "a=10,b=6,c=1,d=21, no source-level comma arithmetic."
+      ],
+      "checks": {
+        "writes": {
+          "a": [
+            "5",
+            "10"
+          ],
+          "b": [
+            "6"
+          ],
+          "c": [
+            "1"
+          ]
+        },
+        "calls": {
+          "next": 2
+        }
+      },
+      "createdAt": "2026-11-06T01:40:41.003Z",
+      "sha256": "a40d305134e7cb29c7622fe0791895ed96c4f3a37f8e6d729786ec3bd746d71d",
+      "predictionCorrection": {
+        "id": "01_comma_conditional",
+        "field": "checks.writes.a",
+        "before": [
+          "10"
+        ],
+        "after": [
+          "5",
+          "10"
+        ],
+        "reason": "Tag is line-wide: the predicted x+=3 writes5 before a gets10. Original prose already predicts both. Harness omitted the first write; not a model defect.",
+        "correctedAt": "2026-11-06T01:44:18.250Z"
+      }
+    },
+    {
+      "id": "02_nested_return",
+      "source": "#include <stdio.h>\ntypedef struct {int a[2];int *p;} Pair;\nPair make(int *p,int n){ Pair r={{n,n+1},p};return r; }\nPair alter(Pair r){r.a[1]+=*r.p;*r.p+=2;return r;}\nint main(void){\n int base=5;\n Pair r=alter(make(&base,3));\n int sum=r.a[0]+r.a[1]+*r.p; // @write:sum\n printf(\"%d %d %d %d\\n\",r.a[0],r.a[1],base,sum);\n return 0;\n}\n",
+      "stdout": "3 9 7 19\n",
+      "process": [
+        "make returns independent aggregate {3,4,&base}; alter by value changes a[1] to9 and shared base to7.",
+        "Two aggregate parameter/return transfers, selected fields remain distinct; sum one source CALC."
+      ],
+      "checks": {
+        "writes": {
+          "sum": [
+            "19"
+          ]
+        },
+        "calls": {
+          "make": 1,
+          "alter": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:40:41.006Z",
+      "sha256": "197d7a63ee28e38b57d31ceb650870a07f68816b204886dfa43e99cef4980191"
+    },
+    {
+      "id": "03_varargs",
+      "source": "#include <stdio.h>\n#include <stdarg.h>\ndouble weighted(int count,...){\n va_list ap;va_start(ap,count);\n double total=0;\n for(int i=0;i<count;i++){\n  int weight=va_arg(ap,int);\n  double value=va_arg(ap,double);\n  total+=weight*value; // @write:total\n }\n va_end(ap);return total;\n}\nint main(void){double result=weighted(3,2,1.5,3,2.0,-1,0.5);printf(\"%.1f\\n\",result);return 0;}\n",
+      "stdout": "8.5\n",
+      "process": [
+        "User variadic function reads alternating int,double values: (2,1.5),(3,2),(-1,0.5).",
+        "total goes 0->3->9->8.5; variadic memory is initialized argument data, not garbage."
+      ],
+      "checks": {
+        "calls": {
+          "weighted": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:40:41.007Z",
+      "sha256": "eb988ddc24cd0b8829d6b7ff16a91da312f08a2f21aab921a7bf7147609c611d"
+    },
+    {
+      "id": "04_vla_sizeof",
+      "source": "#include <stdio.h>\nint visits=0;\nint size(void){visits++;return 3;}\nint main(void){\n int n=size();\n int a[n][2];\n for(int i=0;i<n;i++){a[i][0]=i+1;a[i][1]=2*(i+1);}\n int bytes=(int)sizeof a;\n int total=0;\n for(int i=0;i<n;i++) total+=a[i][0]+a[i][1]; // @write:total\n printf(\"%d %d %d\\n\",bytes,total,visits);\n return 0;\n}\n",
+      "stdout": "24 18 1\n",
+      "process": [
+        "One 24-byte VLA created after n=3. sizeof does not call size again.",
+        "Six distinct element writes; total cumulative 3,9,18. VLA ends before frame."
+      ],
+      "checks": {
+        "writes": {
+          "total": [
+            "3",
+            "9",
+            "18"
+          ]
+        },
+        "calls": {
+          "size": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:40:41.009Z",
+      "sha256": "9bf1e930a8c4c4a0116dbcc2ae19e80082be800e9796cd42a9c9504bbacfb420"
+    },
+    {
+      "id": "05_flexible_bytes",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\ntypedef struct {int n;unsigned char data[];} Packet;\nint main(void){\n Packet *p=malloc(sizeof *p+4*sizeof p->data[0]);if(!p)return 1;\n p->n=4;\n for(int i=0;i<p->n;i++)p->data[i]=(unsigned char)(10+i);\n unsigned char copy[4];memcpy(copy,p->data,4);\n int total=0;for(int i=0;i<4;i++)total+=copy[i];\n printf(\"%d %u %u %d\\n\",p->n,(unsigned)copy[0],(unsigned)copy[3],total);\n free(p);return 0;\n}\n",
+      "stdout": "4 10 13 46\n",
+      "process": [
+        "8-byte allocation: n at offset0 and flexible data bytes at offsets4..7.",
+        "memcpy transfers four initialized bytes; flexible member bounds governed by allocation."
+      ],
+      "checks": {
+        "calls": {
+          "malloc": 1,
+          "memcpy": 1,
+          "free": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:40:41.011Z",
+      "sha256": "d289d0ff8499619a162c4d3804bd2cba0720a0db507bf627968064040b03be92"
+    },
+    {
+      "id": "06_library_end_pointer",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\nint main(void){\n char source[]=\"12,-7,30\";char *p=source,*end;\n long sum=0;\n while(*p){long v=strtol(p,&end,10);sum+=v;if(*end==0)break;p=end+1;}\n char out[32];int length=snprintf(out,sizeof out,\"sum=%ld\",sum);\n char *found=strchr(out,'=');\n printf(\"%s %d %c\\n\",out,length,found[1]);return 0;\n}\n",
+      "stdout": "sum=35 6 3\n",
+      "process": [
+        "strtol outputs 12,-7,30 and writes end pointer after each consumed number.",
+        "snprintf writes sum=35 plus NUL into out; length6; strchr points at out[3]."
+      ],
+      "checks": {
+        "calls": {
+          "strtol": 3,
+          "snprintf": 1,
+          "strchr": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:40:41.013Z",
+      "sha256": "4bfdecb1f7ba323aa403cf642d6b6f9614f3ff6095ac29cdd3b5df4f6605733d"
+    },
+    {
+      "id": "07_overlap_memmove",
+      "source": "#include <stdio.h>\n#include <string.h>\nint main(void){\n char s[16]=\"abcdef\";\n char *p=s+1;\n memmove(p+1,p,6);\n s[1]='X';\n char *tail=memchr(s,'d',7);\n printf(\"%s %ld\\n\",s,(long)(tail-s));\n return 0;\n}\n",
+      "stdout": "aXbcdef 4\n",
+      "process": [
+        "Overlapping copy reads original b,c,d,e,f,NUL and writes offsets2..7.",
+        "s becomes aXbcdef; memchr returns s+4; one copy with correct pre-copy snapshot."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:40:41.015Z",
+      "sha256": "5ea9a5e5c4348a40387c5512e6b5af47466ef041247c265e5421181382a977d2",
+      "predictionCorrection": {
+        "id": "07_overlap_memmove",
+        "field": "stdout",
+        "before": "aXbcdef 5\n",
+        "after": "aXbcdef 4\n",
+        "reason": "Manual character indexing error. In aXbcdef, d is at zero-based4. Both GCC O0 and O2 disagree with original prediction; the model was not executed for this case.",
+        "correctedAt": "2026-11-06T01:44:18.251Z"
+      }
+    },
+    {
+      "id": "08_static_recursion",
+      "source": "#include <stdio.h>\nint sum=0;\nint visit(int n){\n static int calls=0;calls++;\n int local=n;\n if(n>0)local+=visit(n-1);\n sum+=local;\n return local;\n}\nint main(void){int a=visit(3);int b=visit(1);printf(\"%d %d %d\\n\",a,b,sum);return 0;}\n",
+      "stdout": "6 1 11\n",
+      "process": [
+        "Six visit frames, local values n, recursive returns0,1,3,6 then0,1.",
+        "One static calls object incremented six times; global sum ends11; static storage persists across returns."
+      ],
+      "checks": {
+        "calls": {
+          "visit": 6
+        }
+      },
+      "createdAt": "2026-11-06T01:40:41.016Z",
+      "sha256": "6e47de752ad1bf12e08fe7f3607cd1e47ee0b5cc9cecb45a21cd5774775b3ac2"
+    },
+    {
+      "id": "09_function_pointer_array",
+      "source": "#include <stdio.h>\nint add(int a,int b){return a+b;}\nint sub(int a,int b){return a-b;}\nint mul(int a,int b){return a*b;}\nint main(void){\n int (*ops[3])(int,int)={add,sub,mul};\n int total=0;\n for(int i=0;i<3;i++){int result=ops[i](7,i+2);total+=result;}\n printf(\"%d\\n\",total);return 0;\n}\n",
+      "stdout": "41\n",
+      "process": [
+        "Indirect calls resolve to add(7,2)=9, sub(7,3)=4,mul(7,4)=28; total41.",
+        "CALC/call targets must not conflate function pointer index with argument arithmetic."
+      ],
+      "checks": {
+        "calls": {
+          "add": 1,
+          "sub": 1,
+          "mul": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:40:41.021Z",
+      "sha256": "84a2aa36361cad12451079eec85096befd198108e521e8d81fcb34090b45c9c5"
+    },
+    {
+      "id": "10_input_output",
+      "source": "#include <stdio.h>\n#include <string.h>\nint main(void){\n char buffer[16];\n if(!fgets(buffer,sizeof buffer,stdin))return 1;\n int a=0,b=0,used=0;\n int count=sscanf(buffer,\"%d,%d%n\",&a,&b,&used);\n char out[32];int len=snprintf(out,sizeof out,\"%d:%d:%d\",a+b,count,used);\n fwrite(out,1,(size_t)len,stdout);putchar('\\n');\n fprintf(stderr,\"ok\\n\");return 0;\n}\n",
+      "stdout": "19:2:4\n",
+      "process": [
+        "fgets writes 12,7! newline NUL; sscanf assigns a12,b7,used4,returns2.",
+        "snprintf length6; fwrite stdout string; putchar newline; fprintf stderr distinct stream."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:40:41.023Z",
+      "sha256": "d5807a975fa869a2ecde80b210e0d634f2efca84eaa76cee1b691169457e06e3",
+      "stdin": "12,7!\n",
+      "stderr": "ok\n"
+    },
+    {
+      "id": "11_pointer_updates",
+      "source": "#include <stdio.h>\nint main(void){\n int a[]={2,4,6},b[]={10,20,30};int *p=a,*q=b;\n *p++ += *q++;\n int old=(*p)++;\n *(++p)=*(++q)-old;\n printf(\"%d %d %d %d %ld %ld\\n\",a[0],a[1],a[2],old,(long)(p-a),(long)(q-b));\n return 0;\n}\n",
+      "stdout": "12 5 26 4 2 2\n",
+      "process": [
+        "First p/q advance but write targets a[0]=12. Postfix old gets4 while a[1] becomes5.",
+        "Prefix p/q reach element2 then write a[2]=30-4=26; pointer movement does not retarget earlier write."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:42:51.137Z",
+      "sha256": "71766b5abc9b796c59b3081bfa650d8bc0cccec6b318db1ddd7f52a7030faf56"
+    },
+    {
+      "id": "12_float_bool",
+      "source": "#include <stdio.h>\n#include <math.h>\nint main(void){\n double x=-0.5,y=2.25;\n _Bool b=x;int z=(int)x;float f=(float)(x+y*2);\n double whole=0;double part=modf(y,&whole);\n int exponent=0;double mantissa=frexp(8.0,&exponent);\n printf(\"%d %d %.2f %.2f %.0f %.2f %d\\n\",b,z,(double)f,part,whole,mantissa,exponent);\n return 0;\n}\n",
+      "stdout": "1 0 4.00 0.25 2 0.50 4\n",
+      "process": [
+        "double -0.5 -> bool1, int0; source arithmetic x+y*2 produces4.",
+        "modf writes whole2 and returns.25; frexp writes exponent4 and returns.5; side effects represented."
+      ],
+      "checks": {
+        "calls": {
+          "modf": 1,
+          "frexp": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:42:51.139Z",
+      "sha256": "7167a01673eae1cbc19b798a2319f1c686b15812249db973cd64de1a79ee5897"
+    },
+    {
+      "id": "13_search_callback",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\nint comparisons=0;\nint cmp(const void *x,const void *y){\n comparisons++;\n int a=*(const int*)x,b=*(const int*)y;\n return (a>b)-(a<b);\n}\nint main(void){\n int values[]={2,5,8,11,14};int key=11;\n int *p=bsearch(&key,values,5,sizeof values[0],cmp);\n printf(\"%d %ld %d\\n\",*p,(long)(p-values),comparisons>0);\n return 0;\n}\n",
+      "stdout": "11 3 1\n",
+      "process": [
+        "External bsearch invokes actual user comparator calls; their number may vary by libc and is not fixed by oracle.",
+        "Comparator reads int key/array cells; result points to values[3], shared global comparisons updates survive."
+      ],
+      "checks": {
+        "calls": {
+          "bsearch": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:42:51.139Z",
+      "sha256": "9e1e601a334b3b3bc9132580352daf2214f703dc5947e64f9d386f2f7ad60e60"
+    },
+    {
+      "id": "14_strtok_alias",
+      "source": "#include <stdio.h>\n#include <string.h>\nint main(void){\n char s[]=\"ab,cd,ef\";\n char *first=strtok(s,\",\");char *second=strtok(NULL,\",\");char *third=strtok(NULL,\",\");\n printf(\"%s %s %s %d %d\\n\",first,second,third,s[2],s[5]);\n return 0;\n}\n",
+      "stdout": "ab cd ef 0 0\n",
+      "process": [
+        "strtok overwrites commas at2 and5 with NUL; third token already terminated.",
+        "All three returned pointers refer to original s offsets0,3,6; NULL argument continues library state."
+      ],
+      "checks": {
+        "calls": {
+          "strtok": 3
+        }
+      },
+      "createdAt": "2026-11-06T01:42:51.139Z",
+      "sha256": "5e869d8b34af2d6e9c47c0b2f22486fb787d87405ad61f3e707057b5b6ae7c40"
+    },
+    {
+      "id": "15_realloc_alias",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\nint main(void){\n int *p=malloc(3*sizeof *p);if(!p)return 1;\n p[0]=3;p[1]=6;p[2]=9;\n int *q=realloc(p,6*sizeof *q);if(!q){free(p);return 1;}p=q;\n for(int i=3;i<6;i++)p[i]=p[i-3]+10;\n int copy[6];memcpy(copy,p,6*sizeof *p);free(p);p=NULL;\n int total=0;for(int i=0;i<6;i++)total+=copy[i];\n printf(\"%d %d\\n\",total,p==NULL);return 0;\n}\n",
+      "stdout": "66 1\n",
+      "process": [
+        "Resize retains3,6,9; newly initialized tail13,16,19; copy independent, survives free.",
+        "Realloc may move; reference identity must follow observed lifetime, not assumed identical address."
+      ],
+      "checks": {
+        "calls": {
+          "malloc": 1,
+          "realloc": 1,
+          "memcpy": 1,
+          "free": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:42:51.139Z",
+      "sha256": "1b9ecf86278212aa02b12e961052edd21d70be3db7fc5880e38588358b1ceac0"
+    },
+    {
+      "id": "16_macro_effects",
+      "source": "#include <stdio.h>\nint calls=0;\nint get(int n){calls++;return n;}\n#define PICK(a,b) ((a)>(b)?(a):(b))\n#define CHANGE(x,y) do {int temporary=(x);(x)=(y);(y)=temporary;}while(0)\nint main(void){\n int a=3,b=8;\n int chosen=PICK(get(a),get(b));\n CHANGE(a,b);\n printf(\"%d %d %d %d\\n\",chosen,a,b,calls);\n return 0;\n}\n",
+      "stdout": "8 8 3 3\n",
+      "process": [
+        "Macro PICK compares get(3),get(8) then repeats only get(8); exact evaluation order of comparison operands not asserted.",
+        "CHANGE creates lexical temp3 then writes a8,b3; no invented function frame for macro."
+      ],
+      "checks": {
+        "calls": {
+          "get": 3
+        }
+      },
+      "createdAt": "2026-11-06T01:42:51.139Z",
+      "sha256": "aa061fc681cfb3ae79df4dacb2f456f591f446e072bb27784df23160fe9e02a5"
+    },
+    {
+      "id": "17_scope_reentry",
+      "source": "#include <stdio.h>\nint main(void){\n int sum=0,iteration=0;\nagain:\n {\n  int value=iteration+2;\n  sum+=value;\n  iteration++;\n  if(iteration<3)goto again;\n }\n {int sum=40;printf(\"%d \",sum);}\n printf(\"%d\\n\",sum);return 0;\n}\n",
+      "stdout": "40 9\n",
+      "process": [
+        "goto reenters lexical block three times, distinct value lifetimes2,3,4.",
+        "Shadowed sum40 separate object from outer sum9; goto should close departing block before reopening."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:42:51.139Z",
+      "sha256": "cc678474551e71ca309bddc1f0fe54519f8013e65042bf25095bef20d9b92944"
+    },
+    {
+      "id": "18_union_bitfields",
+      "source": "#include <stdio.h>\n#include <string.h>\ntypedef struct {unsigned a:3;unsigned b:5;} Flags;\ntypedef union {Flags flags;unsigned char bytes[sizeof(Flags)];} Data;\nint main(void){\n Data x={0};x.flags.a=3;x.flags.b=17;\n Data y;memcpy(&y,&x,sizeof x);\n unsigned old=y.flags.a++;y.flags.b^=3;\n printf(\"%u %u %u %u\\n\",old,y.flags.a,y.flags.b,x.flags.b);\n return 0;\n}\n",
+      "stdout": "3 4 18 17\n",
+      "process": [
+        "Complete memcpy retains active initialized bitfields; increment is modulo unsigned 3-bit field, here3->4.",
+        "Other field xor17^3=18, original x remains3,17; do not read nonactive bytes as semantic fields."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:42:51.139Z",
+      "sha256": "4e6efb76b1c22ffd8281910a073b844f4e0bbdf7903aa0392da5a78f6860122e"
+    },
+    {
+      "id": "19_vla_pointer_parameter",
+      "source": "#include <stdio.h>\nint sum(int rows,int cols,int a[rows][cols]){\n int result=0;\n for(int i=0;i<rows;i++)for(int j=0;j<cols;j++)result+=a[i][j];\n return result;\n}\nint main(void){int a[2][3]={{1,2,3},{4,5,6}};printf(\"%d\\n\",sum(2,3,a));return 0;}\n",
+      "stdout": "21\n",
+      "process": [
+        "Array parameter is pointer to row with runtime stride cols*4=12.",
+        "Read six original cells in row-major order and accumulate1,3,6,10,15,21; no array parameter deep copy."
+      ],
+      "checks": {
+        "calls": {
+          "sum": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:42:51.139Z",
+      "sha256": "38afdad145dbd724af298f32ee3aa48c6a404b80ef747cbee33d2cb60ae7f054"
+    },
+    {
+      "id": "20_varargs_ints",
+      "source": "#include <stdio.h>\n#include <stdarg.h>\nint sum(int n,...){va_list ap;va_start(ap,n);int total=0;for(int i=0;i<n;i++)total+=va_arg(ap,int);va_end(ap);return total;}\nint main(void){printf(\"%d\\n\",sum(3,4,5,6));return 0;}\n",
+      "stdout": "15\n",
+      "process": [
+        "Minimal integer-only variadic control for mixed double case; reads4,5,6."
+      ],
+      "checks": {
+        "calls": {
+          "sum": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:42:51.139Z",
+      "sha256": "605587cdd3a1308fea54d2572296e952b32a0c2c150364319f5f3d35ff2a9f11"
+    },
+    {
+      "id": "21_unsigned_indirect_update",
+      "source": "#include <stdio.h>\nint main(void){\n unsigned char data[2]={250,0};unsigned char *p=data;\n int before=(*p)++;\n int after=--p[1];\n printf(\"%d %u %d %u\\n\",before,(unsigned)data[0],after,(unsigned)data[1]);\n return 0;\n}\n",
+      "stdout": "250 251 255 255\n",
+      "process": [
+        "Promote unsigned char for arithmetic, convert stored values to unsigned8; postfix passes250, prefix passes255.",
+        "Final writes need unsigned C type, not only raw i8 signed/unsigned strings."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:46:05.122Z",
+      "sha256": "ad75ce3b45fff164acbc9363164c488dfd949bcaad6bad5f3027a9b61dbea8f8"
+    },
+    {
+      "id": "22_named_record_return",
+      "source": "#include <stdio.h>\ntypedef struct {int x,y;} Item;\nItem make(int n){\n Item local={n,n+1};\n local.y+=2;\n return local;\n}\nint main(void){Item result=make(4);printf(\"%d %d\\n\",result.x,result.y);return 0;}\n",
+      "stdout": "4 7\n",
+      "process": [
+        "Source local object belongs to make frame and initializes before local.y+=2.",
+        "ABI return-slot reuse may share physical storage but cannot erase the source local identity or time its creation before function call."
+      ],
+      "checks": {
+        "calls": {
+          "make": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:46:05.124Z",
+      "sha256": "777c5704a3dfb82cd53384cee831f92e500440c0822b8d0cdd53d141f67798fa"
+    },
+    {
+      "id": "23_record_call_value",
+      "source": "#include <stdio.h>\ntypedef struct {int a,b;} Item;\nItem build(int n){Item x={n,n+2};return x;}\nint use(Item x){return x.a+x.b;}\nint main(void){int total=use(build(4));printf(\"%d\\n\",total);return 0;}\n",
+      "stdout": "10\n",
+      "process": [
+        "Nested by-value argument snapshot is {4,6}; call use consumes build return value.",
+        "Provenance should reach return or initialized bytes, not just uninitialized storage-creation event."
+      ],
+      "checks": {
+        "calls": {
+          "build": 1,
+          "use": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:46:05.124Z",
+      "sha256": "4e8ebd2e25eb2db4f926dedde93478c5bd4d32a0862061d5190ca14583f126aa"
+    },
+    {
+      "id": "24_variadic_forward",
+      "source": "#include <stdio.h>\n#include <stdarg.h>\nint emit(const char *format,...){\n va_list ap;va_start(ap,format);\n int n=vprintf(format,ap);\n va_end(ap);return n;\n}\nint main(void){int n=emit(\"%d %.1f\\n\",7,2.5);printf(\"len=%d\\n\",n);return 0;}\n",
+      "stdout": "7 2.5\nlen=6\n",
+      "process": [
+        "User va_list forwarded into external vprintf must remain live argument memory.",
+        "Output occurs inside vprintf nested in emit; emit returns6 before outer printf."
+      ],
+      "checks": {
+        "calls": {
+          "emit": 1,
+          "vprintf": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:46:05.124Z",
+      "sha256": "7a02d8e12af38591037e00ba8310e3f2b8a406492531ea066bef1a0745a9ff5b"
+    },
+    {
+      "id": "25_conditional_lvalue",
+      "source": "#include <stdio.h>\ntypedef struct {int value;} Box;\nint main(void){\n Box a={3},b={8};Box *p=&a,*q=&b;\n int choose=0;\n (choose?p:q)->value+=4;\n int old=((choose?*p:*q).value);\n choose=1;\n (choose?p:q)->value=old-2;\n printf(\"%d %d %d\\n\",a.value,b.value,old);return 0;\n}\n",
+      "stdout": "10 12 12\n",
+      "process": [
+        "First selection targets b for update12; aggregate selection copies chosen Box value for read, old12.",
+        "After choose1, assignment targets a10; no WRITE to unselected object."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:46:05.124Z",
+      "sha256": "6b8652186b2998d3c86c15072bfc16e4ac64e67d3ba6710dbd89ed1bcfa1249c"
+    },
+    {
+      "id": "26_vla_one_dimension",
+      "source": "#include <stdio.h>\nint main(void){int n=3;int a[n];for(int i=0;i<n;i++)a[i]=i+1;printf(\"%d %d\\n\",a[2],(int)sizeof a);return 0;}\n",
+      "stdout": "3 12\n",
+      "process": [
+        "Control for multidimensional VLA: one allocation12 bytes, three initialized cells, correct runtime sizeof."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:46:05.124Z",
+      "sha256": "cd12c0db14f80924a985853e696519bb22ae9075c5f1cae3475eb97252a2e95a"
+    },
+    {
+      "id": "27_scalar_aggregate_init",
+      "source": "#include <stdio.h>\nint count=0;int step(void){return ++count;}\ntypedef struct {int a,b;int values[3];} Packet;\nint main(void){\n Packet p={.b=9,.a=step(),.values={[1]=step()}};\n printf(\"%d %d %d %d %d %d\\n\",p.a,p.b,p.values[0],p.values[1],p.values[2],count);\n return 0;\n}\n",
+      "stdout": "1 9 0 2 0 2\n",
+      "process": [
+        "Two source initializer calls observed; omitted fields implicitly zero-filled.",
+        "Portable code leaves ordering of separate initializer expressions unspecified, so if native order differs this fixture needs review, not a model fault."
+      ],
+      "checks": {
+        "calls": {
+          "step": 2
+        }
+      },
+      "createdAt": "2026-11-06T01:46:05.124Z",
+      "sha256": "b7081c3839db91fe1ce402166a61741d1f7f746f205c074d5ad99da906c2c743"
+    },
+    {
+      "id": "28_output_binary",
+      "source": "#include <stdio.h>\nint main(void){unsigned char data[4]={'A',0,'B','\\n'};fwrite(data,1,4,stdout);fputs(\"end\",stdout);fputc('\\n',stdout);return 0;}\n",
+      "stdout": "A\u0000B\nend\n",
+      "process": [
+        "Output bytes include embedded NUL and newline; preserve byteLength and order across fwrite,fputs,fputc."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:46:05.124Z",
+      "sha256": "b3e6abf33aa8522ee1335dfabe410e61bbbb15762a793f710eac1d76058e00af"
+    },
+    {
+      "id": "29_macro_precedence",
+      "source": "#include <stdio.h>\n#define PART 3+4\n#define DOUBLE(x) ((x)+(x))\n#define TEXT(x) #x\nint main(void){\n int a=2*PART;\n int b=DOUBLE(5-1);\n int c=(PART)*2;\n printf(\"%d %d %d %s\\n\",a,b,c,TEXT(PART));return 0;\n}\n",
+      "stdout": "10 8 14 PART\n",
+      "process": [
+        "Unparenthesized PART expands 2*3+4=10; parenthesized (3+4)*2=14.",
+        "Macro stringification is literal PART, not3+4. Folded calculations must retain source/expanded grouping without inventing calls."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:51:22.761Z",
+      "sha256": "aeb9d661a45ebf2450869fb2a808289baa747dc0350937b5129d90a142cd2a5c"
+    },
+    {
+      "id": "30_large_exact_integer",
+      "source": "#include <stdio.h>\nint main(void){\n unsigned long long a=9007199254740993ULL;\n unsigned long long b=a+2ULL;\n long long n=-23;\n long long q=n/7,r=n%7;\n unsigned long long wrap=(unsigned long long)(-1LL);\n printf(\"%llu %llu %lld %lld %llu\\n\",a,b,q,r,wrap-b);\n return 0;\n}\n",
+      "stdout": "9007199254740993 9007199254740995 -3 -2 18437736874454810620\n",
+      "process": [
+        "64-bit values stay exact beyond JS safe integer; b is9007199254740995.",
+        "Negative C integer division truncates toward zero; remainder -2. Same-width signed->unsigned cast retains 64-bit all ones."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:51:22.762Z",
+      "sha256": "e977e1297f7f8bb238195af32bc7ff508146fba15a30f85090d6781fb68e5cf8"
+    },
+    {
+      "id": "31_nan_truth",
+      "source": "#include <stdio.h>\n#include <math.h>\nint main(void){\n double a=NAN,b=INFINITY;\n int first=a==a;\n int second=a!=a;\n int third=(a<0.0)||(b>100.0);\n _Bool truth=a;\n printf(\"%d %d %d %d\\n\",first,second,third,truth);\n return 0;\n}\n",
+      "stdout": "0 1 1 1\n",
+      "process": [
+        "NaN comparisons equal false, unequal true; a<0 false; infinity>100 true.",
+        "NaN converts to true because unequal to zero; nonfinite floating values need unambiguous serialized bits/type."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:51:22.762Z",
+      "sha256": "492a5596109e51c428a815cab1801cbf0e257858cb0b7f417dc33bbbceb98c83"
+    },
+    {
+      "id": "32_unicode_positions",
+      "source": "#include <stdio.h>\r\nint twice(int x){return x*2;}\r\nint main(void){\r\n\t/* 한글 주석: 📦 */ int 값=3;\r\n\tint 합계=twice(값)+4;\r\n\tprintf(\"결과=%d\\n\",합계);\r\n\treturn 0;\r\n}\r\n",
+      "stdout": "결과=10\n",
+      "process": [
+        "Korean identifiers/comments, supplementary Unicode emoji, tabs and CRLF change source byte/editor offsets.",
+        "Same source calculation and call semantics; box names and source ranges must preserve Korean identifiers."
+      ],
+      "checks": {
+        "calls": {
+          "twice": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:51:22.762Z",
+      "sha256": "c22de4912e0326a422da6f85d1273fbf8a6caec9baac6adb0a1191d73449f657"
+    },
+    {
+      "id": "33_parser_recursion",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <ctype.h>\ntypedef struct {const char *cursor;int ok;int operations;} Parser;\ntypedef struct {long value;int ok;} Result;\nstatic Result expression(Parser *p);\nstatic void space(Parser *p){while(isspace((unsigned char)*p->cursor))p->cursor++;}\nstatic Result factor(Parser *p){\n space(p);Result result={0,1};\n if(*p->cursor=='('){\n  p->cursor++;result=expression(p);space(p);\n  if(*p->cursor!=')'){p->ok=0;result.ok=0;}else p->cursor++;\n }else{\n  char *end;result.value=strtol(p->cursor,&end,10);\n  if(end==p->cursor){p->ok=0;result.ok=0;}else p->cursor=end;\n }\n return result;\n}\nstatic Result term(Parser *p){\n Result value=factor(p);space(p);\n while(p->ok && *p->cursor=='*'){\n  p->cursor++;Result rhs=factor(p);value.value*=rhs.value;p->operations++;space(p);\n }\n return value;\n}\nstatic Result expression(Parser *p){\n Result value=term(p);space(p);\n while(p->ok && (*p->cursor=='+'||*p->cursor=='-')){\n  char op=*p->cursor++;Result rhs=term(p);\n  value.value=(op=='+')?value.value+rhs.value:value.value-rhs.value;\n  p->operations++;space(p);\n }\n return value;\n}\nint main(void){\n Parser p={\"2*(3+4)-5+6*2\",1,0};Result answer=expression(&p);\n printf(\"%ld %d %d %d\\n\",answer.value,p.ok&&answer.ok,p.operations,*p.cursor==0);\n return 0;\n}\n",
+      "stdout": "21 1 5 1\n",
+      "process": [
+        "Recursively parse expression: inner3+4=7,2*7=14,14-5=9,6*2=12,9+12=21.",
+        "Five source arithmetic reductions and six number tokens; cursor updates, result aggregates, strtol end pointer and short circuits interact."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:51:22.762Z",
+      "sha256": "86f039f3b308ac2563d91cd5eba60ccebafdd85c92bfc1de3a811107696d1810"
+    },
+    {
+      "id": "34_short_input",
+      "source": "#include <stdio.h>\nint main(void){\n int a=11,b=22;\n int count=scanf(\"%d %d\",&a,&b);\n printf(\"%d %d %d\\n\",count,a,b);\n char tail[4];int result=scanf(\"%3s\",tail);\n if(result==1)printf(\"%s\\n\",tail);\n return 0;\n}\n",
+      "stdout": "1 7 22\nq\n",
+      "process": [
+        "Input7 q: first scanf assigns a7, stops at q, leaves b22, returns1.",
+        "Second scanf consumes q, writes q NUL, returns1. Do not synthesize failed second integer assignment."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:51:22.762Z",
+      "sha256": "f56208577ed0cbaf14b7be25fa5b96a6c52bc5611ad239093f6f21d710369495",
+      "stdin": "7 q\n"
+    },
+    {
+      "id": "35_pointer_selected_callback",
+      "source": "#include <stdio.h>\ntypedef int (*Operation)(int);\nint inc(int n){return n+1;}\nint square(int n){return n*n;}\nOperation choose(int mode){return mode?square:inc;}\nint main(void){\n int a=choose(0)(4);\n int b=choose(1)(a);\n printf(\"%d %d\\n\",a,b);return 0;\n}\n",
+      "stdout": "5 25\n",
+      "process": [
+        "Function pointer returns become indirect callees; choose0->inc4=5; choose1->square5=25.",
+        "Returned function identity and calleeInputs must link each actual call, no data dereference of code pointer."
+      ],
+      "checks": {
+        "calls": {
+          "choose": 2,
+          "inc": 1,
+          "square": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:51:22.762Z",
+      "sha256": "22b20ed4d65c109208c4fb742cbc237d84db1e8aee0badc0845b48d454b35bed"
+    },
+    {
+      "id": "36_split_function_pointer",
+      "source": "#include <stdio.h>\ntypedef int (*Operation)(int);\nint inc(int n){return n+1;}int square(int n){return n*n;}\nOperation choose(int mode){return mode?square:inc;}\nint main(void){Operation one=choose(0);int a=one(4);Operation two=choose(1);int b=two(a);printf(\"%d %d\\n\",a,b);return 0;}\n",
+      "stdout": "5 25\n",
+      "process": [
+        "Control for nested factory-call binding: separate pointer variables keep call and return types distinct."
+      ],
+      "checks": {
+        "calls": {
+          "choose": 2,
+          "inc": 1,
+          "square": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:53:47.974Z",
+      "sha256": "60de17f784af6030527d292504cc4b0069014944c4e17988beb6d52020c8847a"
+    },
+    {
+      "id": "37_integer_update_forms",
+      "source": "#include <stdio.h>\nint main(void){\n unsigned char a[1]={250};unsigned char *p=a;\n int x=(*p)++;\n int y=p[0]++;\n int z=++*p;\n *p+=1;\n printf(\"%d %d %d %u\\n\",x,y,z,(unsigned)*p);return 0;\n}\n",
+      "stdout": "250 251 253 254\n",
+      "process": [
+        "Same unsigned char storage updated through parenthesized dereference, subscript, prefix dereference, compound assignment.",
+        "Compare cType across actual WRITEs to same object; only source shape changes, signedness must not."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:53:47.976Z",
+      "sha256": "b2e5ac3ef9b46e5d185260746277c0f621b715f394346451097abce54db2ce8f"
+    },
+    {
+      "id": "38_two_record_returns",
+      "source": "#include <stdio.h>\ntypedef struct {int x,y;} Item;\nItem make(int n){\n Item first={n,n+1};Item second={9,10};\n if(n>0)return first;\n return second;\n}\nint main(void){Item a=make(4),b=make(0);printf(\"%d %d %d %d\\n\",a.x,a.y,b.x,b.y);return 0;}\n",
+      "stdout": "4 5 9 10\n",
+      "process": [
+        "Control for source local alias lost through ABI sret reuse: two source locals and return sites.",
+        "Each call initializes first/second; first chosen4,5 then second9,10."
+      ],
+      "checks": {
+        "calls": {
+          "make": 2
+        }
+      },
+      "createdAt": "2026-11-06T01:53:47.976Z",
+      "sha256": "002f71066bad72dec6b1887da565dfaf7045e2905f009543470b7ecc32eed95d"
+    },
+    {
+      "id": "39_unicode_comment_control",
+      "source": "#include <stdio.h>\r\nint twice(int x){return x*2;}\r\nint main(void){\r\n\t/* 한글 주석: 📦 */ int value=3;\r\n\tint total=twice(value)+4;\r\n\tprintf(\"결과=%d\\n\",total);\r\n\treturn 0;\r\n}\r\n",
+      "stdout": "결과=10\n",
+      "process": [
+        "Only identifiers changed to ASCII; Korean comment/string, emoji, tabs, CRLF retained.",
+        "Confirms whether failure comes from LLVM quoted identifiers, not Unicode source coordinate arithmetic."
+      ],
+      "checks": {
+        "calls": {
+          "twice": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:53:47.976Z",
+      "sha256": "d77aafa34554a903cfbf3a98677a3d87b7b5c707a32e5dd2695d32c511d97840"
+    },
+    {
+      "id": "40_fixed_matrix_parameter",
+      "source": "#include <stdio.h>\nint sum(int rows,int a[][3]){int result=0;for(int i=0;i<rows;i++)for(int j=0;j<3;j++)result+=a[i][j];return result;}\nint main(void){int a[2][3]={{1,2,3},{4,5,6}};printf(\"%d\\n\",sum(2,a));return 0;}\n",
+      "stdout": "21\n",
+      "process": [
+        "Control for runtime-width VLA argument: fixed-width row stride12.",
+        "Six reads and source sum total21, pointer-to-array parameter remains shallow."
+      ],
+      "checks": {
+        "calls": {
+          "sum": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:53:47.976Z",
+      "sha256": "c03913078dc0cf1d61008535155f5f8b3a8b2e3f068b9e6187285ec2867ee82a"
+    },
+    {
+      "id": "41_const_volatile",
+      "source": "#include <stdio.h>\nint main(void){\n const int fixed=4;\n int a=fixed*2+1;\n volatile int state=0;\n int no=state||state;\n state=3;\n int yes=state&&state;\n printf(\"%d %d %d\\n\",a,no,yes);return 0;\n}\n",
+      "stdout": "9 0 1\n",
+      "process": [
+        "Two reads of state for || when0; two reads for && when3; volatile accesses cannot disappear.",
+        "const fixed is source object initialized4; compiler-folded fixed*2+1 retains source calculation result9."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:53:47.976Z",
+      "sha256": "8085aeea5ed2ee2c51736d2eda5763ab08672431f404be85dc5b6afd8872edcc"
+    },
+    {
+      "id": "42_sizeof_vla_effect",
+      "source": "#include <stdio.h>\nint main(void){\n int n=2;\n int bytes=(int)sizeof(int[++n]);\n printf(\"%d %d\\n\",n,bytes);return 0;\n}\n",
+      "stdout": "3 12\n",
+      "process": [
+        "Runtime sizeof VLA type evaluates ++n to3 and calculates3*sizeof(int)=12.",
+        "No array object is allocated for this type-name sizeof expression; side effect cannot be marked unevaluated."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:53:47.976Z",
+      "sha256": "694cf90f556f98912b01192024fbaa5add753b2196964cbc7e6e9afe2b0d36e5"
+    },
+    {
+      "id": "43_nested_factory_calls",
+      "source": "#include <stdio.h>\ntypedef int (*Operation)(int);\nint inc(int x){return x+1;}int square(int x){return x*x;}\nOperation choose(int n){return n?square:inc;}\nint main(void){int result=choose(choose(0)(0))(3);printf(\"%d\\n\",result);return 0;}\n",
+      "stdout": "9\n",
+      "process": [
+        "Actual order choose0 -> inc0 returns1 -> choose1 -> square3 returns9.",
+        "Different AST calls share start columns; instruction identity must follow actual callee SSA producer and full source node."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:53:47.976Z",
+      "sha256": "49b72a86df8208d982617693c34bb6cc8dec366c6a0da3a53c9954e329e6f8cb"
+    },
+    {
+      "id": "44_numeric_sweep",
+      "source": "#include <stdio.h>\n#define MIX(c,u,s) (((c)+(u)) ^ ((unsigned int)(s)<<1))\nint main(void){\n int count;if(scanf(\"%d\",&count)!=1)return 1;\n unsigned int total=0;\n for(int i=0;i<count;i++){\n  unsigned int input,u;int s;if(scanf(\"%u %u %d\",&input,&u,&s)!=3)return 1;\n  unsigned char c=(unsigned char)input;\n  unsigned int z=(c+u)^((unsigned int)s<<1); // @write:z\n  unsigned int w=(z>>3)+(unsigned int)(s/7-s%7); // @write:w\n  unsigned char end=(unsigned char)(z+w); // @write:end\n  unsigned long long wide=((unsigned long long)z<<33)|w; // @write:wide\n  int truth=c<200&&(s>=-20||end>10); // @write:truth\n  int truncated=(int)((double)c/4+(double)s/2); // @write:truncated\n  if(z&8U)total+=w&255U;\n  printf(\"%u %u %u %llu %d %d\\n\",z,w,(unsigned)end,wide,truth,truncated);\n }\n printf(\"total=%u\\n\",total);return 0;\n}\n",
+      "stdout": "1 3 4 8589934595 1 -1\n1234581 154322 103 10604970038680274 1 -7\n2469170 308643 213 21210008796837283 1 -12\n3703593 462943 136 31813621625851999 1 -13\n4938188 617272 4 42418711923616568 0 4\n6172832 771600 176 53024223128176144 1 -2\n7407302 925905 151 63628239684116689 1 9\n8641622 1080192 214 74230967749868416 0 3\n9876375 1234533 252 84837415257298533 0 9\n11110698 1388821 63 95440169092854037 0 3\n12345666 1543189 87 106048463436221461 0 -2\n13580003 1697486 177 116651337530861262 1 -68\n14815012 1851859 247 127259984061546963 1 -63\n16049417 2006157 150 137863442271739021 1 -53\n17284076 2160486 82 148469082325317478 0 -42\n18518389 2314772 137 159071750261527060 0 -39\ntotal=415\n",
+      "stdin": "16\n0 4294967291 -3\n1 4293732724 -16\n7 4292498157 -29\n31 4291263590 -42\n127 4290029023 -55\n128 4288794456 -68\n199 4287559889 -81\n200 4286325322 -94\n250 4285090755 -107\n254 4283856188 -120\n255 4282621621 -133\n17 4281387054 -146\n63 4280152487 -159\n129 4278917920 -172\n201 4277683353 -185\n239 4276448786 -198\n",
+      "checks": {
+        "writes": {
+          "z": [
+            "1",
+            "1234581",
+            "2469170",
+            "3703593",
+            "4938188",
+            "6172832",
+            "7407302",
+            "8641622",
+            "9876375",
+            "11110698",
+            "12345666",
+            "13580003",
+            "14815012",
+            "16049417",
+            "17284076",
+            "18518389"
+          ],
+          "w": [
+            "3",
+            "154322",
+            "308643",
+            "462943",
+            "617272",
+            "771600",
+            "925905",
+            "1080192",
+            "1234533",
+            "1388821",
+            "1543189",
+            "1697486",
+            "1851859",
+            "2006157",
+            "2160486",
+            "2314772"
+          ],
+          "end": [
+            "4",
+            "103",
+            "213",
+            "136",
+            "4",
+            "176",
+            "151",
+            "214",
+            "252",
+            "63",
+            "87",
+            "177",
+            "247",
+            "150",
+            "82",
+            "137"
+          ],
+          "wide": [
+            "8589934595",
+            "10604970038680274",
+            "21210008796837283",
+            "31813621625851999",
+            "42418711923616568",
+            "53024223128176144",
+            "63628239684116689",
+            "74230967749868416",
+            "84837415257298533",
+            "95440169092854037",
+            "106048463436221461",
+            "116651337530861262",
+            "127259984061546963",
+            "137863442271739021",
+            "148469082325317478",
+            "159071750261527060"
+          ],
+          "truth": [
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0"
+          ],
+          "truncated": [
+            "-1",
+            "-7",
+            "-12",
+            "-13",
+            "4",
+            "-2",
+            "9",
+            "3",
+            "9",
+            "3",
+            "-2",
+            "-68",
+            "-63",
+            "-53",
+            "-42",
+            "-39"
+          ]
+        }
+      },
+      "process": [
+        "16 preselected type-boundary inputs; expectations computed with independent BigInt modular arithmetic before compilation.",
+        "Check every z,w,end,wide,truth,truncated WRITE, not only printed result.",
+        "Unsigned wrap, signed quotient/remainder, 64-bit shifts, floating-to-int truncation, short circuit and bitmask branch in common expressions."
+      ],
+      "createdAt": "2026-11-06T01:56:56.630Z",
+      "sha256": "6deec7f43be4874b3af73b71bec4ea06ffaae66ea8f2b5b8a4a9ad0ea7fe09f6"
+    },
+    {
+      "id": "45_numeric_macro_sweep",
+      "source": "#include <stdio.h>\n#define MIX(c,u,s) (((c)+(u)) ^ ((unsigned int)(s)<<1))\nint main(void){\n int count;if(scanf(\"%d\",&count)!=1)return 1;\n unsigned int total=0;\n for(int i=0;i<count;i++){\n  unsigned int input,u;int s;if(scanf(\"%u %u %d\",&input,&u,&s)!=3)return 1;\n  unsigned char c=(unsigned char)input;\n  unsigned int z=MIX(c,u,s); // @write:z\n  unsigned int w=(z>>3)+(unsigned int)(s/7-s%7); // @write:w\n  unsigned char end=(unsigned char)(z+w); // @write:end\n  unsigned long long wide=((unsigned long long)z<<33)|w; // @write:wide\n  int truth=c<200&&(s>=-20||end>10); // @write:truth\n  int truncated=(int)((double)c/4+(double)s/2); // @write:truncated\n  if(z&8U)total+=w&255U;\n  printf(\"%u %u %u %llu %d %d\\n\",z,w,(unsigned)end,wide,truth,truncated);\n }\n printf(\"total=%u\\n\",total);return 0;\n}\n",
+      "stdout": "1 3 4 8589934595 1 -1\n1234581 154322 103 10604970038680274 1 -7\n2469170 308643 213 21210008796837283 1 -12\n3703593 462943 136 31813621625851999 1 -13\n4938188 617272 4 42418711923616568 0 4\n6172832 771600 176 53024223128176144 1 -2\n7407302 925905 151 63628239684116689 1 9\n8641622 1080192 214 74230967749868416 0 3\n9876375 1234533 252 84837415257298533 0 9\n11110698 1388821 63 95440169092854037 0 3\n12345666 1543189 87 106048463436221461 0 -2\n13580003 1697486 177 116651337530861262 1 -68\n14815012 1851859 247 127259984061546963 1 -63\n16049417 2006157 150 137863442271739021 1 -53\n17284076 2160486 82 148469082325317478 0 -42\n18518389 2314772 137 159071750261527060 0 -39\ntotal=415\n",
+      "stdin": "16\n0 4294967291 -3\n1 4293732724 -16\n7 4292498157 -29\n31 4291263590 -42\n127 4290029023 -55\n128 4288794456 -68\n199 4287559889 -81\n200 4286325322 -94\n250 4285090755 -107\n254 4283856188 -120\n255 4282621621 -133\n17 4281387054 -146\n63 4280152487 -159\n129 4278917920 -172\n201 4277683353 -185\n239 4276448786 -198\n",
+      "checks": {
+        "writes": {
+          "z": [
+            "1",
+            "1234581",
+            "2469170",
+            "3703593",
+            "4938188",
+            "6172832",
+            "7407302",
+            "8641622",
+            "9876375",
+            "11110698",
+            "12345666",
+            "13580003",
+            "14815012",
+            "16049417",
+            "17284076",
+            "18518389"
+          ],
+          "w": [
+            "3",
+            "154322",
+            "308643",
+            "462943",
+            "617272",
+            "771600",
+            "925905",
+            "1080192",
+            "1234533",
+            "1388821",
+            "1543189",
+            "1697486",
+            "1851859",
+            "2006157",
+            "2160486",
+            "2314772"
+          ],
+          "end": [
+            "4",
+            "103",
+            "213",
+            "136",
+            "4",
+            "176",
+            "151",
+            "214",
+            "252",
+            "63",
+            "87",
+            "177",
+            "247",
+            "150",
+            "82",
+            "137"
+          ],
+          "wide": [
+            "8589934595",
+            "10604970038680274",
+            "21210008796837283",
+            "31813621625851999",
+            "42418711923616568",
+            "53024223128176144",
+            "63628239684116689",
+            "74230967749868416",
+            "84837415257298533",
+            "95440169092854037",
+            "106048463436221461",
+            "116651337530861262",
+            "127259984061546963",
+            "137863442271739021",
+            "148469082325317478",
+            "159071750261527060"
+          ],
+          "truth": [
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0"
+          ],
+          "truncated": [
+            "-1",
+            "-7",
+            "-12",
+            "-13",
+            "4",
+            "-2",
+            "9",
+            "3",
+            "9",
+            "3",
+            "-2",
+            "-68",
+            "-63",
+            "-53",
+            "-42",
+            "-39"
+          ]
+        }
+      },
+      "process": [
+        "16 preselected type-boundary inputs; expectations computed with independent BigInt modular arithmetic before compilation.",
+        "Check every z,w,end,wide,truth,truncated WRITE, not only printed result.",
+        "Unsigned wrap, signed quotient/remainder, 64-bit shifts, floating-to-int truncation, short circuit and bitmask branch in common expressions."
+      ],
+      "createdAt": "2026-11-06T01:56:56.633Z",
+      "sha256": "bbb3e87da14ead5591203c41c59e6a9cb9c92fb65dc0c79262e99455252d3cb2"
+    },
+    {
+      "id": "46_errno_storage",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <errno.h>\n#include <limits.h>\nint main(void){\n errno=0;\n char *end;\n long value=strtol(\"999999999999999999999999999999\",&end,10);\n int range=errno==ERANGE;\n printf(\"%d %d %d\\n\",value==LONG_MAX,range,*end==0);\n return 0;\n}\n",
+      "stdout": "1 1 1\n",
+      "process": [
+        "strtol range error is defined library behavior: LONG_MAX, errno ERANGE, end at NUL.",
+        "errno points at library-owned persistent int storage; its initialization/write/read must be tracked, not confused with invalid C memory."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:58:33.050Z",
+      "sha256": "015723faf05417a4c86fa4be78d688394d9d6778ad5c022d317b7d8812abd4b2"
+    },
+    {
+      "id": "47_library_static_string",
+      "source": "#include <stdio.h>\n#include <string.h>\nint main(void){\n const char *message=strerror(0);\n int nonempty=message[0]!=0;\n printf(\"%d\\n\",nonempty);return 0;\n}\n",
+      "stdout": "1\n",
+      "process": [
+        "strerror returns a library-owned static string. Exact language/text not asserted.",
+        "Reading first character of valid return string must have a real observed object/value or explicit coverage gap."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:58:33.052Z",
+      "sha256": "77810818e7b940014dca34b4aad6af9fb5c7bfdd0670c1f8c9f14be051ec3d1c"
+    },
+    {
+      "id": "48_external_record_return",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\nint main(void){\n div_t result=div(-23,7);\n printf(\"%d %d\\n\",result.quot,result.rem);return 0;\n}\n",
+      "stdout": "-3 -2\n",
+      "process": [
+        "Library aggregate return receives quotient-3,remainder-2 through ABI return storage, source result type div_t."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:58:33.052Z",
+      "sha256": "af37974ca62e996450aabee9ebc61d002e6a76f9509e8d0878367334308e39cf"
+    },
+    {
+      "id": "49_normal_exit_callbacks",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\nint state=0;\nvoid first(void){state+=1;printf(\"first:%d\\n\",state);}\nvoid second(void){state+=10;printf(\"second:%d\\n\",state);}\nint main(void){\n if(atexit(first)!=0||atexit(second)!=0)return 1;\n puts(\"before\");exit(0);\n puts(\"after\");return 0;\n}\n",
+      "stdout": "before\nsecond:10\nfirst:11\n",
+      "process": [
+        "Normal exit runs registered callbacks in reverse order; after is never executed.",
+        "Callback frames/calls and writes are user work even though exit is noreturn."
+      ],
+      "checks": {
+        "calls": {
+          "first": 1,
+          "second": 1
+        }
+      },
+      "createdAt": "2026-11-06T01:58:33.052Z",
+      "sha256": "e19182bd404129d5579883038413d37e9465b60b3706b8942bb674375646bf2e"
+    },
+    {
+      "id": "50_integer_parser_tail",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\nint main(void){\n char text[]=\"18446744073709551615:end\";char *end;\n unsigned long long n=strtoull(text,&end,10);\n printf(\"%llu %c %ld\\n\",n,*end,(long)(end-text));\n return 0;\n}\n",
+      "stdout": "18446744073709551615 : 20\n",
+      "process": [
+        "strtoull returns exact ULLONG_MAX and end pointer at colon offset20; no overflow, no errno dependency."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T01:58:33.052Z",
+      "sha256": "d2834ef046c81e7a57a63087a0edc3ef154dce7dc2fc3a521ddc778bab8cf2f2"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import {topology} from "../../model/structure.mjs";
+import {topology} from "../../shared/topology.mjs";
 export {topology};
 
 export function inferDynamicArray(samples) {

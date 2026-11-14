@@ -14,6 +14,9 @@ importers:
       fflate:
         specifier: 0.8.2
         version: 0.8.2
+      libavoid-js:
+        specifier: 0.5.0-beta.5
+        version: 0.5.0-beta.5
       monaco-editor:
         specifier: 0.57.0
         version: 0.57.0
@@ -359,6 +362,9 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
+  libavoid-js@0.5.0-beta.5:
+    resolution: {integrity: sha512-jHkn6A10815TgFhZ1paUD/NDnQkg4C66qJc2Juj1NpmO/+QXnJ4UjIdKQarkXLmI/QgXhEO3RWDxMi3i+uHPwA==}
+
   marked@14.0.0:
     resolution: {integrity: sha512-uIj4+faQ+MgHgwUW1l2PsPglZLOLOT1uErt06dAPtx2kjteLAkbsd/0FiYg/MGS+i7ZKLb7w2WClxHkzOOuryQ==}
     engines: {node: '>= 18'}
@@ -642,6 +648,8 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  libavoid-js@0.5.0-beta.5: {}
 
   marked@14.0.0: {}
 

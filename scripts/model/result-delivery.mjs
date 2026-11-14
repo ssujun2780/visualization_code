@@ -1,5 +1,6 @@
 // A returned value goes to its next observed operand slot. These annotations do
-// not allocate storage, add work, or move call/return/cleanup events.
+// not allocate storage or add work. return-sequence.mjs orders the existing
+// frame cleanup after the observed receiver and annotates FLOW/return.
 const unique=values=>[...new Set(values.filter(v=>v!==null&&v!==undefined))];
 const operator=node=>node?.kind==='BinaryOperator'?/ '([^']+)'\s*$/.exec(node.details)?.[1]:null;
 const transparent=node=>node?.kind==='ParenExpr'||node?.kind==='ImplicitCastExpr'&&
@@ -83,6 +84,7 @@ export function buildResultDeliveries(plan,trace){
     if(BigInt(address)!==BigInt(returned.sourceAddress))return {delivery:null,reason:'observed aggregate return range does not match the compiler return-storage argument'};
     if(!returned.sourceObjectId||!Number.isSafeInteger(offset)||offset<0||!Number.isSafeInteger(size)||size<0||
       returned.memoryState?.byteLength!==size)return {delivery:null,reason:'aggregate return storage range or snapshot was not observed'};
+    const targetId=returned.returnStorage?.objectId??returned.sourceObjectId;
     const writes=unique((returned.dataInputs??[]).filter(id=>{
       const record=events.get(id),e=record?.event,target=e?.target;
       return e?.kind==='WRITE'&&e.phase==='complete'&&target?.objectId===returned.sourceObjectId&&
@@ -90,7 +92,7 @@ export function buildResultDeliveries(plan,trace){
     }));
     if(size&&!writes.length)return {delivery:null,reason:'aggregate return snapshot has no matching observed destination writes'};
     return {delivery:{kind:'abi-return-storage',abiParameterIndex:slot.abiIndex,
-      target:{objectId:returned.sourceObjectId,address:returned.sourceAddress,offset,size},
+      target:{objectId:targetId,address:returned.sourceAddress,offset:(returned.returnStorage?.offset??0)+offset,size},
       snapshotExecutionId:returned.eventId,availableAtExecutionId:returned.eventId,writtenByExecutionIds:writes,
       evidence:'compiler return-storage slot, observed destination address, return snapshot and existing writes'},reason:null};
   }
@@ -100,7 +102,7 @@ export function buildResultDeliveries(plan,trace){
       disposition=resume?.returnDisposition??call.returnDisposition??'unknown',isVoid=(resume?.returnType??call.returnType)?.kind==='void',
       after=e=>resume&&e.activationId===resume.activationId&&events.get(e.eventId).index>events.get(resume.eventId).index,
       inputs=resume?(uses.get(resume.eventId)??[]).filter(use=>after(use.event)):[],first=inputs[0]?.event,
-      selected=first?inputs.filter(use=>use.event===first):[],site=sites.get(call.instructionId),storage=storedResult(call,returned);
+      selected=first?inputs.filter(use=>use.event===first):[],site=sites.get(call.instructionId),storage=storedResult(call,returned??resume);
     const status=!resume?'not-returned':isVoid?'void':disposition==='discarded'?'discarded':first?'delivered':storage.delivery?'storage-delivered':'unresolved';
     const consumer=status==='delivered'?{...location(first),role:consumerRole(first),
       inputIndices:unique(selected.map(use=>use.inputIndex)),parameterIndices:unique(selected.map(use=>use.input.parameterIndex))}:null;

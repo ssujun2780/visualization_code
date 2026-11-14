@@ -12,13 +12,14 @@ const contains=(root,node)=>{for(let n=node;n;n=n.parent)if(n===root)return true
 const strip=n=>{while(n?.children.length===1&&['ParenExpr','ImplicitCastExpr','CStyleCastExpr'].includes(n.kind))n=n.children[0];return n;};
 const literal=n=>compilerInteger(strip(n));
 const llvmType=t=>t?.kind==='pointer'?`${llvmType(t.pointee)??'?'}*`:
-  t?.encoding==='DW_ATE_float'?(t.sizeBits===32?'float':t.sizeBits===64?'double':null):t?.signedness?`i${t.sizeBits}`:null;
+  t?.encoding==='DW_ATE_float'?(t.sizeBits===32?'float':t.sizeBits===64?'double':null):t?.signedness||t?.encoding==='DW_ATE_boolean'?`i${t.sizeBits}`:null;
 
-export function macroExpressionBindings({types}){
+export function macroExpressionBindings({types,matchesCast}){
   const producers=new Map(),claimed=new Set();
   const key=(op,value)=>`${op.functionId}:${value}`;
   function compatibleType(node,type){
-    const expected=llvmType(types.spelling(node?.type,node?.canonical));
+    const cType=types.spelling(node?.type,node?.canonical),expected=llvmType(cType);
+    if(cType?.encoding==='DW_ATE_boolean'&&type==='i1')return true;
     return !expected||expected.includes('?')||expected===type;
   }
   function inputScore(op,expected,input){
@@ -60,13 +61,18 @@ export function macroExpressionBindings({types}){
       const previous=producers.get(key(op,op.inputs[0].value));
       if(previous?.node?.macroTokenRange&&(predicates[operator(previous.node)]&&
         ['icmp','fcmp'].includes(previous.op.opcode)||previous.op.opcode==='phi'&&['&&','||'].includes(operator(previous.node))))return previous.node;
-      return null;
+      // A real _Bool promotion is a C cast, unlike comparison materialization.
     }
     const choices=[];
     for(const node of macro){
       if(claimed.has(`${node.id}:${op.opcode}`))continue;
       const symbol=operator(node);let score=0;
-      if(op.opcode==='call'){
+      if(matchesCast(node,op)){
+        if(!compatibleType(node,op.type))continue;
+        const input=inputScore(op,node.children[0],op.inputs?.[0]);
+        if(input<=0)continue;
+        score+=input;
+      }else if(op.opcode==='call'){
         if(node.kind!=='CallExpr'||!op.callee?.startsWith('@'))continue;
         const target=strip(node.children[0]),symbol=/\bFunction 0x[0-9a-f]+ '([^']+)'/.exec(target?.details??'')?.[1];
         if(!symbol||symbol!==op.callee.slice(1).replace(/^"|"$/g,''))continue;

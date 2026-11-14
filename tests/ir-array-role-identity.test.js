@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {bindArrayStructures,arrayStructures} from '../scripts/model/array-views.mjs';
-import {compilerTypeIdentity} from '../scripts/model/compiler-type-identity.mjs';
+import {bindArrayStructures,arrayStructures} from '../scripts/inference/array-views.mjs';
+import {compilerTypeIdentity} from '../scripts/inference/compiler-type-identity.mjs';
 
 const scalar={id:'debug:int',name:'int',sizeBits:32,signedness:'signed',encoding:'DW_ATE_signed'},
   record={id:'debug:r',recordTypeId:'debug:r',kind:'record',sizeBits:96,members:[{typeId:'debug:int',offsetBits:0,sizeBits:32},{typeId:'debug:ptr',offsetBits:32,sizeBits:32}]},

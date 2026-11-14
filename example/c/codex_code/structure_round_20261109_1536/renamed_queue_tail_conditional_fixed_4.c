@@ -1,0 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stddef.h>
+typedef struct{int Xcb45d44b20[4];int X808ad84dcf,Xefa799f377,X543732c7be;int*Xb21c3f3575,*X3169037900;}X3cfaf17b03;void X98d2065161(X3cfaf17b03*X2339c613f0,int x){X2339c613f0->Xcb45d44b20[X2339c613f0->X543732c7be]=x;X2339c613f0->X543732c7be++;if(X2339c613f0->X543732c7be==4)X2339c613f0->X543732c7be=0;X2339c613f0->X808ad84dcf++;}int X4cca8be527(X3cfaf17b03*X2339c613f0){int x=X2339c613f0->Xcb45d44b20[X2339c613f0->Xefa799f377];X2339c613f0->Xefa799f377++;if(X2339c613f0->Xefa799f377==4)X2339c613f0->Xefa799f377=0;X2339c613f0->X808ad84dcf--;return x;}int main(void){X3cfaf17b03 X2339c613f0={0};X2339c613f0.Xb21c3f3575=X2339c613f0.X3169037900=X2339c613f0.Xcb45d44b20;int X99ea4af74a=0;for(int x=1;x<=12;x++){if(X2339c613f0.X808ad84dcf==3)X99ea4af74a+=X4cca8be527(&X2339c613f0);X98d2065161(&X2339c613f0,x);}while(X2339c613f0.X808ad84dcf)X99ea4af74a+=X4cca8be527(&X2339c613f0);printf("%d %d\n",X99ea4af74a,X2339c613f0.X808ad84dcf);return 0;}

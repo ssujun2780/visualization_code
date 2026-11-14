@@ -1,0 +1,299 @@
+[
+  {
+    "id": "intrusive-hash-list",
+    "area": "mixed",
+    "stdout": "4 6 6 4 ",
+    "expect": {
+      "orders": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          2,
+          0,
+          1
+        ]
+      ],
+      "hashKeys": [
+        1,
+        3,
+        2
+      ],
+      "roles": [
+        "bucket",
+        "next",
+        "prev"
+      ]
+    },
+    "sourceHash": "febb7719928778f8555b82405c384065d98d0a094b68dcb3d753ffaa3fe27bd3"
+  },
+  {
+    "id": "tree-queue-shared-records",
+    "area": "mixed",
+    "stdout": "6 6 ",
+    "expect": {
+      "treeEdges": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "queueOrder": [
+        0,
+        1,
+        2
+      ]
+    },
+    "sourceHash": "2494e4c6e3c14b96e5cc048ae53d24e085ae9c24bfb89035f8cdb9c0e9148a15"
+  },
+  {
+    "id": "rotation-and-split",
+    "area": "transition",
+    "stdout": "6 3 6 3 6 ",
+    "expect": {
+      "rootOrders": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ]
+      ],
+      "cyclic": false
+    },
+    "sourceHash": "bc5d4662a75e796cb90db02e8dd6f68535ff33c8e7c8a337eb3556e6d8114050"
+  },
+  {
+    "id": "temporary-cycle",
+    "area": "transition",
+    "stdout": "1 1 1 ",
+    "expect": {
+      "cycleStates": [
+        false,
+        true,
+        false
+      ]
+    },
+    "sourceHash": "2c966a2782221d5852a5a8481427b8b28fa61221f9fb58ffcfff167f24d662eb"
+  },
+  {
+    "id": "allocation-reuse",
+    "area": "reuse",
+    "stdout": "3 9 ",
+    "expect": {
+      "distinctAllocations": true,
+      "oldExcluded": true
+    },
+    "sourceHash": "fb13f5b5a76d605c32e4407b4818b570d1ca0c7bcf680fb1930e30250c08b910"
+  },
+  {
+    "id": "pool-partition-reset",
+    "area": "reuse",
+    "stdout": "0 0 2 0 1 2 ",
+    "expect": {
+      "before": [
+        [
+          0,
+          1
+        ],
+        [
+          2
+        ]
+      ],
+      "after": [
+        [
+          0
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ]
+      ],
+      "finalNoMergeSupport": true
+    },
+    "sourceHash": "34ae2c0ea6234186a3966948d2afa5fef7ef9c6bb6c7797da0af2b22222422ec"
+  },
+  {
+    "id": "relocating-index-list",
+    "area": "reuse",
+    "stdout": "3 10 ",
+    "expect": {
+      "old": [
+        0,
+        1
+      ],
+      "current": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "oldAllocationExcluded": true
+    },
+    "sourceHash": "3afcd41b6d1d769b96b1b4c9ddc1b72a9a0900e3a75438b473d2ded053dc4476"
+  },
+  {
+    "id": "pool-detach-reinsert",
+    "area": "reuse",
+    "stdout": "6 4 12 ",
+    "expect": {
+      "orders": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          0,
+          2
+        ]
+      ],
+      "valueReused": 8
+    },
+    "sourceHash": "efcf144047051eb5c6406857a9a1a7736b238340a52c769b9cad121e01fbe4b1"
+  },
+  {
+    "id": "null-parent-partition",
+    "area": "terminal",
+    "stdout": "0 0 0 3 ",
+    "expect": {
+      "groups": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "terminal": "null"
+    },
+    "sourceHash": "b6927e5a3c7d1ade40d17078cb251be137dac296fd7b20575812e19107956d77"
+  },
+  {
+    "id": "sentinel-parent-partition",
+    "area": "terminal",
+    "stdout": "0 0 0 3 ",
+    "expect": {
+      "groups": [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "sentinelExcluded": true
+    },
+    "sourceHash": "82b37a2c87fe4e4bb396e14675e5572862bd6cb06437c9db77d86a5fb9846a34"
+  },
+  {
+    "id": "sentinel-list-negative",
+    "area": "terminal",
+    "stdout": "6 ",
+    "expect": {
+      "notPartition": true,
+      "sentinelExcluded": true
+    },
+    "sourceHash": "1a29441d87e4bcc15423f7b0a52459921dfe470e6dee2c62d047b086ae05f03d"
+  },
+  {
+    "id": "pointer-comparator",
+    "area": "custom",
+    "stdout": "2:9 2:5 3:7 4:1 ",
+    "expect": {
+      "keyOrder": [
+        [
+          0,
+          1
+        ],
+        [
+          4,
+          -1
+        ]
+      ],
+      "pointerArguments": true
+    },
+    "sourceHash": "e348b6f53135ad16f8dcd9dc967f585082aeb66482f7a4ca072f763a52080215"
+  },
+  {
+    "id": "or-range",
+    "area": "custom",
+    "stdout": "15 11 ",
+    "expect": {
+      "coverage": [
+        0,
+        4
+      ],
+      "initial": 15,
+      "final": 11
+    },
+    "sourceHash": "513a520d516d052896b9942526f43e90da912cf87374bbf5a5d4178d0f490c57"
+  },
+  {
+    "id": "multiply-lazy",
+    "area": "custom",
+    "stdout": "60 6 24 ",
+    "expect": {
+      "sum": 60,
+      "tag": 6,
+      "leaf": 24,
+      "clearedTag": 1,
+      "applications": 6
+    },
+    "sourceHash": "324743387f072fbea8423e2da819b8574abf361b8b29c19f60f9a6bcb6dfaefa"
+  },
+  {
+    "id": "assign-lazy",
+    "area": "custom",
+    "stdout": "0 0 7 7 ",
+    "expect": {
+      "sum": 0,
+      "firstTag": 0,
+      "newValue": 7,
+      "assignmentNotAccumulation": true
+    },
+    "sourceHash": "fd9ac3b6c1b7c10fa60eb50b57697251607d00d4cbbc42e2f38c070a13652954"
+  },
+  {
+    "id": "coupled-counters-negative",
+    "area": "custom",
+    "stdout": "15 6 ",
+    "expect": {
+      "notPropagation": true
+    },
+    "sourceHash": "86356455c6b453c9e2abca5d9fb98346411a401bce7c36f34e90c1d7fb9d31e5"
+  }
+]
