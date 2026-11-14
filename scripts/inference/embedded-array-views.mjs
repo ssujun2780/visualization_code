@@ -84,14 +84,18 @@ export function bindEmbeddedArrays(plan){
 export function embeddedArrayStructures(plan,{events,objects,views,storageExtent=arrayStorageExtent(plan,{objects,events})}){
   const roles=plan.structureBindings?.embeddedArrayRoles??[];if(!roles.length)return [];
   const defs=new Map(plan.instructions.map(d=>[d.id,d])),byObject=new Map(objects.map(o=>[o.id,o])),byEvent=new Map(events.map(e=>[e.eventId,e])),
-    contexts=new Map(),alive=new Set(),valueFlow=createValueFlow(plan,{events}),instructionNodes=new Map(plan.instructions.map(d=>[d.id,new Set(walk(d.expression).map(n=>n.nodeId))]));
+    contexts=new Map(),alive=new Set(),valueFlow=createValueFlow(plan,{events}),instructionNodes=new Map(plan.instructions.map(d=>[d.id,new Set(walk(d.expression).map(n=>n.nodeId))])),
+    contextInputs=new Set(),objectsByDeclaration=new Map();
+  for(const o of objects){const id=defs.get(byEvent.get(o.createdBy)?.instructionId)?.declarationId;
+    if(!objectsByDeclaration.has(id))objectsByDeclaration.set(id,[]);objectsByDeclaration.get(id).push(o);}
   function context(objectId,offset,type){
+    const input=`${objectId}:${offset}:${type?.recordTypeId??''}`;if(contextInputs.has(input))return;contextInputs.add(input);
     const o=byObject.get(objectId);if(!o||defs.get(byEvent.get(o.createdBy)?.instructionId)?.visibility==='implementation')return;
     const declaration=defs.get(byEvent.get(o.createdBy)?.instructionId)?.declarationId;
     for(const candidate of roles.filter(r=>r.storage==='separate'?r.data.declarationId===declaration:!!r.recordTypeId&&r.recordTypeId===type?.recordTypeId)){
       let role=candidate;
       if(candidate.storage==='separate'){
-        const fields=candidate.fields.map(f=>{const matches=objects.filter(x=>defs.get(byEvent.get(x.createdBy)?.instructionId)?.declarationId===f.declarationId&&
+        const fields=candidate.fields.map(f=>{const matches=(objectsByDeclaration.get(f.declarationId)??[]).filter(x=>
           (x.storage==='static'||x.frameId===o.frameId));return matches.length===1?{...f,objectId:matches[0].id}:null;}).filter(Boolean);
         role={...candidate,fields};
       }
@@ -134,11 +138,20 @@ export function embeddedArrayStructures(plan,{events,objects,views,storageExtent
       return e.kind==='READ'?[events.indexOf(e)]:[];
     return (e.dataInputs??[]).flatMap(id=>indexReadPositions(id,c,f,seen));
   }
+  const contextsByObject=new Map(),bindingBoundaries=new Map(),groupsByActivation=new Map();
+  const indexContext=(map,key,c)=>{if(!map.has(key))map.set(key,new Set());map.get(key).add(c);};
+  for(const c of contexts.values()){
+    for(const id of new Set([c.ownerObjectId,c.range.objectId,...c.role.fields.map(f=>f.objectId).filter(Boolean)]))indexContext(contextsByObject,id,c);
+    for(const at of [c.bindingStart,c.bindingEnd])if(Number.isFinite(at))indexContext(bindingBoundaries,at,c);
+  }
   for(let sequence=0;sequence<events.length;sequence++){
     const e=events[sequence];if(e.action==='object.begin')alive.add(e.objectId);
     if(e.action==='object.end')alive.delete(e.objectId);
     if(e.action==='frame.end')for(const id of e.endedObjects??[])alive.delete(id);
-    for(const c of contexts.values()){
+    const affected=sequence===0?new Set(contexts.values()):new Set(bindingBoundaries.get(sequence));
+    for(const id of [e.target?.objectId,e.objectId,...e.endedObjects??[]])for(const c of contextsByObject.get(id)??[])affected.add(c);
+    if(e.action==='frame.end')for(const c of groupsByActivation.get(e.activationId)??[])affected.add(c);
+    for(const c of affected){
       const {role}=c,previous={...c.values},inBinding=sequence>=(c.bindingStart??0)&&sequence<(c.bindingEnd??Infinity),target=inBinding&&e.target?.objectId===c.range.objectId,
         own=role.fields.find(f=>e.target?.objectId===(f.objectId??c.ownerObjectId)&&(f.objectId?0:c.ownerOffset)+f.offset===e.target.offset&&f.size===e.target.size);
       let access=target&&['READ','WRITE'].includes(e.kind)?role.accesses.find(a=>instructionNodes.get(e.instructionId)?.has(a.nodeId)):null;
@@ -178,7 +191,7 @@ export function embeddedArrayStructures(plan,{events,objects,views,storageExtent
         e.sourceOffset>=c.range.offset&&e.sourceOffset+e.target.size<=c.range.offset+c.range.size&&
         [e.target.offset-c.range.offset,e.sourceOffset-c.range.offset,e.target.size].every(n=>n%role.elementBytes===0);
       if(inBinding&&(access||own||bulk)&&e.activationId){
-        let g=c.groups.get(e.activationId);if(!g)c.groups.set(e.activationId,g={activationId:e.activationId,before:previous,after:{},accesses:[],updates:[],copies:[]});
+        let g=c.groups.get(e.activationId);if(!g){c.groups.set(e.activationId,g={activationId:e.activationId,before:previous,after:{},accesses:[],updates:[],copies:[]});indexContext(groupsByActivation,e.activationId,c);}
         // A first read can supply a previously unobserved scalar without being a mutation.
         if(own&&e.kind==='READ'&&g.before[own.fieldNodeId]===undefined)g.before[own.fieldNodeId]=c.values[own.fieldNodeId];
         g.after={...c.values};

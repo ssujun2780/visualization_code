@@ -1,8 +1,9 @@
 // Validate projection identities and evidence, never the correctness of the
 // user's links. Cycles, missing relations and reciprocal warnings remain data.
+import {verificationStates} from './history-evidence.mjs';
 export function validateLinkedProjections(trace){
   const events=new Map((trace.events??[]).map((e,index)=>[e.eventId,{event:e,index}])),
-    objects=new Map((trace.objects??[]).map(o=>[o.id,o]));
+    objects=new Map((trace.objects??[]).map(o=>[o.id,o])),positions=new Map([...events].map(([id,e])=>[id,e.index]));
   const fail=message=>{throw new Error(`연결 투영: ${message}`);};
   const ids=(values,label)=>{
     if(!Array.isArray(values)||values.some(id=>typeof id!=='string'||!id)||new Set(values).size!==values.length)fail(`${label} ID가 잘못됐습니다.`);
@@ -47,8 +48,11 @@ export function validateLinkedProjections(trace){
       }
       episodes.set(episode.id,{episode,first,last});
     }
-    let previous=-1;
-    for(const state of structure.states??[]){
+    // Cache only within this validation call and candidate. A later invocation
+    // must re-check even the same object after external edits. Earlier evidence
+    // remains valid at later times only for the same boundary/role context.
+    const topologyChecks=new WeakMap();let previous=-1;
+    for(const state of verificationStates(structure,positions)){
       const at=time(state.afterExecutionId);if(at<previous)fail('상태의 실행 순서가 뒤집혔습니다.');previous=at;
       const boundaries=new Map(),projections=new Map();
       for(const boundary of state.boundaries??[]){
@@ -60,6 +64,8 @@ export function validateLinkedProjections(trace){
       }
       function topology(value,fields){
         if(!value)fail('역할 투영의 topology가 없습니다.');
+        const context=JSON.stringify([fields,[...boundaries.keys()]]),checks=topologyChecks.get(value);
+        if(checks?.get(context)<=at)return;
         if(value.rootNodeId!==null&&value.rootNodeId!==undefined)node(value.rootNodeId);
         for(const id of [...value.reachableNodeIds??[],...value.endedTargetNodeIds??[],...value.terminalNodeIds??[]])node(id);
         for(const id of value.terminalNodeIds??[])if(!boundaries.has(id))fail('종료 노드에 경계 근거가 없습니다.');
@@ -75,6 +81,7 @@ export function validateLinkedProjections(trace){
           }
         }
         for(const unknown of value.unknownRelations??[])if(fields&&unknown.fieldNodeId&&!fields.includes(unknown.fieldNodeId))fail('미관측 관계의 역할이 투영과 다릅니다.');
+        if(!checks)topologyChecks.set(value,new Map([[context,at]]));else checks.set(context,at);
       }
       for(const projection of state.roleTopologies??[]){
         const group=groups.get(projection.roleGroupId);if(!group||projections.has(projection.roleGroupId))fail('상태의 역할 그룹 ID가 없거나 중복됐습니다.');
@@ -84,7 +91,7 @@ export function validateLinkedProjections(trace){
       }
       if(state.selectedRoleGroupId){
         const projection=projections.get(state.selectedRoleGroupId);
-        if(!projection||JSON.stringify(projection.topology)!==JSON.stringify(state.topology))fail('선택된 역할 투영과 표시 topology가 다릅니다.');
+        if(!projection||projection.topology!==state.topology&&JSON.stringify(projection.topology)!==JSON.stringify(state.topology))fail('선택된 역할 투영과 표시 topology가 다릅니다.');
       }
       if(state.topology)topology(state.topology,null);
       for(const issue of state.inconsistencies??[]){

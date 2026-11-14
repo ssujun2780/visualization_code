@@ -3,6 +3,8 @@ import {recordObservedTrace} from './recorded-result.mjs';
 export function partialResult(prepared,raw,{includeObservations=false,skipConversion=false,retainedRaw=raw}={}){
   const {observationPlan,type,...info}=prepared;
   const diagnostic=raw.diagnostics.at(-1),event=raw.events.at(-1);
+  // Bounded recovery is exclusively for execution records; optional inference
+  // must not spend that budget and discard an otherwise recovered IR prefix.
   const recorded=prepared.plan&&!skipConversion?recordObservedTrace(prepared.plan,observationPlan,raw):{
     trace:{...raw,schemaVersion:3,events:[{...event,schemaVersion:3,eventId:'x1',executionId:'x1',instructionId:prepared.plan?.processInstructions?.['ERROR:fault']??null,
       action:'fault',phase:'failed'}],diagnostics:[{...diagnostic,eventId:'x1'}],objects:[],frames:[],views:[],references:[]},

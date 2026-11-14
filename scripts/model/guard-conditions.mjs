@@ -50,7 +50,11 @@ export function bindGuardConditions(plan,observations,{nodes,nearest,types,sourc
             plan.bindings[consumer.id].sourceCondition={invert:false,cType:types.spelling('int')};
           continue;
         }
-        const fields={operator:'truth',sourceNodeId:root.id,expression:tree(root),cType:types.spelling('int'),grouping:'expression',conditionTest:true},
+        // Reused CALCs can still point at the LLVM operand's token (e.g. p).
+        // Keep the semantic AST expression and its full display range together.
+        const source=sourceMap.range(root.source,{text:true}),
+          fields={operator:'truth',sourceNodeId:root.id,expression:tree(root),cType:types.spelling('int'),grouping:'expression',conditionTest:true,
+            ...(source?{source}:{})},
           existing=plan.instructions.find(d=>d.id===b.roles.CALC&&d.kind==='CALC'&&!d.operator),
           calc=existing?Object.assign(existing,fields):add(`condition:truth:${root.id}`,'CALC','expression',o,root,fields);
         b.group=calc.id;b.roles.CALC=calc.id;b.expressionNodeId=root.id;b.sourceOperator='truth';

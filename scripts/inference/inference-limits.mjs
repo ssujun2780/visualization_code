@@ -20,6 +20,10 @@ export function historyDiagnostics(structures){
     for(const st of s.states??[])for(const [resource,count]of Object.entries(st))if(/^omitted/.test(resource)&&typeof count==='number'&&count>0){
       const old=losses.get(resource);if(old)old.count=Math.max(old.count,count);else losses.set(resource,{count,first:st.afterExecutionId??st.executionId});
     }
-    return [...losses].map(([resource,{count,first}])=>({code:'structure-inference-limit',resource,structureId:s.id,omitted:typeof count==='number'?count:null,firstExecutionId:first,scope:'visualization-only'}));
+    return [...losses].map(([resource,{count,first}])=>({code:'structure-inference-limit',resource,structureId:s.id,omitted:typeof count==='number'?count:null,firstExecutionId:first,
+      ...(resource==='omittedStates'&&Number.isSafeInteger(s.coverage?.maxStates)?{
+        limit:s.coverage.maxStates,retainedStates:s.states?.length??0,
+        historyGapFromExecutionId:s.coverage.historyGapFromExecutionId??null,
+        historyGapToExecutionId:s.states?.at(-1)?.afterExecutionId??s.states?.at(-1)?.executionId??null}:{}),scope:'visualization-only'}));
   });
 }

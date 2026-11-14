@@ -5,6 +5,8 @@ import {observeScalarBytes} from './observed-scalar-bytes.mjs';
 import {bindLinkedRootCollections,linkedRootRanges} from './linked-root-collections.mjs';
 import {reciprocalIssues,annotateReciprocalEpisodes,supportedReciprocalRelations} from './linked-reciprocity.mjs';
 import {createValueFlow} from './observed-value-flow.mjs';
+import {createSharedValues} from './shared-values.mjs';
+import {returnedLinkRecurrences} from './returned-link-recurrences.mjs';
 const walk=n=>n?[n,...(n.children??[]).flatMap(walk)]:[];
 const unwrap=n=>{while(n&&['ImplicitCastExpr','CStyleCastExpr','ParenExpr'].includes(n.kind))n=n.children[0];return n;};
 const position=s=>`${s?.file}:${s?.start?.byte??`${s?.line}:${s?.column}`}`;
@@ -20,14 +22,6 @@ export function bindLinkedStructures(plan,trace=null){
     declarationTypes=new Map(plan.declarations.map(d=>[d.id,d.cType])),functions=new Map((plan.functions??[]).map(f=>[f.symbol,f]));
   for(const d of plan.instructions)for(const n of [d.expression,...d.arguments??[]].flatMap(walk))if(n?.nodeId)nodes.set(n.nodeId,n);
   for(const n of nodes.values()){const f=linkField(n);if(f)fields.set(f.fieldNodeId,f);}
-  const returned=new Map(),callsByNode=new Map(plan.instructions.filter(d=>d.action==='call'&&d.callee).map(d=>[d.sourceNodeId,d])),resolving=new Set();
-  if(trace){const flow=createValueFlow(plan,trace),defs=new Map(plan.instructions.map(d=>[d.id,d]));
-    for(const e of trace.events)if(e.action==='return.value'&&e.value?.cType?.kind==='pointer'){
-      const read=(e.dataInputs??[]).map(id=>flow.sourceRead(id)).find(r=>r?.activationId===e.activationId),expr=defs.get(read?.instructionId)?.expression,
-        fn=defs.get(e.instructionId)?.functionId;
-      if(expr&&fn){if(!returned.has(fn))returned.set(fn,[]);returned.get(fn).push(expr);}
-    }
-  }
   function origins(n){
     n=unwrap(n);if(!n)return [];
     if(n.kind==='DeclRefExpr')return [{declarationId:n.declarationId,fieldNodeIds:[]}];
@@ -35,15 +29,10 @@ export function bindLinkedStructures(plan,trace=null){
     if(n.kind==='ArraySubscriptExpr')return origins(n.children[0]).map(o=>({...o,indexedRootCollection:true}));
     const f=linkField(n);if(f)return origins(n.children[0]).map(o=>({...o,fieldNodeIds:[...o.fieldNodeIds,f.fieldNodeId]}));
     if(n.kind==='ConditionalOperator')return n.children.slice(1).flatMap(origins);
-    if(n.kind==='CallExpr'){
-      const call=callsByNode.get(n.nodeId),callee=functions.get(call?.callee);if(!callee||resolving.has(callee.id))return [];
-      resolving.add(callee.id);
-      const result=(returned.get(callee.id)??[]).flatMap(origins).flatMap(o=>{
-        const index=callee.parameters.indexOf(o.declarationId);
-        return index<0?(plan.declarations.find(d=>d.id===o.declarationId)?.storage==='static'?[o]:[]):
-          origins(call.arguments[index]).map(p=>({...p,fieldNodeIds:[...p.fieldNodeIds,...o.fieldNodeIds],callInstructionId:call.id}));
-      });resolving.delete(callee.id);return result;
-    }
+    // An observed return belongs to one activation, not every invocation of
+    // that function. Runtime result deliveries/received pointer slots establish
+    // actual roots separately; do not turn a call's arguments into its result.
+    if(n.kind==='CallExpr')return [];
     return [];
   }
   for(const n of nodes.values()){
@@ -74,11 +63,15 @@ export function bindLinkedStructures(plan,trace=null){
     }}
     search(cursor,[],new Set([cursor]),[]);
   }
+  for(const observed of returnedLinkRecurrences(plan,trace,linkField)){
+    const key=`${observed.cursorDeclarationId}:${observed.fieldNodeId}`;
+    if(!recurrenceKeys.has(key)){recurrenceKeys.add(key);recurrences.push(observed);}
+  }
   const cursorIds=new Set(recurrences.map(r=>r.cursorDeclarationId)),anchors=[],rootDeclarations=new Set(),rootOrigins=[];
   // A traversal may receive its root through several parameter and local
   // alias slots. Follow field-free declaration dependencies to their
   // caller sources, but stop at field traversal and unsupported expressions
-  // (unobserved return paths remain unsupported). These are candidates, not a union of
+  // (static return aliases remain unsupported). These are candidates, not a union of
   // the objects seen in different invocations of those declarations.
   for(const cursor of cursorIds){
     const queue=[{id:cursor,viaDeclarationIds:[cursor],callInstructionIds:[]}],seen=new Set([cursor]);
@@ -120,6 +113,7 @@ export function bindLinkedStructures(plan,trace=null){
       if(!roleGroups.has(id))roleGroups.set(id,{id,recordTypeId:family,fieldNodeIds,cursorDeclarationIds:[],callInstructionIds:[],evidence:'compiler traversal recurrence groups, independent of field names'});
       const group=roleGroups.get(id);group.cursorDeclarationIds.push(cursor);
       group.callInstructionIds=[...new Set([...group.callInstructionIds,...matching.flatMap(r=>r.callInstructionIds)])];
+      if(matching.some(r=>r.returnWitnesses))group.evidence='compiler field identities and exact observed cursor/return recurrence; witnesses retained in linkRecurrences';
     }
   }
   function location(input){
@@ -154,7 +148,9 @@ export function bindLinkedStructures(plan,trace=null){
   plan.structureBindings.linkRootOrigins=rootOrigins;
   bindLinkedRootCollections(plan);
   plan.coverage.structureInference??={};Object.assign(plan.coverage.structureInference,{linkRoleCandidates:roles.length,
-    linkedStorageSupport:'record ranges, pointer slots and direct-call argument recurrence; indirect calls, return-value aliases/recurrence and arbitrary index links unresolved',
+    linkedStorageSupport:recurrences.some(r=>r.returnWitnesses)?
+      'record ranges, pointer slots, direct-call argument recurrence and witnessed return-link recurrence; static return aliases and arbitrary index links unresolved':
+      'record ranges, pointer slots and direct-call argument recurrence; indirect calls, return-value aliases/recurrence and arbitrary index links unresolved',
     linkRootAliasPolicy:'transitive field-free declaration and direct-call argument dependencies nominate roots; actual object/offset/lifetime determines each root state',
     relationPolicy:'candidate roles are separate from actual connectivity and lifetime'});
 }
@@ -166,13 +162,30 @@ export function linkedStructures(plan,{events,objects,views,arrays=[],valueFlow,
     positions=new Map(events.map((e,i)=>[e.eventId,i])),flow=valueFlow??createValueFlow(plan,{events,resultDeliveries});
   const slot=(id,offset)=>`${id}:${offset}`,recordId=t=>t?.recordTypeId;
   const boundarySpecs=plan.structureBindings.linkBoundarySpecs??[],boundaryRecords=new Map(),payloadReads=new Set();
+  const shared=createSharedValues(),lastPayload=new WeakMap(),stateDependencies=new WeakMap(),storageLists=new WeakMap(),storageRecords=new WeakMap(),componentIds=new WeakMap(),familyVersions=new Map(),familyCache=new Map(),relationCache=new Map(),
+    nodesByObject=new Map(),rootsByObject=new Map(),rootsByFamily=new Map(),dirty=new Set(),discoveries=new Map(),topologyCaches=new Map();
+  function invalidateTopologies(family,changed){
+    const cache=topologyCaches.get(family);if(!cache)return;
+    if(!changed){cache.values.clear();cache.dependencies.clear();return;}
+    const affected=new Set();for(const id of changed)for(const key of cache.dependencies.get(id)??[])affected.add(key);
+    for(const key of affected){const entry=cache.values.get(key);if(!entry)continue;cache.values.delete(key);for(const id of entry.dependencies){const keys=cache.dependencies.get(id);keys.delete(key);if(!keys.size)cache.dependencies.delete(id);}}
+  }
+  const markFamily=(family,changed)=>{familyVersions.set(family,(familyVersions.get(family)??0)+1);familyCache.delete(family);invalidateTopologies(family,changed);for(const c of rootsByFamily.get(family)??[])dirty.add(c);};
+  const markObject=(id,range=null)=>{
+    // Root-collection checkpoints may refresh reciprocal witness timestamps.
+    // Preserve those boundaries; narrow only the topology dependencies below.
+    for(const c of rootsByObject.get(id)??[])dirty.add(c);
+    const affected=new Map();for(const n of nodesByObject.get(id)??[]){if(!affected.has(n.recordTypeId))affected.set(n.recordTypeId,[]);if(!range||n.offset<range.offset+range.size&&range.offset<n.offset+n.size)affected.get(n.recordTypeId).push(n.id);}
+    for(const [family,ids]of affected)markFamily(family,ids);
+  };
   for(const r of roles){if(!families.has(r.recordTypeId))families.set(r.recordTypeId,[]);families.get(r.recordTypeId).push(r);}
   function addNode(objectId,offset,type){
     if(!families.has(recordId(type)))return null;const o=byObject.get(objectId),size=type.sizeBits/8;
     if(!o||offset<0||offset+size>o.size)return null;
     const id=`node:${objectId}:${offset}:${type.recordTypeId}`;
     if(!nodes.has(id)){const n={id,objectId,offset,size,recordTypeId:type.recordTypeId,storage:o.storage,
-      sourceTemporary:!!defs.get(byEvent.get(o.createdBy)?.instructionId)?.sourceTemporary};nodes.set(id,n);nodeAt.set(`${slot(objectId,offset)}:${type.recordTypeId}`,id);}
+      sourceTemporary:!!defs.get(byEvent.get(o.createdBy)?.instructionId)?.sourceTemporary};nodes.set(id,n);nodeAt.set(`${slot(objectId,offset)}:${type.recordTypeId}`,id);
+      if(!nodesByObject.has(objectId))nodesByObject.set(objectId,[]);nodesByObject.get(objectId).push(n);}
     return nodes.get(id);
   }
   for(const o of objects){
@@ -191,7 +204,10 @@ export function linkedStructures(plan,{events,objects,views,arrays=[],valueFlow,
     if(!roots.has(id))roots.set(id,{id,kind:'linked-structure',root:{kind,objectId,offset,recordTypeId:type.recordTypeId},
       roles:families.get(type.recordTypeId),evidence:[evidence],states:[],members:new Set(),inversePairs:new Map(),observedRoles:new Set(observedRolesByFamily.get(type.recordTypeId)??[]),
       roleGroups:(plan.structureBindings.linkRoleGroups??[]).filter(g=>g.recordTypeId===type.recordTypeId).map(g=>({...g,auxiliaryFieldNodeIds:[]}))});
-    return roots.get(id);
+    const root=roots.get(id);
+    if(!rootsByObject.has(objectId))rootsByObject.set(objectId,new Set());rootsByObject.get(objectId).add(root);
+    if(!rootsByFamily.has(type.recordTypeId))rootsByFamily.set(type.recordTypeId,new Set());rootsByFamily.get(type.recordTypeId).add(root);
+    dirty.add(root);return root;
   }
   // A cursor's observed entry value can come directly from an array/address,
   // another record's head field, or an alias. These are roots even when no
@@ -278,6 +294,7 @@ export function linkedStructures(plan,{events,objects,views,arrays=[],valueFlow,
     if(range)root.rootCollection={id:range.id,arrayId:range.arrayId,range:range.range,index:(h.offset-range.range.offset)/range.elementBytes};
   }
   seedCursorRoots();
+  for(const c of roots.values())if(c.discoveredAtExecutionId){const id=c.discoveredAtExecutionId;if(!discoveries.has(id))discoveries.set(id,[]);discoveries.get(id).push(c);}
   const alive=new Set(),slots=new Map(),slotBytes=new Map(),ended=new Map();
   const boundaryCandidates=new Map(),boundaryTriggers=new Map();
   const integer=v=>Number(v?.decimal??v?.signed??v?.unsigned??v?.address??v?.bits);
@@ -335,36 +352,60 @@ export function linkedStructures(plan,{events,objects,views,arrays=[],valueFlow,
     return o?{targetObjectId:o.id,targetOffset:address-o.address,status:'in-bounds',evidence:'recorded snapshot and live allocation range'}:
       {targetObjectId:null,targetOffset:0,status:'unresolved',address};
   };
-  function relation(n,r){const s=slots.get(slot(n.objectId,n.offset+r.offset));if(!s)return null;const to=target(s.reference,n.recordTypeId);
-    return {from:n.id,to,fieldNodeId:r.fieldNodeId,source:{objectId:n.objectId,offset:n.offset+r.offset,size:r.size},
-      reference:s.reference,lastWrite:s.lastWrite,status:s.reference?.targetObjectId&&!alive.has(s.reference.targetObjectId)?'ended-target':s.reference?.status??'unknown'};
+  function relation(n,r){const id=`${n.id}:${r.fieldNodeId}`,version=familyVersions.get(n.recordTypeId)??0,old=relationCache.get(id);if(old?.version===version)return old.value;
+    const s=slots.get(slot(n.objectId,n.offset+r.offset)),to=s&&target(s.reference,n.recordTypeId),value=s?shared.intern({from:n.id,to,fieldNodeId:r.fieldNodeId,source:{objectId:n.objectId,offset:n.offset+r.offset,size:r.size},
+      reference:s.reference,lastWrite:s.lastWrite,status:s.reference?.targetObjectId&&!alive.has(s.reference.targetObjectId)?'ended-target':s.reference?.status??'unknown'}):null;
+    relationCache.set(id,{version,value});return value;
+  }
+  function familyState(family){let value=familyCache.get(family);if(value)return value;
+    const familyNodes=[...nodes.values()].filter(n=>n.recordTypeId===family&&alive.has(n.objectId)),links=familyNodes.flatMap(n=>families.get(family).map(r=>relation(n,r)).filter(Boolean)),neighbors=new Map();
+    for(const l of links)if(l.to)for(const [a,b]of [[l.from,l.to],[l.to,l.from]]){if(!neighbors.has(a))neighbors.set(a,[]);neighbors.get(a).push(b);}
+    value={familyNodes,liveNodeIds:shared.intern(familyNodes.map(n=>n.id)),links,neighbors,components:new Map(),orders:new Map(),inversePairs:new Map(),temporaryStorage:shared.intern({liveNodeIds:familyNodes.filter(n=>n.sourceTemporary).map(n=>n.id),endedNodeIds:[...nodes.values()].filter(n=>n.recordTypeId===family&&n.sourceTemporary&&ended.has(n.objectId)).map(n=>n.id)})};familyCache.set(family,value);return value;
+  }
+  function getTopology(family,key,start,options){
+    let cache=topologyCaches.get(family);if(!cache){cache={values:new Map(),dependencies:new Map()};topologyCaches.set(family,cache);}
+    let entry=cache.values.get(key);if(entry)return entry.value;
+    const value=shared.intern(rootedConnectivity(start,options)),dependencies=new Set([start,...value.reachableNodeIds,...value.endedTargetNodeIds,...value.terminalNodeIds,...value.unknownRelations.map(x=>x.from)].filter(Boolean));
+    entry={value,dependencies};cache.values.set(key,entry);for(const id of dependencies){if(!cache.dependencies.has(id))cache.dependencies.set(id,new Set());cache.dependencies.get(id).add(key);}return value;
+  }
+  const sameSequence=(a,b)=>!!a&&a.length===b.length&&b.every((v,i)=>Object.is(v,a[i]));
+  function storageList(c,kind,ids){
+    let lists=storageLists.get(c);if(!lists){lists={};storageLists.set(c,lists);}
+    const previous=lists[kind];if(previous&&sameSequence(previous.ids,ids))return previous.value;
+    const value=shared.intern(ids.map(id=>{
+      const n=nodes.get(id);let records=storageRecords.get(n);if(!records){records={};storageRecords.set(n,records);}
+      return records[kind]??=shared.intern({nodeId:id,objectId:n.objectId,offset:n.offset,size:n.size,sourceTemporary:n.sourceTemporary,
+        evidence:kind==='associated'?'incoming relation without observed root reachability':'observed live record without root reachability'});
+    }));lists[kind]={ids,value};return value;
   }
   function state(c,e){
+    // Inactive roots still retain historical-member and external-storage
+    // changes. Their empty topology is shared; do not erase those checkpoints.
     if(c.discoveredAtExecutionId&&positions.get(e.eventId)<positions.get(c.discoveredAtExecutionId))return;
     const family=c.root.recordTypeId,rootAlive=alive.has(c.root.objectId),rootNode=nodeAt.get(`${slot(c.root.objectId,c.root.offset)}:${family}`),
       anchor=c.root.kind==='anchor'&&!payloadReads.has(rootNode)?rootNode:null,
       rootReference=slots.get(slot(c.root.objectId,c.root.offset))?.reference,
       direct=c.root.kind==='record-root'||c.root.kind==='anchor'&&!anchor?rootNode:null,
-      start=rootAlive?(direct??anchor??target(rootReference,family)):null,connected=new Set(start?[start]:[]),
-      storageTopology=rootedConnectivity(start,{nodes,roles:c.roles,relation,isAlive:n=>alive.has(n.objectId),
-        rootStatus:!rootAlive?'ended-root':anchor||direct?'in-bounds':rootReference?.status??'unknown'}),
+      start=rootAlive?(direct??anchor??target(rootReference,family)):null,
+      cache=familyState(family),topologyAt=(key,options)=>getTopology(family,key,start,options),
+      rootStatus=!rootAlive?'ended-root':anchor||direct?'in-bounds':rootReference?.status??'unknown',
+      topologyKey=`${start}:${rootStatus}:${!!anchor}`,
+      storageTopology=topologyAt(`storage:${topologyKey}`,{nodes,roles:c.roles,relation,isAlive:n=>alive.has(n.objectId),rootStatus}),
       options={nodes,relation,isAlive:n=>!!n&&alive.has(n.objectId),isTerminal:n=>!!n&&boundaryRecords.has(n.id)&&alive.has(n.objectId),
         includeRootBoundary:!!anchor,rootStatus:!rootAlive?'ended-root':anchor||direct?'in-bounds':rootReference?.status??'unknown'},
       hasBoundary=[...boundaryRecords.values()].some(b=>b.recordTypeId===family&&alive.has(b.objectId)),
-      fullTopology=hasBoundary?rootedConnectivity(start,{...options,roles:c.roles}):storageTopology,
+      fullTopology=hasBoundary?topologyAt(`boundary:${topologyKey}`,{...options,roles:c.roles}):storageTopology,
       properGroups=c.roleGroups.filter(g=>g.fieldNodeIds.length<c.roles.length),
       widestGroups=properGroups.filter(g=>g.fieldNodeIds.length===Math.max(...properGroups.map(x=>x.fieldNodeIds.length))),
       selectedGroup=widestGroups.length===1?widestGroups[0]:null,
       roleTopologies=c.roleGroups.map(g=>({roleGroupId:g.id,fieldNodeIds:g.fieldNodeIds.slice(),auxiliaryFieldNodeIds:g.auxiliaryFieldNodeIds.slice(),
-        topology:g.fieldNodeIds.length===c.roles.length?fullTopology:rootedConnectivity(start,{...options,roles:c.roles.filter(r=>g.fieldNodeIds.includes(r.fieldNodeId))})})),
+        topology:g.fieldNodeIds.length===c.roles.length?fullTopology:topologyAt(`${topologyKey}:${g.fieldNodeIds.join('|')}`,{...options,roles:c.roles.filter(r=>g.fieldNodeIds.includes(r.fieldNodeId))})})),
       topology=selectedGroup?roleTopologies.find(g=>g.roleGroupId===selectedGroup.id).topology:fullTopology;
     // Weak connectivity only associates participating nodes with this root;
     // ordered membership below follows each actual directed role separately.
-    const familyNodes=[...nodes.values()].filter(n=>n.recordTypeId===family&&alive.has(n.objectId));
-    const links=familyNodes.flatMap(n=>c.roles.map(r=>relation(n,r)).filter(Boolean));
-    const neighbors=new Map();for(const l of links)if(l.to){for(const [a,b]of [[l.from,l.to],[l.to,l.from]]){if(!neighbors.has(a))neighbors.set(a,[]);neighbors.get(a).push(b);}}
-    const queue=[...connected];for(let i=0;i<queue.length;i++)for(const next of neighbors.get(queue[i])??[])if(!connected.has(next)){connected.add(next);queue.push(next);}
-    const orders=c.roles.map(r=>{
+    const {familyNodes,links,neighbors}=cache;
+    let connected=cache.components.get(start);if(!connected){connected=new Set(start?[start]:[]);const queue=[...connected];for(let i=0;i<queue.length;i++)for(const next of neighbors.get(queue[i])??[])if(!connected.has(next)){connected.add(next);queue.push(next);}cache.components.set(start,connected);}
+    let orders=cache.orders.get(topologyKey);if(!orders){orders=shared.intern(c.roles.map(r=>{
       const ids=[],seen=new Set();let at=start,termination='unknown';
       if(anchor&&rootAlive){const edge=relation(nodes.get(anchor),r);at=edge?.to;termination=edge?.status==='null'?'null':'unknown';if(at===anchor)return {fieldNodeId:r.fieldNodeId,nodeIds:[],termination:'anchor'};}
       else if(!at){const ref=slots.get(slot(c.root.objectId,c.root.offset))?.reference;termination=!rootAlive?'ended-root':ref?.status==='null'?'null':ref?.status??'unknown';}
@@ -373,18 +414,18 @@ export function linkedStructures(plan,{events,objects,views,arrays=[],valueFlow,
         if(!edge){termination='unknown';break;}if(!edge.to){termination=edge.status;break;}at=edge.to;
       }
       return {fieldNodeId:r.fieldNodeId,nodeIds:ids,termination};
-    });
+    }));cache.orders.set(topologyKey,orders);}
     // A mixed path (first field, then second field) is as reachable as a
     // repeated single-field chain. Incoming aliases are not root members.
     for(const id of [...storageTopology.reachableNodeIds,...storageTopology.endedTargetNodeIds,...topology.terminalNodeIds])c.members.add(id);
-    const edges=[...c.members].flatMap(id=>{const n=nodes.get(id);return c.roles.map(r=>relation(n,r)).filter(Boolean);});
-    for(const a of c.roles)for(const b of c.roles)if(a.fieldNodeId<b.fieldNodeId){
+    const edges=shared.intern([...c.members].flatMap(id=>{const n=nodes.get(id);return c.roles.map(r=>relation(n,r)).filter(Boolean);}));
+    let pairs=cache.inversePairs.get(anchor);if(!pairs){pairs=[];for(const a of c.roles)for(const b of c.roles)if(a.fieldNodeId<b.fieldNodeId){
       const key=`${a.fieldNodeId}:${b.fieldNodeId}`;
       if(links.some(l=>l.fieldNodeId===a.fieldNodeId&&l.to&&l.to!==l.from&&
         (!boundaryRecords.has(l.from)||l.from===anchor)&&(!boundaryRecords.has(l.to)||l.to===anchor)&&
         links.some(m=>m.from===l.to&&m.to===l.from&&m.fieldNodeId===b.fieldNodeId)))
-        c.inversePairs.set(key,{fields:[a.fieldNodeId,b.fieldNodeId],evidence:'observed reciprocal references across distinct nodes'});
-    }
+        pairs.push([key,shared.intern({fields:[a.fieldNodeId,b.fieldNodeId],evidence:'observed reciprocal references across distinct nodes'})]);
+    }cache.inversePairs.set(anchor,pairs);}for(const [key,pair]of pairs)c.inversePairs.set(key,pair);
     for(const group of c.roleGroups){
       group.auxiliaryFieldNodeIds=c.roles.map(r=>r.fieldNodeId).filter(id=>!group.fieldNodeIds.includes(id)&&
         [...c.inversePairs.values()].some(p=>p.fields.includes(id)&&p.fields.some(f=>group.fieldNodeIds.includes(f))));
@@ -393,28 +434,45 @@ export function linkedStructures(plan,{events,objects,views,arrays=[],valueFlow,
     const reciprocalCandidates=selectedGroup?.auxiliaryFieldNodeIds.length?selectedGroup.auxiliaryFieldNodeIds.map(id=>({
       forwardFieldNodeIds:selectedGroup.fieldNodeIds,backwardFieldNodeIds:[id]})):
       [...c.inversePairs.values()].map(p=>({forwardFieldNodeIds:[p.fields[0]],backwardFieldNodeIds:[p.fields[1]]}));
-    const reciprocalRelations=supportedReciprocalRelations(c,reciprocalCandidates,links,{observedRoles:c.observedRoles,groups:c.roleGroups,rootAlive,eventId:e.eventId,
-      isAlive:id=>alive.has(nodes.get(id)?.objectId),isTerminal:id=>boundaryRecords.has(id)&&id!==anchor});
-    const reached=new Set(topology.reachableNodeIds),inconsistencies=reciprocalIssues(edges,reciprocalRelations,{
+    const reciprocalRelations=shared.intern(supportedReciprocalRelations(c,reciprocalCandidates,links,{observedRoles:c.observedRoles,groups:c.roleGroups,rootAlive,eventId:e.eventId,
+      isAlive:id=>alive.has(nodes.get(id)?.objectId),isTerminal:id=>boundaryRecords.has(id)&&id!==anchor}));
+    const reached=new Set(topology.reachableNodeIds),
+      boundaries=shared.intern([...new Set([...topology.terminalNodeIds,...storageTopology.reachableNodeIds.filter(id=>boundaryRecords.has(id))])]
+        .map(id=>boundaryRecords.get(id)).filter(Boolean).map(b=>({...b,evidenceExecutionIds:b.evidenceExecutionIds.slice(),sourceNodeIds:b.sourceNodeIds.slice()})));
+    const activeMembers=shared.intern([...c.members].filter(id=>alive.has(nodes.get(id).objectId))),
+      endedMembers=shared.intern([...c.members].filter(id=>ended.has(nodes.get(id).objectId))),
+      observedRoleIds=shared.intern([...c.observedRoles]),observedPayloadNodeIds=shared.intern([...payloadReads].filter(id=>c.members.has(id))),
+      sharedRoleTopologies=shared.intern(roleTopologies);
+    let connectedIds=componentIds.get(connected);if(!connectedIds){connectedIds=shared.intern([...connected]);componentIds.set(connected,connectedIds);}
+    // Check the complete state dependencies before assembling a checkpoint.
+    // members only grows, so its size also captures its insertion order/history.
+    // Reciprocal witness updates above MUST run even when all links are equal:
+    // their establishedAtExecutionId can change at a root-collection write.
+    const dependencies=[rootAlive,orders,edges,activeMembers,endedMembers,topology,storageTopology,
+      sharedRoleTopologies,boundaries,observedRoleIds,observedPayloadNodeIds,selectedGroup?.id??null,
+      reciprocalRelations,connectedIds,cache.liveNodeIds,cache.temporaryStorage,c.members.size];
+    if(sameSequence(stateDependencies.get(c),dependencies))return;
+    stateDependencies.set(c,dependencies);
+    const inconsistencies=reciprocalIssues(edges,reciprocalRelations,{
       reached,isAlive:id=>alive.has(nodes.get(id)?.objectId),isTerminal:id=>boundaryRecords.has(id)&&id!==anchor}),
-      boundaries=[...new Set([...topology.terminalNodeIds,...storageTopology.reachableNodeIds.filter(id=>boundaryRecords.has(id))])]
-        .map(id=>boundaryRecords.get(id)).filter(Boolean).map(b=>({...b,evidenceExecutionIds:b.evidenceExecutionIds.slice(),sourceNodeIds:b.sourceNodeIds.slice()}));
-    const activeMembers=[...c.members].filter(id=>alive.has(nodes.get(id).objectId)),
-      row={afterExecutionId:e.eventId,rootAlive,orders,edges,activeMembers,reachableMembers:[...reached],topology,storageTopology,roleTopologies,boundaries,
-        observedRoleIds:[...c.observedRoles],
+      row={afterExecutionId:e.eventId,rootAlive,orders,edges,activeMembers,reachableMembers:[...reached],topology,storageTopology,roleTopologies:sharedRoleTopologies,boundaries,
+        observedRoleIds,
         membership:{physicalNodeIds:[...reached],boundaryNodeIds:boundaries.map(b=>b.nodeId),
           dataNodeIds:[...reached].filter(id=>!boundaries.some(b=>b.nodeId===id))},
-        observedPayloadNodeIds:[...payloadReads].filter(id=>c.members.has(id)),
+        observedPayloadNodeIds,
         selectedRoleGroupId:selectedGroup?.id??null,reciprocalRelations,
-        detachedMembers:activeMembers.filter(id=>!reached.has(id)),endedMembers:[...c.members].filter(id=>ended.has(nodes.get(id).objectId)),
-        associatedStorage:[...connected].filter(id=>!c.members.has(id)).map(id=>{const n=nodes.get(id);return {nodeId:id,objectId:n.objectId,offset:n.offset,size:n.size,sourceTemporary:n.sourceTemporary,evidence:'incoming relation without observed root reachability'};}),
-        unrelatedStorage:familyNodes.filter(n=>!c.members.has(n.id)&&!connected.has(n.id)).map(n=>({nodeId:n.id,objectId:n.objectId,offset:n.offset,size:n.size,sourceTemporary:n.sourceTemporary,
-          evidence:'observed live record without root reachability'})),
-        temporaryStorage:{liveNodeIds:familyNodes.filter(n=>n.sourceTemporary).map(n=>n.id),
-          endedNodeIds:[...nodes.values()].filter(n=>n.recordTypeId===family&&n.sourceTemporary&&ended.has(n.objectId)).map(n=>n.id)},
+        detachedMembers:activeMembers.filter(id=>!reached.has(id)),endedMembers,
+        associatedStorage:storageList(c,'associated',connectedIds.filter(id=>!c.members.has(id))),
+        unrelatedStorage:storageList(c,'unrelated',cache.liveNodeIds.filter(id=>!c.members.has(id)&&!connected.has(id))),
+        temporaryStorage:cache.temporaryStorage,
         inconsistencies,circular:orders.some(o=>o.termination==='anchor'||o.termination==='cycle'),
         status:inconsistencies.length?'intermediate-or-inconsistent':topology.status==='partial'?'partial':'observed'};
-    const prev=c.states.at(-1);if(!prev||JSON.stringify({...prev,afterExecutionId:null})!==JSON.stringify({...row,afterExecutionId:null}))c.states.push(row);
+    // Share child values without retaining another full payload wrapper in the
+    // interning pool for every checkpoint. Keep only this root's last signature;
+    // annotation passes may still attach endpoint policies and warning IDs.
+    const signature=[];for(const key of Object.keys(row))if(key!=='afterExecutionId'){row[key]=shared.intern(row[key]);signature.push(key,row[key]);}
+    const previous=lastPayload.get(c);
+    if(!previous||previous.length!==signature.length||signature.some((v,i)=>!Object.is(v,previous[i]))){lastPayload.set(c,signature);row.inconsistencies=row.inconsistencies.map(issue=>({...issue}));c.states.push(row);}
   }
   function cursorReferences(id,seen=new Set()){
     if(seen.has(id))return [];seen.add(id);const e=byEvent.get(id);if(!e)return [];
@@ -423,6 +481,8 @@ export function linkedStructures(plan,{events,objects,views,arrays=[],valueFlow,
   }
   for(const e of events){
     let changed=observeBoundaries(e);
+    if(changed)for(const family of families.keys())markFamily(family);
+    for(const c of discoveries.get(e.eventId)??[])dirty.add(c);
     if(e.kind==='READ'&&e.target&&!e.value?.reference){
       const n=unwrap(defs.get(e.instructionId)?.expression);
       const references=(e.addressInputs??[]).flatMap(id=>cursorReferences(id));
@@ -433,26 +493,26 @@ export function linkedStructures(plan,{events,objects,views,arrays=[],valueFlow,
       if(n?.kind==='MemberExpr'&&n.cType?.kind!=='pointer')for(const record of nodes.values())
         if(record.objectId===e.target.objectId&&e.target.offset>=record.offset&&e.target.offset+e.target.size<=record.offset+record.size&&
           references.some(ref=>ref.status==='in-bounds'&&ref.targetObjectId===record.objectId&&(ref.targetOffset??0)===record.offset)){
-          if(!payloadReads.has(record.id))changed=true;
+          if(!payloadReads.has(record.id)){changed=true;markFamily(record.recordTypeId,[record.id]);}
           payloadReads.add(record.id);if(boundaryRecords.delete(record.id))changed=true;
         }
     }
     // A termination comparison can mark a return-to-start boundary. Once the
     // record's data was consumed it cannot be excluded as a dummy sentinel.
-    for(const id of payloadReads)if(boundaryRecords.delete(id))changed=true;
-    if(e.action==='object.begin'){alive.add(e.objectId);changed=true;}
-    if(e.action==='object.end'){alive.delete(e.objectId);ended.set(e.objectId,{eventId:e.eventId,reason:e.reason});changed=true;}
-    if(e.action==='frame.end')for(const id of e.endedObjects??[]){alive.delete(id);ended.set(id,{eventId:e.eventId,reason:'frame-end'});changed=true;}
+    for(const id of payloadReads)if(boundaryRecords.delete(id)){changed=true;markFamily(nodes.get(id).recordTypeId,[id]);}
+    if(e.action==='object.begin'){alive.add(e.objectId);changed=true;markObject(e.objectId);}
+    if(e.action==='object.end'){alive.delete(e.objectId);ended.set(e.objectId,{eventId:e.eventId,reason:e.reason});changed=true;markObject(e.objectId);}
+    if(e.action==='frame.end')for(const id of e.endedObjects??[]){alive.delete(id);ended.set(id,{eventId:e.eventId,reason:'frame-end'});changed=true;markObject(id);}
     if(['READ','WRITE'].includes(e.kind)&&e.target?.objectId&&e.value?.reference){
       const key=slot(e.target.objectId,e.target.offset),old=slots.get(key),next={reference:e.value.reference,lastWrite:e.kind==='WRITE'?e.eventId:old?.lastWrite??null};
       const observed=observeScalarBytes(slotBytes.get(key),{size:e.value.cType?.sizeBits/8||e.target.size,value:e.value.address});
       if(observed)slotBytes.set(key,observed);
-      if(JSON.stringify(old)!==JSON.stringify(next)){slots.set(key,next);changed=true;}
+      if(shared.intern(old)!==shared.intern(next)){slots.set(key,next);changed=true;markObject(e.target.objectId,e.target);}
       if(e.kind==='READ')for(const r of roles)if([...nodes.values()].some(n=>n.recordTypeId===r.recordTypeId&&n.objectId===e.target.objectId&&n.offset+r.offset===e.target.offset)){
         if(!observedRolesByFamily.has(r.recordTypeId))observedRolesByFamily.set(r.recordTypeId,new Set());
         observedRolesByFamily.get(r.recordTypeId).add(r.fieldNodeId);
         for(const c of roots.values())if(c.root.recordTypeId===r.recordTypeId&&!c.observedRoles.has(r.fieldNodeId)){
-          c.observedRoles.add(r.fieldNodeId);changed=true;
+          c.observedRoles.add(r.fieldNodeId);changed=true;dirty.add(c);
         }
       }
     }
@@ -468,13 +528,13 @@ export function linkedStructures(plan,{events,objects,views,arrays=[],valueFlow,
         if(offset>=start+e.memoryState.byteLength||offset+size<=start)continue;
         const key=slot(objectId,offset),previous=slotBytes.get(key),observed=observeScalarBytes(previous,{size,snapshot:e.memoryState,start,offset});
         if(!observed)continue;slotBytes.set(key,observed);const number=observed.value;
-        if(number===null){slots.set(key,{reference:{status:'unknown',targetObjectId:null,targetOffset:null},lastWrite:e.eventId});changed=true;continue;}
+        if(number===null){slots.set(key,{reference:{status:'unknown',targetObjectId:null,targetOffset:null},lastWrite:e.eventId});changed=true;markObject(objectId,{offset,size});continue;}
         const copied=e.sourceObjectId&&slots.get(slot(e.sourceObjectId,(e.sourceOffset??0)+offset-start)),
           retained=previous?.value===number?slots.get(key)?.reference:null,reference=copied?.reference??retained??snapshotRef(number);
-        slots.set(key,{reference,lastWrite:e.eventId});changed=true;
+        slots.set(key,{reference,lastWrite:e.eventId});changed=true;markObject(objectId,{offset,size});
       }
     }
-    if(changed)for(const c of roots.values())state(c,e);
+    for(const c of dirty)state(c,e);dirty.clear();
   }
   const viewIds=new Map();for(const v of views){if(!viewIds.has(v.objectId))viewIds.set(v.objectId,[]);viewIds.get(v.objectId).push(v.id);}
   return [...roots.values()].filter(c=>(c.members.size||c.observedEmptyArraySlot||c.observedEmptySeed)&&(c.observedRoles.size||c.rootCollection||c.observedEmptySeed)).map(c=>{

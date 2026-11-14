@@ -2,10 +2,11 @@ import {recordEvidence} from './record-evidence.mjs';
 import {structureStateAt} from './state-history.mjs';
 import {selectionEvidence} from './selection-evidence.mjs';
 import {num,key,unique} from './storage-semantics.mjs';
+import {colorEncodingStates} from './color-encoding.mjs';
 const unwrap=n=>{while(n&&['ImplicitCastExpr','ParenExpr','CStyleCastExpr'].includes(n.kind))n=n.children?.[0];return n;};
 export function queryManagementRoles(trace,{recordTypeId,afterExecutionId}={}){
  const positions=new Map(trace.events.map((e,i)=>[e.eventId,i])),at=afterExecutionId===undefined?trace.events.length-1:positions.get(afterExecutionId);if(at===undefined)throw new RangeError('관측한 실행 식별자가 필요합니다.');
- return structuredClone(trace.structures.filter(s=>s.kind==='management-role-candidate'&&(!recordTypeId||s.recordTypeId===recordTypeId)&&positions.get(s.discoveredAtExecutionId)<=at).flatMap(s=>{const state=structureStateAt(s,positions,at,trace.objects);return !state||state.historyGap||state.lifetimeGap?[]:[{candidateId:s.id,role:s.role,binding:s.binding,leafHeight:s.leafHeight??null,mapping:s.mapping??null,origin:'inferred',evidenceExecutionIds:state.evidenceExecutionIds??[]}];}));
+  return structuredClone(trace.structures.filter(s=>s.kind==='management-role-candidate'&&(!recordTypeId||s.recordTypeId===recordTypeId)&&positions.get(s.discoveredAtExecutionId)<=at).flatMap(s=>{const state=structureStateAt(s,positions,at,trace.objects);return !state||state.historyGap||state.lifetimeGap?[]:[{candidateId:s.id,role:s.role,binding:s.binding,leafHeight:s.leafHeight??null,mapping:s.mapping??null,suggestedMapping:state.suggestedMapping??null,encodingHypotheses:state.encodingHypotheses??[],origin:'inferred',evidenceExecutionIds:state.evidenceExecutionIds??[]}];}));
 }
 export function managementRoleStructures(plan,trace){
  const c=recordEvidence(plan,trace),groups=new Map(),writes=c.events.filter(e=>e.kind==='WRITE'&&e.action==='write'),partitions=c.structures.filter(s=>s.kind==='pointer-partition-candidate');
@@ -55,5 +56,5 @@ export function managementRoleStructures(plan,trace){
    groups.get(id).proofs.push({afterExecutionId:w.eventId,writeExecutionId:w.eventId,mergeExecutionId:m.eventId,evidenceExecutionIds:unique([m.eventId,w.eventId,...[a,b].filter(Boolean).map(r=>r.eventId),...(equality?[equality.executionId]:[])])});
   }
  }
- return [...groups.values()].map(g=>({...g,kind:'management-role-candidate',nodes:[],edges:[],intent:'unconfirmed',discoveredAtExecutionId:g.proofs[0].afterExecutionId,states:g.proofs.map((p,i)=>({afterExecutionId:p.afterExecutionId,status:'supported-observed-role',evidenceExecutionIds:unique(g.proofs.slice(0,i+1).flatMap(x=>x.evidenceExecutionIds))})),limitations:['role evidence is independent from structural correctness','unobserved policies and colour meanings require explicit binding']}));
+ return [...groups.values()].map(g=>({...g,kind:'management-role-candidate',nodes:[],edges:[],intent:'unconfirmed',discoveredAtExecutionId:g.proofs[0].afterExecutionId,states:g.role==='color'?colorEncodingStates(c,trace,g):g.proofs.map((p,i)=>({afterExecutionId:p.afterExecutionId,status:'supported-observed-role',evidenceExecutionIds:unique(g.proofs.slice(0,i+1).flatMap(x=>x.evidenceExecutionIds))})),limitations:['role evidence is independent from structural correctness','colour encoding hypotheses are not author intent; explicit binding takes precedence']}));
 }

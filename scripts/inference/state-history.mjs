@@ -18,21 +18,26 @@ export function stateHistoryGapAt(candidate,positions,at){
     end=positions.get(candidate.states?.at(-1)?.afterExecutionId??candidate.states?.at(-1)?.executionId);
   if(start!==undefined&&end!==undefined&&at>=start&&at<end)return true;
   if(candidate.coverage?.historyGaps?.some(g=>positions.get(g.fromExecutionId)<=at&&at<(positions.get(g.toExecutionId)??Infinity)))return true;
+  // Malformed imported coverage is rejected by validation; an unchecked query
+  // must still not reuse a stale success after its last retained snapshot.
+  if(candidate.coverage?.omittedStates>0&&start===undefined&&end!==undefined&&at>end)return true;
   // Legacy results stopped recording without an explicit interval.
   return !Object.hasOwn(candidate.coverage??{},'historyGapFromExecutionId')&&
     !!(candidate.coverage?.omittedStates||candidate.coverage?.truncated)&&end!==undefined&&at>end;
 }
+const lifetimeIndices=new WeakMap();
 export function structureStateAt(candidate,positions,at,objects=[]){
   const state=candidate.states?.findLast(s=>positions.has(s.afterExecutionId??s.executionId)&&positions.get(s.afterExecutionId??s.executionId)<=at)??null;
   if(!state)return null;
   const gap=state.historyGap||stateHistoryGapAt(candidate,positions,at);
   const evidenceGap=Object.entries(state).some(([k,v])=>/^omitted/.test(k)&&typeof v==='number'&&v>0);
+  let lifetimes=lifetimeIndices.get(positions);
+  if(!lifetimes||lifetimes.source!==objects){lifetimes={source:objects,byId:new Map(objects.map((o,i)=>[o.id,{o,i}]))};lifetimeIndices.set(positions,lifetimes);}
   const anchored=[candidate.root?.objectId,candidate.range?.objectId,candidate.objectId].filter(Boolean),
-    ended=objects.filter(o=>positions.get(o.endedBy)<=at&&positions.get(o.endedBy)>positions.get(state.afterExecutionId??state.executionId)),
-    rootEnded=ended.some(o=>anchored.includes(o.id)),
+    rootEnded=anchored.some(id=>positions.get(lifetimes.byId.get(id)?.o.endedBy)<=at),
     members=new Set((state.nodes??state.entries??[]).flatMap(n=>[n.range?.objectId,n.record?.objectId,n.objectId,...(n.parts??[]).map(p=>p.range?.objectId)])),
-    memberEnded=ended.filter(o=>members.has(o.id));
-  if(rootEnded)return {...state,alive:false,active:false,rootAlive:false,storageAlive:false,status:'ended',historyGap:!!gap};
+    memberEnded=[...members].map(id=>lifetimes.byId.get(id)).filter(x=>x&&positions.get(x.o.endedBy)<=at&&positions.get(x.o.endedBy)>positions.get(state.afterExecutionId??state.executionId)).sort((a,b)=>a.i-b.i).map(x=>x.o);
+  if(rootEnded)return {...state,alive:false,active:false,rootAlive:false,storageAlive:false,status:'ended',lifetimeStatus:'ended',historyGap:!!gap};
   if(gap||evidenceGap||memberEnded.length)return {...state,status:'incomplete',historyGap:!!gap,...(evidenceGap?{evidenceGap:true}:{}),...(memberEnded.length?{lifetimeGap:true,endedObjectIds:memberEnded.map(o=>o.id)}:{})};
   return state;
 }

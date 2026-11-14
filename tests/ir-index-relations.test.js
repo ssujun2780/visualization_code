@@ -7,7 +7,9 @@ async function inspect(source){
   const r=await traceModel(source);assert.equal(r.trace.status,'completed',JSON.stringify(r.trace.diagnostics));
   assert.equal(r.trace.exitCode,0);assert.deepEqual(r.trace.coverage.observationAccounting.unexplained,[]);
   const before=JSON.stringify({events:r.trace.events,objects:r.trace.objects});
-  bindIndexRelations(r.plan);const trees=indexRelationStructures(r.plan,r.trace);
+  const bindingPlan=structuredClone(r.plan),originalPlan=structuredClone(r.plan);
+  bindIndexRelations(bindingPlan);const trees=indexRelationStructures(bindingPlan,r.trace);
+  assert.deepEqual(r.plan,originalPlan);
   assert.equal(JSON.stringify({events:r.trace.events,objects:r.trace.objects}),before);
   for(const tree of trees){const array=r.trace.structures.find(s=>s.id===tree.arrayId);assert.ok(array);
     assert.equal(tree.objectId,array.objectId);assert.deepEqual(tree.range,array.range);assert.equal(tree.isPointerStructure,false);assert.deepEqual(tree.edges,[]);}
@@ -43,7 +45,7 @@ return box.slots[0]!=9;}`);
   assert.ok(writes.length>=2);assert.ok(writes.every(e=>tree.states.some(s=>s.afterExecutionId===e.eventId)));
   const formula=tree.formulaEvidence.find(f=>f.form==='parent'),altered={...r.trace,events:r.trace.events.map(e=>e.eventId===formula.executionId?
     {...e,steps:e.steps.map(s=>s.nodeId===formula.sourceNodeId?{...s,value:{decimal:'999'}}:s)}:e)};
-  const [contradicted]=indexRelationStructures(r.plan,altered);
+  const [contradicted]=indexRelationStructures(structuredClone(r.plan),altered);
   assert.equal(contradicted.status,'contradicted');assert.ok(contradicted.formulaEvidence.some(f=>f.status==='contradicted'));
 });
 

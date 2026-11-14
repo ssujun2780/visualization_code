@@ -13,7 +13,8 @@ export function buildStructureStorageBindings(trace,structures){
    if(!state.historyGap&&state.alive!==false&&state.active!==false&&state.rootAlive!==false&&state.storageAlive!==false&&state.status!=='ended')for(const n of pool){
     const ranges=[n.range??n.record??(n.objectId?{objectId:n.objectId,offset:n.offset,size:n.size}:null),...(n.parts??[]).map(p=>p.range)].filter(Boolean),elementId=n.id??(Number.isSafeInteger(n.index)?`${s.id}:element:${n.index}`:null);
     for(const r of ranges){const o=objects.get(r.objectId);if(!elementId||!o||pos.get(o.createdBy)>at||pos.get(o.endedBy)<=at||!Number.isSafeInteger(r.offset)||!Number.isSafeInteger(r.size)||r.offset<0||r.size<=0||r.offset+r.size>o.size)continue;
-     const k=JSON.stringify([elementId,r.objectId,r.offset,r.size]);current.set(k,{...r,structureId:s.id,elementId,availableAtExecutionId:id,invalidatedAtExecutionId:o.endedBy??null});
+     const k=JSON.stringify([elementId,r.objectId,r.offset,r.size]);current.set(k,{...r,structureId:s.id,elementId,availableAtExecutionId:id,invalidatedAtExecutionId:o.endedBy??null,
+       ...(s.origin==='user'?{origin:'user'}:{})});
     }
    }
    for(const [k,b]of active)if(!current.has(k)){if(!b.invalidatedAtExecutionId||at<pos.get(b.invalidatedAtExecutionId))b.invalidatedAtExecutionId=id;active.delete(k);}

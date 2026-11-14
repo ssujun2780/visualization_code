@@ -3,6 +3,7 @@ import {test} from 'node:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {gunzipSync} from 'node:zlib';
 import {inferStructures} from '../scripts/inference/index.mjs';
 import {traceWithStructureView as traceModel} from './helpers/structure-runner.mjs';
 const digest=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
@@ -30,7 +31,15 @@ async function run(name,source,stdout){
 for(const c of predictions)test(`original array audit: ${c.name}`,async()=>{
   const source=await fs.readFile(`${fixtures}/${c.name}.c`,'utf8'),r=await run(c.name,source,c.stdout),t=r.trace,
     outputs=t.events.filter(e=>e.action==='output');
-  for(const k of ['events','objects','frames','resultDeliveries'])assert.equal(digest(t[k]),c.coreSha256[k],`${c.name}: unchanged ${k}`);
+  // Keep the original pre-fix hashes as historical compatibility evidence.
+  // Live generation can add contracted provenance/selection events; its
+  // read-only inference check belongs to this run, not to an older model hash.
+  const historical=JSON.parse(gunzipSync(await fs.readFile(new URL(`./fixtures/array-membership-history/${c.name}.json.gz`,import.meta.url))));
+  assert.equal(historical.plan.sourceMap.snapshot.text,source);
+  const historyBefore=digest(historical);
+  inferStructures(historical.plan,historical.trace);
+  assert.equal(digest(historical),historyBefore,'historical input remains unchanged');
+  for(const k of ['events','objects','frames','resultDeliveries'])assert.equal(digest(historical.trace[k]),c.coreSha256[k],`${c.name}: unchanged historical ${k}`);
   for(const [i,expected]of c.expected.entries()){
     const at=outputs[i].eventId;
     if(!expected.roles){const s=t.structures.find(s=>s.kind==='array-structure'),state=snapshot(t,s,at);

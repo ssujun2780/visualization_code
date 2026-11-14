@@ -1,0 +1,4855 @@
+{
+  "plan": {
+    "schemaVersion": 3,
+    "programId": "dfa7bb27f6a0bc075adbfd5435100e88b71c71e402ab54c07c9f45477db85d55",
+    "source": {
+      "file": "main.c",
+      "sha256": "dfa7bb27f6a0bc075adbfd5435100e88b71c71e402ab54c07c9f45477db85d55"
+    },
+    "backend": {
+      "compiler": "bundled Clang 8.0.1",
+      "target": "wasm32-unknown-wasi",
+      "pointerBits": 32,
+      "byteOrder": "little",
+      "method": "automatic LLVM observation"
+    },
+    "instructions": [
+      {
+        "id": "i1",
+        "kind": "SPACE",
+        "action": "frame.begin",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1408",
+        "source": {
+          "file": "main.c",
+          "line": 3,
+          "column": 1,
+          "start": {
+            "line": 3,
+            "column": 1,
+            "byte": 20,
+            "editorColumn": 1
+          },
+          "end": {
+            "line": 9,
+            "column": 2,
+            "byte": 97,
+            "editorColumn": 2
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 3,
+            "startColumn": 1,
+            "endLineNumber": 9,
+            "endColumn": 2
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        },
+        "scopeId": "s1",
+        "functionName": "main",
+        "parameters": [],
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i2",
+        "kind": "FLOW",
+        "action": "enter",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1408",
+        "source": {
+          "file": "main.c",
+          "line": 3,
+          "column": 1,
+          "start": {
+            "line": 3,
+            "column": 1,
+            "byte": 20,
+            "editorColumn": 1
+          },
+          "end": {
+            "line": 9,
+            "column": 2,
+            "byte": 97,
+            "editorColumn": 2
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 3,
+            "startColumn": 1,
+            "endLineNumber": 9,
+            "endColumn": 2
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        },
+        "scopeId": "s1",
+        "functionName": "main",
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i3",
+        "kind": "SPACE",
+        "action": "object.begin",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1411",
+        "source": {
+          "file": "main.c",
+          "line": 4,
+          "column": 5,
+          "start": {
+            "line": 4,
+            "column": 5,
+            "byte": 36,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 4,
+            "column": 15,
+            "byte": 46,
+            "editorColumn": 15
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 4,
+            "startColumn": 5,
+            "endLineNumber": 4,
+            "endColumn": 15
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        },
+        "scopeId": "s2",
+        "declarationId": "d1",
+        "storage": "automatic",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "visibility": "source",
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i4",
+        "kind": "SPACE",
+        "action": "object.begin",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1414",
+        "source": {
+          "file": "main.c",
+          "line": 5,
+          "column": 5,
+          "start": {
+            "line": 5,
+            "column": 5,
+            "byte": 52,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 5,
+            "column": 15,
+            "byte": 62,
+            "editorColumn": 15
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 5,
+            "startColumn": 5,
+            "endLineNumber": 5,
+            "endColumn": 15
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        },
+        "scopeId": "s2",
+        "declarationId": "d2",
+        "storage": "automatic",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "visibility": "source",
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i5",
+        "kind": "SPACE",
+        "action": "object.begin",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1417",
+        "source": {
+          "file": "main.c",
+          "line": 6,
+          "column": 5,
+          "start": {
+            "line": 6,
+            "column": 5,
+            "byte": 68,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 6,
+            "column": 16,
+            "byte": 79,
+            "editorColumn": 16
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 6,
+            "startColumn": 5,
+            "endLineNumber": 6,
+            "endColumn": 16
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        },
+        "scopeId": "s2",
+        "declarationId": "d3",
+        "storage": "automatic",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "visibility": "source",
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i6",
+        "kind": "WRITE",
+        "action": "write",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1411",
+        "source": {
+          "file": "main.c",
+          "line": 4,
+          "column": 5,
+          "start": {
+            "line": 4,
+            "column": 5,
+            "byte": 36,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 4,
+            "column": 15,
+            "byte": 46,
+            "editorColumn": 15
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 4,
+            "startColumn": 5,
+            "endLineNumber": 4,
+            "endColumn": 15
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "int a = 10"
+        },
+        "scopeId": "s2",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "accessType": "i32",
+        "expression": {
+          "nodeId": "ast1411",
+          "kind": "VarDecl",
+          "operator": null,
+          "type": "int",
+          "cType": {
+            "id": "debug:11",
+            "name": "int",
+            "sizeBits": 32,
+            "signedness": "signed",
+            "encoding": "DW_ATE_signed",
+            "display": {
+              "label": "int",
+              "badges": []
+            },
+            "evidence": "compiler"
+          },
+          "source": {
+            "file": "main.c",
+            "line": 4,
+            "column": 5,
+            "start": {
+              "line": 4,
+              "column": 5,
+              "byte": 36,
+              "editorColumn": 5
+            },
+            "end": {
+              "line": 4,
+              "column": 15,
+              "byte": 46,
+              "editorColumn": 15
+            },
+            "endExclusive": true,
+            "editorRange": {
+              "startLineNumber": 4,
+              "startColumn": 5,
+              "endLineNumber": 4,
+              "endColumn": 15
+            },
+            "evidence": "compiler location with bounded token-end lookup"
+          },
+          "children": [
+            {
+              "nodeId": "ast1412",
+              "kind": "IntegerLiteral",
+              "operator": null,
+              "type": "int",
+              "cType": {
+                "id": "debug:11",
+                "name": "int",
+                "sizeBits": 32,
+                "signedness": "signed",
+                "encoding": "DW_ATE_signed",
+                "display": {
+                  "label": "int",
+                  "badges": []
+                },
+                "evidence": "compiler"
+              },
+              "literal": "10",
+              "source": {
+                "file": "main.c",
+                "line": 4,
+                "column": 13,
+                "start": {
+                  "line": 4,
+                  "column": 13,
+                  "byte": 44,
+                  "editorColumn": 13
+                },
+                "end": {
+                  "line": 4,
+                  "column": 15,
+                  "byte": 46,
+                  "editorColumn": 15
+                },
+                "endExclusive": true,
+                "editorRange": {
+                  "startLineNumber": 4,
+                  "startColumn": 13,
+                  "endLineNumber": 4,
+                  "endColumn": 15
+                },
+                "evidence": "compiler location with bounded token-end lookup"
+              },
+              "children": []
+            }
+          ]
+        },
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i7",
+        "kind": "WRITE",
+        "action": "write",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1414",
+        "source": {
+          "file": "main.c",
+          "line": 5,
+          "column": 5,
+          "start": {
+            "line": 5,
+            "column": 5,
+            "byte": 52,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 5,
+            "column": 15,
+            "byte": 62,
+            "editorColumn": 15
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 5,
+            "startColumn": 5,
+            "endLineNumber": 5,
+            "endColumn": 15
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "int b = 20"
+        },
+        "scopeId": "s2",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "accessType": "i32",
+        "expression": {
+          "nodeId": "ast1414",
+          "kind": "VarDecl",
+          "operator": null,
+          "type": "int",
+          "cType": {
+            "id": "debug:11",
+            "name": "int",
+            "sizeBits": 32,
+            "signedness": "signed",
+            "encoding": "DW_ATE_signed",
+            "display": {
+              "label": "int",
+              "badges": []
+            },
+            "evidence": "compiler"
+          },
+          "source": {
+            "file": "main.c",
+            "line": 5,
+            "column": 5,
+            "start": {
+              "line": 5,
+              "column": 5,
+              "byte": 52,
+              "editorColumn": 5
+            },
+            "end": {
+              "line": 5,
+              "column": 15,
+              "byte": 62,
+              "editorColumn": 15
+            },
+            "endExclusive": true,
+            "editorRange": {
+              "startLineNumber": 5,
+              "startColumn": 5,
+              "endLineNumber": 5,
+              "endColumn": 15
+            },
+            "evidence": "compiler location with bounded token-end lookup"
+          },
+          "children": [
+            {
+              "nodeId": "ast1415",
+              "kind": "IntegerLiteral",
+              "operator": null,
+              "type": "int",
+              "cType": {
+                "id": "debug:11",
+                "name": "int",
+                "sizeBits": 32,
+                "signedness": "signed",
+                "encoding": "DW_ATE_signed",
+                "display": {
+                  "label": "int",
+                  "badges": []
+                },
+                "evidence": "compiler"
+              },
+              "literal": "20",
+              "source": {
+                "file": "main.c",
+                "line": 5,
+                "column": 13,
+                "start": {
+                  "line": 5,
+                  "column": 13,
+                  "byte": 60,
+                  "editorColumn": 13
+                },
+                "end": {
+                  "line": 5,
+                  "column": 15,
+                  "byte": 62,
+                  "editorColumn": 15
+                },
+                "endExclusive": true,
+                "editorRange": {
+                  "startLineNumber": 5,
+                  "startColumn": 13,
+                  "endLineNumber": 5,
+                  "endColumn": 15
+                },
+                "evidence": "compiler location with bounded token-end lookup"
+              },
+              "children": []
+            }
+          ]
+        },
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i8",
+        "kind": "READ",
+        "action": "read",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1419",
+        "source": {
+          "file": "main.c",
+          "line": 6,
+          "column": 13,
+          "start": {
+            "line": 6,
+            "column": 13,
+            "byte": 76,
+            "editorColumn": 13
+          },
+          "end": {
+            "line": 6,
+            "column": 14,
+            "byte": 77,
+            "editorColumn": 14
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 6,
+            "startColumn": 13,
+            "endLineNumber": 6,
+            "endColumn": 14
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "a"
+        },
+        "scopeId": "s2",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "accessType": "i32",
+        "expression": {
+          "nodeId": "ast1419",
+          "kind": "ImplicitCastExpr",
+          "operator": null,
+          "type": "int",
+          "cType": {
+            "id": "debug:11",
+            "name": "int",
+            "sizeBits": 32,
+            "signedness": "signed",
+            "encoding": "DW_ATE_signed",
+            "display": {
+              "label": "int",
+              "badges": []
+            },
+            "evidence": "compiler"
+          },
+          "cast": "LValueToRValue",
+          "source": {
+            "file": "main.c",
+            "line": 6,
+            "column": 13,
+            "start": {
+              "line": 6,
+              "column": 13,
+              "byte": 76,
+              "editorColumn": 13
+            },
+            "end": {
+              "line": 6,
+              "column": 14,
+              "byte": 77,
+              "editorColumn": 14
+            },
+            "endExclusive": true,
+            "editorRange": {
+              "startLineNumber": 6,
+              "startColumn": 13,
+              "endLineNumber": 6,
+              "endColumn": 14
+            },
+            "evidence": "compiler location with bounded token-end lookup"
+          },
+          "children": [
+            {
+              "nodeId": "ast1420",
+              "kind": "DeclRefExpr",
+              "operator": null,
+              "type": "int",
+              "cType": {
+                "id": "debug:11",
+                "name": "int",
+                "sizeBits": 32,
+                "signedness": "signed",
+                "encoding": "DW_ATE_signed",
+                "display": {
+                  "label": "int",
+                  "badges": []
+                },
+                "evidence": "compiler"
+              },
+              "declarationId": "d1",
+              "referencedName": "a",
+              "source": {
+                "file": "main.c",
+                "line": 6,
+                "column": 13,
+                "start": {
+                  "line": 6,
+                  "column": 13,
+                  "byte": 76,
+                  "editorColumn": 13
+                },
+                "end": {
+                  "line": 6,
+                  "column": 14,
+                  "byte": 77,
+                  "editorColumn": 14
+                },
+                "endExclusive": true,
+                "editorRange": {
+                  "startLineNumber": 6,
+                  "startColumn": 13,
+                  "endLineNumber": 6,
+                  "endColumn": 14
+                },
+                "evidence": "compiler location with bounded token-end lookup"
+              },
+              "children": []
+            }
+          ]
+        },
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i9",
+        "kind": "READ",
+        "action": "read",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1421",
+        "source": {
+          "file": "main.c",
+          "line": 6,
+          "column": 15,
+          "start": {
+            "line": 6,
+            "column": 15,
+            "byte": 78,
+            "editorColumn": 15
+          },
+          "end": {
+            "line": 6,
+            "column": 16,
+            "byte": 79,
+            "editorColumn": 16
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 6,
+            "startColumn": 15,
+            "endLineNumber": 6,
+            "endColumn": 16
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "b"
+        },
+        "scopeId": "s2",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "accessType": "i32",
+        "expression": {
+          "nodeId": "ast1421",
+          "kind": "ImplicitCastExpr",
+          "operator": null,
+          "type": "int",
+          "cType": {
+            "id": "debug:11",
+            "name": "int",
+            "sizeBits": 32,
+            "signedness": "signed",
+            "encoding": "DW_ATE_signed",
+            "display": {
+              "label": "int",
+              "badges": []
+            },
+            "evidence": "compiler"
+          },
+          "cast": "LValueToRValue",
+          "source": {
+            "file": "main.c",
+            "line": 6,
+            "column": 15,
+            "start": {
+              "line": 6,
+              "column": 15,
+              "byte": 78,
+              "editorColumn": 15
+            },
+            "end": {
+              "line": 6,
+              "column": 16,
+              "byte": 79,
+              "editorColumn": 16
+            },
+            "endExclusive": true,
+            "editorRange": {
+              "startLineNumber": 6,
+              "startColumn": 15,
+              "endLineNumber": 6,
+              "endColumn": 16
+            },
+            "evidence": "compiler location with bounded token-end lookup"
+          },
+          "children": [
+            {
+              "nodeId": "ast1422",
+              "kind": "DeclRefExpr",
+              "operator": null,
+              "type": "int",
+              "cType": {
+                "id": "debug:11",
+                "name": "int",
+                "sizeBits": 32,
+                "signedness": "signed",
+                "encoding": "DW_ATE_signed",
+                "display": {
+                  "label": "int",
+                  "badges": []
+                },
+                "evidence": "compiler"
+              },
+              "declarationId": "d2",
+              "referencedName": "b",
+              "source": {
+                "file": "main.c",
+                "line": 6,
+                "column": 15,
+                "start": {
+                  "line": 6,
+                  "column": 15,
+                  "byte": 78,
+                  "editorColumn": 15
+                },
+                "end": {
+                  "line": 6,
+                  "column": 16,
+                  "byte": 79,
+                  "editorColumn": 16
+                },
+                "endExclusive": true,
+                "editorRange": {
+                  "startLineNumber": 6,
+                  "startColumn": 15,
+                  "endLineNumber": 6,
+                  "endColumn": 16
+                },
+                "evidence": "compiler location with bounded token-end lookup"
+              },
+              "children": []
+            }
+          ]
+        },
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i10",
+        "kind": "CALC",
+        "action": "expression",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1418",
+        "source": {
+          "file": "main.c",
+          "line": 6,
+          "column": 13,
+          "start": {
+            "line": 6,
+            "column": 13,
+            "byte": 76,
+            "editorColumn": 13
+          },
+          "end": {
+            "line": 6,
+            "column": 16,
+            "byte": 79,
+            "editorColumn": 16
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 6,
+            "startColumn": 13,
+            "endLineNumber": 6,
+            "endColumn": 16
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "a+b"
+        },
+        "scopeId": "s2",
+        "expression": {
+          "nodeId": "ast1418",
+          "kind": "BinaryOperator",
+          "operator": "+",
+          "type": "int",
+          "cType": {
+            "id": "debug:11",
+            "name": "int",
+            "sizeBits": 32,
+            "signedness": "signed",
+            "encoding": "DW_ATE_signed",
+            "display": {
+              "label": "int",
+              "badges": []
+            },
+            "evidence": "compiler"
+          },
+          "source": {
+            "file": "main.c",
+            "line": 6,
+            "column": 13,
+            "start": {
+              "line": 6,
+              "column": 13,
+              "byte": 76,
+              "editorColumn": 13
+            },
+            "end": {
+              "line": 6,
+              "column": 16,
+              "byte": 79,
+              "editorColumn": 16
+            },
+            "endExclusive": true,
+            "editorRange": {
+              "startLineNumber": 6,
+              "startColumn": 13,
+              "endLineNumber": 6,
+              "endColumn": 16
+            },
+            "evidence": "compiler location with bounded token-end lookup"
+          },
+          "children": [
+            {
+              "nodeId": "ast1419",
+              "kind": "ImplicitCastExpr",
+              "operator": null,
+              "type": "int",
+              "cType": {
+                "id": "debug:11",
+                "name": "int",
+                "sizeBits": 32,
+                "signedness": "signed",
+                "encoding": "DW_ATE_signed",
+                "display": {
+                  "label": "int",
+                  "badges": []
+                },
+                "evidence": "compiler"
+              },
+              "cast": "LValueToRValue",
+              "source": {
+                "file": "main.c",
+                "line": 6,
+                "column": 13,
+                "start": {
+                  "line": 6,
+                  "column": 13,
+                  "byte": 76,
+                  "editorColumn": 13
+                },
+                "end": {
+                  "line": 6,
+                  "column": 14,
+                  "byte": 77,
+                  "editorColumn": 14
+                },
+                "endExclusive": true,
+                "editorRange": {
+                  "startLineNumber": 6,
+                  "startColumn": 13,
+                  "endLineNumber": 6,
+                  "endColumn": 14
+                },
+                "evidence": "compiler location with bounded token-end lookup"
+              },
+              "children": [
+                {
+                  "nodeId": "ast1420",
+                  "kind": "DeclRefExpr",
+                  "operator": null,
+                  "type": "int",
+                  "cType": {
+                    "id": "debug:11",
+                    "name": "int",
+                    "sizeBits": 32,
+                    "signedness": "signed",
+                    "encoding": "DW_ATE_signed",
+                    "display": {
+                      "label": "int",
+                      "badges": []
+                    },
+                    "evidence": "compiler"
+                  },
+                  "declarationId": "d1",
+                  "referencedName": "a",
+                  "source": {
+                    "file": "main.c",
+                    "line": 6,
+                    "column": 13,
+                    "start": {
+                      "line": 6,
+                      "column": 13,
+                      "byte": 76,
+                      "editorColumn": 13
+                    },
+                    "end": {
+                      "line": 6,
+                      "column": 14,
+                      "byte": 77,
+                      "editorColumn": 14
+                    },
+                    "endExclusive": true,
+                    "editorRange": {
+                      "startLineNumber": 6,
+                      "startColumn": 13,
+                      "endLineNumber": 6,
+                      "endColumn": 14
+                    },
+                    "evidence": "compiler location with bounded token-end lookup"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "nodeId": "ast1421",
+              "kind": "ImplicitCastExpr",
+              "operator": null,
+              "type": "int",
+              "cType": {
+                "id": "debug:11",
+                "name": "int",
+                "sizeBits": 32,
+                "signedness": "signed",
+                "encoding": "DW_ATE_signed",
+                "display": {
+                  "label": "int",
+                  "badges": []
+                },
+                "evidence": "compiler"
+              },
+              "cast": "LValueToRValue",
+              "source": {
+                "file": "main.c",
+                "line": 6,
+                "column": 15,
+                "start": {
+                  "line": 6,
+                  "column": 15,
+                  "byte": 78,
+                  "editorColumn": 15
+                },
+                "end": {
+                  "line": 6,
+                  "column": 16,
+                  "byte": 79,
+                  "editorColumn": 16
+                },
+                "endExclusive": true,
+                "editorRange": {
+                  "startLineNumber": 6,
+                  "startColumn": 15,
+                  "endLineNumber": 6,
+                  "endColumn": 16
+                },
+                "evidence": "compiler location with bounded token-end lookup"
+              },
+              "children": [
+                {
+                  "nodeId": "ast1422",
+                  "kind": "DeclRefExpr",
+                  "operator": null,
+                  "type": "int",
+                  "cType": {
+                    "id": "debug:11",
+                    "name": "int",
+                    "sizeBits": 32,
+                    "signedness": "signed",
+                    "encoding": "DW_ATE_signed",
+                    "display": {
+                      "label": "int",
+                      "badges": []
+                    },
+                    "evidence": "compiler"
+                  },
+                  "declarationId": "d2",
+                  "referencedName": "b",
+                  "source": {
+                    "file": "main.c",
+                    "line": 6,
+                    "column": 15,
+                    "start": {
+                      "line": 6,
+                      "column": 15,
+                      "byte": 78,
+                      "editorColumn": 15
+                    },
+                    "end": {
+                      "line": 6,
+                      "column": 16,
+                      "byte": 79,
+                      "editorColumn": 16
+                    },
+                    "endExclusive": true,
+                    "editorRange": {
+                      "startLineNumber": 6,
+                      "startColumn": 15,
+                      "endLineNumber": 6,
+                      "endColumn": 16
+                    },
+                    "evidence": "compiler location with bounded token-end lookup"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "operator": "+",
+        "grouping": "expression",
+        "observationIds": [
+          "m22"
+        ],
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i11",
+        "kind": "WRITE",
+        "action": "write",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1417",
+        "source": {
+          "file": "main.c",
+          "line": 6,
+          "column": 5,
+          "start": {
+            "line": 6,
+            "column": 5,
+            "byte": 68,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 6,
+            "column": 16,
+            "byte": 79,
+            "editorColumn": 16
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 6,
+            "startColumn": 5,
+            "endLineNumber": 6,
+            "endColumn": 16
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "int c = a+b"
+        },
+        "scopeId": "s2",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "accessType": "i32",
+        "expression": {
+          "nodeId": "ast1417",
+          "kind": "VarDecl",
+          "operator": null,
+          "type": "int",
+          "cType": {
+            "id": "debug:11",
+            "name": "int",
+            "sizeBits": 32,
+            "signedness": "signed",
+            "encoding": "DW_ATE_signed",
+            "display": {
+              "label": "int",
+              "badges": []
+            },
+            "evidence": "compiler"
+          },
+          "source": {
+            "file": "main.c",
+            "line": 6,
+            "column": 5,
+            "start": {
+              "line": 6,
+              "column": 5,
+              "byte": 68,
+              "editorColumn": 5
+            },
+            "end": {
+              "line": 6,
+              "column": 16,
+              "byte": 79,
+              "editorColumn": 16
+            },
+            "endExclusive": true,
+            "editorRange": {
+              "startLineNumber": 6,
+              "startColumn": 5,
+              "endLineNumber": 6,
+              "endColumn": 16
+            },
+            "evidence": "compiler location with bounded token-end lookup"
+          },
+          "children": [
+            {
+              "nodeId": "ast1418",
+              "kind": "BinaryOperator",
+              "operator": "+",
+              "type": "int",
+              "cType": {
+                "id": "debug:11",
+                "name": "int",
+                "sizeBits": 32,
+                "signedness": "signed",
+                "encoding": "DW_ATE_signed",
+                "display": {
+                  "label": "int",
+                  "badges": []
+                },
+                "evidence": "compiler"
+              },
+              "source": {
+                "file": "main.c",
+                "line": 6,
+                "column": 13,
+                "start": {
+                  "line": 6,
+                  "column": 13,
+                  "byte": 76,
+                  "editorColumn": 13
+                },
+                "end": {
+                  "line": 6,
+                  "column": 16,
+                  "byte": 79,
+                  "editorColumn": 16
+                },
+                "endExclusive": true,
+                "editorRange": {
+                  "startLineNumber": 6,
+                  "startColumn": 13,
+                  "endLineNumber": 6,
+                  "endColumn": 16
+                },
+                "evidence": "compiler location with bounded token-end lookup"
+              },
+              "children": [
+                {
+                  "nodeId": "ast1419",
+                  "kind": "ImplicitCastExpr",
+                  "operator": null,
+                  "type": "int",
+                  "cType": {
+                    "id": "debug:11",
+                    "name": "int",
+                    "sizeBits": 32,
+                    "signedness": "signed",
+                    "encoding": "DW_ATE_signed",
+                    "display": {
+                      "label": "int",
+                      "badges": []
+                    },
+                    "evidence": "compiler"
+                  },
+                  "cast": "LValueToRValue",
+                  "source": {
+                    "file": "main.c",
+                    "line": 6,
+                    "column": 13,
+                    "start": {
+                      "line": 6,
+                      "column": 13,
+                      "byte": 76,
+                      "editorColumn": 13
+                    },
+                    "end": {
+                      "line": 6,
+                      "column": 14,
+                      "byte": 77,
+                      "editorColumn": 14
+                    },
+                    "endExclusive": true,
+                    "editorRange": {
+                      "startLineNumber": 6,
+                      "startColumn": 13,
+                      "endLineNumber": 6,
+                      "endColumn": 14
+                    },
+                    "evidence": "compiler location with bounded token-end lookup"
+                  },
+                  "children": [
+                    {
+                      "nodeId": "ast1420",
+                      "kind": "DeclRefExpr",
+                      "operator": null,
+                      "type": "int",
+                      "cType": {
+                        "id": "debug:11",
+                        "name": "int",
+                        "sizeBits": 32,
+                        "signedness": "signed",
+                        "encoding": "DW_ATE_signed",
+                        "display": {
+                          "label": "int",
+                          "badges": []
+                        },
+                        "evidence": "compiler"
+                      },
+                      "declarationId": "d1",
+                      "referencedName": "a",
+                      "source": {
+                        "file": "main.c",
+                        "line": 6,
+                        "column": 13,
+                        "start": {
+                          "line": 6,
+                          "column": 13,
+                          "byte": 76,
+                          "editorColumn": 13
+                        },
+                        "end": {
+                          "line": 6,
+                          "column": 14,
+                          "byte": 77,
+                          "editorColumn": 14
+                        },
+                        "endExclusive": true,
+                        "editorRange": {
+                          "startLineNumber": 6,
+                          "startColumn": 13,
+                          "endLineNumber": 6,
+                          "endColumn": 14
+                        },
+                        "evidence": "compiler location with bounded token-end lookup"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "nodeId": "ast1421",
+                  "kind": "ImplicitCastExpr",
+                  "operator": null,
+                  "type": "int",
+                  "cType": {
+                    "id": "debug:11",
+                    "name": "int",
+                    "sizeBits": 32,
+                    "signedness": "signed",
+                    "encoding": "DW_ATE_signed",
+                    "display": {
+                      "label": "int",
+                      "badges": []
+                    },
+                    "evidence": "compiler"
+                  },
+                  "cast": "LValueToRValue",
+                  "source": {
+                    "file": "main.c",
+                    "line": 6,
+                    "column": 15,
+                    "start": {
+                      "line": 6,
+                      "column": 15,
+                      "byte": 78,
+                      "editorColumn": 15
+                    },
+                    "end": {
+                      "line": 6,
+                      "column": 16,
+                      "byte": 79,
+                      "editorColumn": 16
+                    },
+                    "endExclusive": true,
+                    "editorRange": {
+                      "startLineNumber": 6,
+                      "startColumn": 15,
+                      "endLineNumber": 6,
+                      "endColumn": 16
+                    },
+                    "evidence": "compiler location with bounded token-end lookup"
+                  },
+                  "children": [
+                    {
+                      "nodeId": "ast1422",
+                      "kind": "DeclRefExpr",
+                      "operator": null,
+                      "type": "int",
+                      "cType": {
+                        "id": "debug:11",
+                        "name": "int",
+                        "sizeBits": 32,
+                        "signedness": "signed",
+                        "encoding": "DW_ATE_signed",
+                        "display": {
+                          "label": "int",
+                          "badges": []
+                        },
+                        "evidence": "compiler"
+                      },
+                      "declarationId": "d2",
+                      "referencedName": "b",
+                      "source": {
+                        "file": "main.c",
+                        "line": 6,
+                        "column": 15,
+                        "start": {
+                          "line": 6,
+                          "column": 15,
+                          "byte": 78,
+                          "editorColumn": 15
+                        },
+                        "end": {
+                          "line": 6,
+                          "column": 16,
+                          "byte": 79,
+                          "editorColumn": 16
+                        },
+                        "endExclusive": true,
+                        "editorRange": {
+                          "startLineNumber": 6,
+                          "startColumn": 15,
+                          "endLineNumber": 6,
+                          "endColumn": 16
+                        },
+                        "evidence": "compiler location with bounded token-end lookup"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i12",
+        "kind": "SPACE",
+        "action": "object.end",
+        "functionId": "fn1",
+        "sourceNodeId": null,
+        "source": {
+          "file": "main.c",
+          "line": 9,
+          "column": 1,
+          "start": {
+            "line": 9,
+            "column": 1,
+            "byte": 96,
+            "editorColumn": 1
+          },
+          "end": {
+            "line": 9,
+            "column": 2,
+            "byte": 97,
+            "editorColumn": 2
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 9,
+            "startColumn": 1,
+            "endLineNumber": 9,
+            "endColumn": 2
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        },
+        "scopeId": "s2",
+        "declarationId": "d3",
+        "reason": "function-return",
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i13",
+        "kind": "SPACE",
+        "action": "object.end",
+        "functionId": "fn1",
+        "sourceNodeId": null,
+        "source": {
+          "file": "main.c",
+          "line": 9,
+          "column": 1,
+          "start": {
+            "line": 9,
+            "column": 1,
+            "byte": 96,
+            "editorColumn": 1
+          },
+          "end": {
+            "line": 9,
+            "column": 2,
+            "byte": 97,
+            "editorColumn": 2
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 9,
+            "startColumn": 1,
+            "endLineNumber": 9,
+            "endColumn": 2
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        },
+        "scopeId": "s2",
+        "declarationId": "d2",
+        "reason": "function-return",
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i14",
+        "kind": "SPACE",
+        "action": "object.end",
+        "functionId": "fn1",
+        "sourceNodeId": null,
+        "source": {
+          "file": "main.c",
+          "line": 9,
+          "column": 1,
+          "start": {
+            "line": 9,
+            "column": 1,
+            "byte": 96,
+            "editorColumn": 1
+          },
+          "end": {
+            "line": 9,
+            "column": 2,
+            "byte": 97,
+            "editorColumn": 2
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 9,
+            "startColumn": 1,
+            "endLineNumber": 9,
+            "endColumn": 2
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        },
+        "scopeId": "s2",
+        "declarationId": "d1",
+        "reason": "function-return",
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i15",
+        "kind": "WRITE",
+        "action": "return.value",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1423",
+        "source": {
+          "file": "main.c",
+          "line": 8,
+          "column": 5,
+          "start": {
+            "line": 8,
+            "column": 5,
+            "byte": 86,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 8,
+            "column": 13,
+            "byte": 94,
+            "editorColumn": 13
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 8,
+            "startColumn": 5,
+            "endLineNumber": 8,
+            "endColumn": 13
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "return 0"
+        },
+        "scopeId": "s2",
+        "returnType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i16",
+        "kind": "FLOW",
+        "action": "return",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1423",
+        "source": {
+          "file": "main.c",
+          "line": 8,
+          "column": 5,
+          "start": {
+            "line": 8,
+            "column": 5,
+            "byte": 86,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 8,
+            "column": 13,
+            "byte": 94,
+            "editorColumn": 13
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 8,
+            "startColumn": 5,
+            "endLineNumber": 8,
+            "endColumn": 13
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "return 0"
+        },
+        "scopeId": "s2",
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i17",
+        "kind": "SPACE",
+        "action": "object.end",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1423",
+        "source": {
+          "file": "main.c",
+          "line": 8,
+          "column": 5,
+          "start": {
+            "line": 8,
+            "column": 5,
+            "byte": 86,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 8,
+            "column": 13,
+            "byte": 94,
+            "editorColumn": 13
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 8,
+            "startColumn": 5,
+            "endLineNumber": 8,
+            "endColumn": 13
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "return 0"
+        },
+        "scopeId": "s2",
+        "reason": "function-return",
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i18",
+        "kind": "SPACE",
+        "action": "frame.end",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1423",
+        "source": {
+          "file": "main.c",
+          "line": 8,
+          "column": 5,
+          "start": {
+            "line": 8,
+            "column": 5,
+            "byte": 86,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 8,
+            "column": 13,
+            "byte": 94,
+            "editorColumn": 13
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 8,
+            "startColumn": 5,
+            "endLineNumber": 8,
+            "endColumn": 13
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "return 0"
+        },
+        "scopeId": "s2",
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i19",
+        "kind": "WRITE",
+        "action": "output",
+        "functionId": null,
+        "sourceNodeId": null,
+        "source": null,
+        "scopeId": null,
+        "processEffect": true,
+        "sourceStatus": "implementation"
+      },
+      {
+        "id": "i20",
+        "kind": "READ",
+        "action": "input",
+        "functionId": null,
+        "sourceNodeId": null,
+        "source": null,
+        "scopeId": null,
+        "processEffect": true,
+        "sourceStatus": "implementation"
+      },
+      {
+        "id": "i21",
+        "kind": "SPACE",
+        "action": "object.end",
+        "functionId": null,
+        "sourceNodeId": null,
+        "source": null,
+        "scopeId": null,
+        "processEffect": true,
+        "sourceStatus": "implementation"
+      },
+      {
+        "id": "i22",
+        "kind": "SPACE",
+        "action": "frame.end",
+        "functionId": null,
+        "sourceNodeId": null,
+        "source": null,
+        "scopeId": null,
+        "processEffect": true,
+        "sourceStatus": "implementation"
+      },
+      {
+        "id": "i23",
+        "kind": "ERROR",
+        "action": "fault",
+        "functionId": null,
+        "sourceNodeId": null,
+        "source": null,
+        "scopeId": null,
+        "processEffect": true,
+        "sourceStatus": "implementation"
+      },
+      {
+        "id": "i24",
+        "kind": "SPACE",
+        "action": "object.begin",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1411",
+        "source": {
+          "file": "main.c",
+          "line": 4,
+          "column": 5,
+          "start": {
+            "line": 4,
+            "column": 5,
+            "byte": 36,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 4,
+            "column": 15,
+            "byte": 46,
+            "editorColumn": 15
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 4,
+            "startColumn": 5,
+            "endLineNumber": 4,
+            "endColumn": 15
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "int a = 10"
+        },
+        "scopeId": "s2",
+        "bindingStatus": "source-only",
+        "declarationId": "d1",
+        "storage": "automatic",
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i25",
+        "kind": "SPACE",
+        "action": "object.begin",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1414",
+        "source": {
+          "file": "main.c",
+          "line": 5,
+          "column": 5,
+          "start": {
+            "line": 5,
+            "column": 5,
+            "byte": 52,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 5,
+            "column": 15,
+            "byte": 62,
+            "editorColumn": 15
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 5,
+            "startColumn": 5,
+            "endLineNumber": 5,
+            "endColumn": 15
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "int b = 20"
+        },
+        "scopeId": "s2",
+        "bindingStatus": "source-only",
+        "declarationId": "d2",
+        "storage": "automatic",
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i26",
+        "kind": "SPACE",
+        "action": "object.begin",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1417",
+        "source": {
+          "file": "main.c",
+          "line": 6,
+          "column": 5,
+          "start": {
+            "line": 6,
+            "column": 5,
+            "byte": 68,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 6,
+            "column": 16,
+            "byte": 79,
+            "editorColumn": 16
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 6,
+            "startColumn": 5,
+            "endLineNumber": 6,
+            "endColumn": 16
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "int c = a+b"
+        },
+        "scopeId": "s2",
+        "bindingStatus": "source-only",
+        "declarationId": "d3",
+        "storage": "automatic",
+        "sourceStatus": "mapped"
+      },
+      {
+        "id": "i27",
+        "kind": "FLOW",
+        "action": "return",
+        "functionId": "fn1",
+        "sourceNodeId": "ast1423",
+        "source": {
+          "file": "main.c",
+          "line": 8,
+          "column": 5,
+          "start": {
+            "line": 8,
+            "column": 5,
+            "byte": 86,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 8,
+            "column": 13,
+            "byte": 94,
+            "editorColumn": 13
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 8,
+            "startColumn": 5,
+            "endLineNumber": 8,
+            "endColumn": 13
+          },
+          "evidence": "compiler location with bounded token-end lookup",
+          "expression": "return 0"
+        },
+        "scopeId": "s2",
+        "bindingStatus": "source-only",
+        "sourceStatus": "mapped"
+      }
+    ],
+    "functions": [
+      {
+        "id": "fn1",
+        "name": "main",
+        "symbol": "@main",
+        "llvmLinkage": "external",
+        "parameters": [],
+        "source": {
+          "file": "main.c",
+          "line": 3,
+          "column": 1,
+          "start": {
+            "line": 3,
+            "column": 1,
+            "byte": 20,
+            "editorColumn": 1
+          },
+          "end": {
+            "line": 9,
+            "column": 2,
+            "byte": 97,
+            "editorColumn": 2
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 3,
+            "startColumn": 1,
+            "endLineNumber": 9,
+            "endColumn": 2
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        },
+        "sourceNodeId": "ast1408",
+        "declarationNodeIds": [
+          "ast1408"
+        ],
+        "specifiers": {
+          "inline": false
+        }
+      }
+    ],
+    "declarations": [
+      {
+        "id": "d1",
+        "name": "a",
+        "kind": "VarDecl",
+        "functionName": "main",
+        "scopeId": "s2",
+        "source": {
+          "file": "main.c",
+          "line": 4,
+          "column": 5,
+          "start": {
+            "line": 4,
+            "column": 5,
+            "byte": 36,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 4,
+            "column": 15,
+            "byte": 46,
+            "editorColumn": 15
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 4,
+            "startColumn": 5,
+            "endLineNumber": 4,
+            "endColumn": 15
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        },
+        "point": {
+          "file": "main.c",
+          "line": 4,
+          "column": 9
+        },
+        "type": "int",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "storage": "automatic",
+        "hasInitializer": true
+      },
+      {
+        "id": "d2",
+        "name": "b",
+        "kind": "VarDecl",
+        "functionName": "main",
+        "scopeId": "s2",
+        "source": {
+          "file": "main.c",
+          "line": 5,
+          "column": 5,
+          "start": {
+            "line": 5,
+            "column": 5,
+            "byte": 52,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 5,
+            "column": 15,
+            "byte": 62,
+            "editorColumn": 15
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 5,
+            "startColumn": 5,
+            "endLineNumber": 5,
+            "endColumn": 15
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        },
+        "point": {
+          "file": "main.c",
+          "line": 5,
+          "column": 9
+        },
+        "type": "int",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "storage": "automatic",
+        "hasInitializer": true
+      },
+      {
+        "id": "d3",
+        "name": "c",
+        "kind": "VarDecl",
+        "functionName": "main",
+        "scopeId": "s2",
+        "source": {
+          "file": "main.c",
+          "line": 6,
+          "column": 5,
+          "start": {
+            "line": 6,
+            "column": 5,
+            "byte": 68,
+            "editorColumn": 5
+          },
+          "end": {
+            "line": 6,
+            "column": 16,
+            "byte": 79,
+            "editorColumn": 16
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 6,
+            "startColumn": 5,
+            "endLineNumber": 6,
+            "endColumn": 16
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        },
+        "point": {
+          "file": "main.c",
+          "line": 6,
+          "column": 9
+        },
+        "type": "int",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "storage": "automatic",
+        "hasInitializer": true
+      }
+    ],
+    "scopes": [
+      {
+        "id": "s1",
+        "parentId": null,
+        "kind": "FunctionDecl",
+        "functionName": "main",
+        "source": {
+          "file": "main.c",
+          "line": 3,
+          "column": 1,
+          "start": {
+            "line": 3,
+            "column": 1,
+            "byte": 20,
+            "editorColumn": 1
+          },
+          "end": {
+            "line": 9,
+            "column": 2,
+            "byte": 97,
+            "editorColumn": 2
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 3,
+            "startColumn": 1,
+            "endLineNumber": 9,
+            "endColumn": 2
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        }
+      },
+      {
+        "id": "s2",
+        "parentId": "s1",
+        "kind": "CompoundStmt",
+        "functionName": "main",
+        "source": {
+          "file": "main.c",
+          "line": 3,
+          "column": 11,
+          "start": {
+            "line": 3,
+            "column": 11,
+            "byte": 30,
+            "editorColumn": 11
+          },
+          "end": {
+            "line": 9,
+            "column": 2,
+            "byte": 97,
+            "editorColumn": 2
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 3,
+            "startColumn": 11,
+            "endLineNumber": 9,
+            "endColumn": 2
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        }
+      }
+    ],
+    "types": [
+      {
+        "id": "debug:9",
+        "kind": "Subroutine",
+        "sizeBits": 0,
+        "offsetBits": 0,
+        "encoding": null,
+        "baseType": null,
+        "elements": [],
+        "flags": null,
+        "evidence": "compiler",
+        "signedness": null,
+        "display": {
+          "label": null,
+          "badges": []
+        }
+      },
+      {
+        "id": "debug:11",
+        "kind": "Basic",
+        "name": "int",
+        "sizeBits": 32,
+        "offsetBits": 0,
+        "encoding": "DW_ATE_signed",
+        "baseType": null,
+        "elements": [],
+        "flags": null,
+        "evidence": "compiler",
+        "signedness": "signed",
+        "display": {
+          "label": "int",
+          "badges": []
+        }
+      }
+    ],
+    "llvmTypes": {},
+    "bindings": {
+      "m1": {
+        "roles": {},
+        "administrative": true,
+        "hiddenStorage": false,
+        "sourceMapping": {
+          "compilerLocation": null,
+          "astNodeIds": []
+        }
+      },
+      "m2": {
+        "roles": {},
+        "administrative": true,
+        "hiddenStorage": false,
+        "sourceMapping": {
+          "compilerLocation": null,
+          "astNodeIds": []
+        }
+      },
+      "m3": {
+        "roles": {
+          "SPACE:frame.begin": "i1",
+          "FLOW:enter": "i2"
+        },
+        "administrative": false,
+        "failedInstructionId": "i1",
+        "sourceMapping": {
+          "compilerLocation": null,
+          "astNodeIds": []
+        }
+      },
+      "m4": {
+        "roles": {},
+        "administrative": true,
+        "hiddenStorage": true,
+        "sourceMapping": {
+          "compilerLocation": null,
+          "astNodeIds": []
+        }
+      },
+      "m5": {
+        "roles": {
+          "SPACE:object.begin": "i3"
+        },
+        "administrative": true,
+        "declarationObservationId": "m11",
+        "failedInstructionId": "i3",
+        "sourceMapping": {
+          "compilerLocation": null,
+          "astNodeIds": []
+        }
+      },
+      "m6": {
+        "roles": {
+          "SPACE:object.begin": "i4"
+        },
+        "administrative": true,
+        "declarationObservationId": "m15",
+        "failedInstructionId": "i4",
+        "sourceMapping": {
+          "compilerLocation": null,
+          "astNodeIds": []
+        }
+      },
+      "m7": {
+        "roles": {
+          "SPACE:object.begin": "i5"
+        },
+        "administrative": true,
+        "declarationObservationId": "m19",
+        "failedInstructionId": "i5",
+        "sourceMapping": {
+          "compilerLocation": null,
+          "astNodeIds": []
+        }
+      },
+      "m8": {
+        "roles": {},
+        "administrative": true,
+        "hiddenStorage": false,
+        "sourceMapping": {
+          "compilerLocation": null,
+          "astNodeIds": []
+        }
+      },
+      "m9": {
+        "roles": {},
+        "administrative": true,
+        "failedInstructionId": null,
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 4,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1411",
+            "ast1410",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m10": {
+        "roles": {
+          "SPACE:object.begin": "i3"
+        },
+        "administrative": false,
+        "declarationObservationId": "m11",
+        "failedInstructionId": "i3",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 4,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1411",
+            "ast1410",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m11": {
+        "roles": {
+          "SPACE:declaration": "i3"
+        },
+        "administrative": false,
+        "sourceDeclaration": true,
+        "allocationObservationId": "m5",
+        "failedInstructionId": "i3",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 4,
+            "column": 9
+          },
+          "astNodeIds": [
+            "ast1411",
+            "ast1410",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m12": {
+        "roles": {
+          "WRITE": "i6"
+        },
+        "administrative": false,
+        "failedInstructionId": "i6",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 4,
+            "column": 9
+          },
+          "astNodeIds": [
+            "ast1411",
+            "ast1410",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m13": {
+        "roles": {},
+        "administrative": true,
+        "failedInstructionId": null,
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 5,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1414",
+            "ast1413",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m14": {
+        "roles": {
+          "SPACE:object.begin": "i4"
+        },
+        "administrative": false,
+        "declarationObservationId": "m15",
+        "failedInstructionId": "i4",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 5,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1414",
+            "ast1413",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m15": {
+        "roles": {
+          "SPACE:declaration": "i4"
+        },
+        "administrative": false,
+        "sourceDeclaration": true,
+        "allocationObservationId": "m6",
+        "failedInstructionId": "i4",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 5,
+            "column": 9
+          },
+          "astNodeIds": [
+            "ast1414",
+            "ast1413",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m16": {
+        "roles": {
+          "WRITE": "i7"
+        },
+        "administrative": false,
+        "failedInstructionId": "i7",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 5,
+            "column": 9
+          },
+          "astNodeIds": [
+            "ast1414",
+            "ast1413",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m17": {
+        "roles": {},
+        "administrative": true,
+        "failedInstructionId": null,
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 6,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m18": {
+        "roles": {
+          "SPACE:object.begin": "i5"
+        },
+        "administrative": false,
+        "declarationObservationId": "m19",
+        "failedInstructionId": "i5",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 6,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m19": {
+        "roles": {
+          "SPACE:declaration": "i5"
+        },
+        "administrative": false,
+        "sourceDeclaration": true,
+        "allocationObservationId": "m7",
+        "failedInstructionId": "i5",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 6,
+            "column": 9
+          },
+          "astNodeIds": [
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m20": {
+        "roles": {
+          "READ": "i8"
+        },
+        "administrative": false,
+        "failedInstructionId": "i8",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 6,
+            "column": 13
+          },
+          "astNodeIds": [
+            "ast1420",
+            "ast1419",
+            "ast1418",
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m21": {
+        "roles": {
+          "READ": "i9"
+        },
+        "administrative": false,
+        "failedInstructionId": "i9",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 6,
+            "column": 15
+          },
+          "astNodeIds": [
+            "ast1422",
+            "ast1421",
+            "ast1418",
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m22": {
+        "roles": {
+          "CALC": "i10"
+        },
+        "administrative": false,
+        "group": "i10",
+        "expressionNodeId": "ast1418",
+        "sourceOperator": "+",
+        "failedInstructionId": "i10",
+        "inputTypes": [
+          {
+            "nodeId": "ast1419",
+            "cType": {
+              "id": "debug:11",
+              "name": "int",
+              "sizeBits": 32,
+              "signedness": "signed",
+              "encoding": "DW_ATE_signed",
+              "display": {
+                "label": "int",
+                "badges": []
+              },
+              "evidence": "compiler"
+            }
+          },
+          {
+            "nodeId": "ast1421",
+            "cType": {
+              "id": "debug:11",
+              "name": "int",
+              "sizeBits": 32,
+              "signedness": "signed",
+              "encoding": "DW_ATE_signed",
+              "display": {
+                "label": "int",
+                "badges": []
+              },
+              "evidence": "compiler"
+            }
+          }
+        ],
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 6,
+            "column": 14
+          },
+          "astNodeIds": [
+            "ast1418",
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m23": {
+        "roles": {
+          "WRITE": "i11"
+        },
+        "administrative": false,
+        "failedInstructionId": "i11",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 6,
+            "column": 9
+          },
+          "astNodeIds": [
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m24": {
+        "roles": {},
+        "administrative": true,
+        "failedInstructionId": null,
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 9,
+            "column": 1
+          },
+          "astNodeIds": [
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m25": {
+        "roles": {
+          "SPACE:object.end": "i12"
+        },
+        "administrative": false,
+        "failedInstructionId": "i12",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 9,
+            "column": 1
+          },
+          "astNodeIds": [
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m26": {
+        "roles": {},
+        "administrative": true,
+        "failedInstructionId": null,
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 9,
+            "column": 1
+          },
+          "astNodeIds": [
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m27": {
+        "roles": {
+          "SPACE:object.end": "i13"
+        },
+        "administrative": false,
+        "failedInstructionId": "i13",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 9,
+            "column": 1
+          },
+          "astNodeIds": [
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m28": {
+        "roles": {},
+        "administrative": true,
+        "failedInstructionId": null,
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 9,
+            "column": 1
+          },
+          "astNodeIds": [
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m29": {
+        "roles": {
+          "SPACE:object.end": "i14"
+        },
+        "administrative": false,
+        "failedInstructionId": "i14",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 9,
+            "column": 1
+          },
+          "astNodeIds": [
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      },
+      "m30": {
+        "roles": {
+          "WRITE:return.value": "i15",
+          "FLOW:return": "i16",
+          "SPACE:object.end": "i17",
+          "SPACE:frame.end": "i18"
+        },
+        "administrative": false,
+        "failedInstructionId": "i15",
+        "sourceMapping": {
+          "compilerLocation": {
+            "file": "main.c",
+            "line": 8,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1423",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      }
+    },
+    "coverage": {
+      "memory": "user translation-unit scalar/aggregate loads and stores; library effects through explicit adapters",
+      "lifetime": "observed Clang lifetime and stack restore intrinsics for automatic objects; remaining unmarked storage falls back to function return",
+      "calculations": "compiled operations; source expressions may be lowered or constant-folded by Clang",
+      "unsupported": [
+        "atomic/volatile accesses",
+        "inline assembly",
+        "vector and extended floating-point values"
+      ],
+      "libraryInternals": "unobserved",
+      "pointerProvenance": "best effort from observed pointer operations; not a complete C provenance model",
+      "cConversions": {
+        "source": "Clang AST + DWARF encoding",
+        "sameWidthSignednessCasts": 0,
+        "inserted": 0,
+        "unobserved": [],
+        "initiallyUnobserved": [],
+        "resolved": [],
+        "notExecuted": []
+      },
+      "shortCircuits": {
+        "mode": "literal constant-left decisions at observed consumers",
+        "expressions": [],
+        "foldedSkips": 0,
+        "inserted": 0,
+        "unobserved": []
+      },
+      "automaticLifetimes": {
+        "source": "Clang lifetime and stack save/restore intrinsics; LLVM optimization passes disabled",
+        "stackRestores": 0,
+        "managedAllocations": 3,
+        "unmarkedLocals": []
+      },
+      "ir": "source work with explicit LLVM observation bindings",
+      "unboundSourceWork": [],
+      "unmappedObservations": [],
+      "compilerTypeQueries": {
+        "source": "compiler record layout + target ABI",
+        "unresolved": [
+          {
+            "nodeId": "ast349",
+            "type": "__wasi_dirent_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 287,
+                "column": 16
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 287,
+                "column": 40
+              }
+            }
+          },
+          {
+            "nodeId": "ast405",
+            "type": "__wasi_event_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 308,
+                "column": 16
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 308,
+                "column": 39
+              }
+            }
+          },
+          {
+            "nodeId": "ast477",
+            "type": "__wasi_prestat_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 328,
+                "column": 5
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 328,
+                "column": 30
+              }
+            }
+          },
+          {
+            "nodeId": "ast488",
+            "type": "__wasi_prestat_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 330,
+                "column": 5
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 330,
+                "column": 30
+              }
+            }
+          },
+          {
+            "nodeId": "ast533",
+            "type": "__wasi_fdstat_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 347,
+                "column": 16
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 347,
+                "column": 40
+              }
+            }
+          },
+          {
+            "nodeId": "ast606",
+            "type": "__wasi_filestat_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 374,
+                "column": 16
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 374,
+                "column": 42
+              }
+            }
+          },
+          {
+            "nodeId": "ast674",
+            "type": "__wasi_ciovec_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 390,
+                "column": 5
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 390,
+                "column": 29
+              }
+            }
+          },
+          {
+            "nodeId": "ast685",
+            "type": "__wasi_ciovec_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 392,
+                "column": 5
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 392,
+                "column": 29
+              }
+            }
+          },
+          {
+            "nodeId": "ast753",
+            "type": "__wasi_iovec_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 408,
+                "column": 5
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 408,
+                "column": 28
+              }
+            }
+          },
+          {
+            "nodeId": "ast764",
+            "type": "__wasi_iovec_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 410,
+                "column": 5
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 410,
+                "column": 28
+              }
+            }
+          },
+          {
+            "nodeId": "ast843",
+            "type": "__wasi_subscription_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 449,
+                "column": 16
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 449,
+                "column": 46
+              }
+            }
+          }
+        ]
+      },
+      "compilerEnums": {
+        "declarations": 0,
+        "unresolved": []
+      },
+      "sourceTemporaries": {
+        "bound": 0,
+        "unresolved": []
+      },
+      "bitfields": {
+        "accesses": 0,
+        "unresolved": []
+      },
+      "foldedCalculations": {
+        "defined": 0,
+        "source": "AST expressions at literal LLVM consumers",
+        "operands": []
+      },
+      "callABI": {
+        "source": "compiler AST and LLVM slots",
+        "mapped": 0,
+        "unresolved": []
+      },
+      "structureInference": {
+        "arrayRoleCandidates": 0,
+        "indexedStorageCandidates": 0,
+        "unresolvedArrayRoles": 0,
+        "source": "compiler operator roles + field identities + observed range evidence",
+        "classification": "candidates, not a proof of algorithm identity",
+        "embeddedArrayCandidates": 0,
+        "embeddedArrayPolicy": "recorded endpoint operations and compiler bounds; multi-write prefix operations retain intermediate states",
+        "arrayWorkAccessSites": 0,
+        "arrayWorkRangeCandidates": 0,
+        "arrayWorkPolicy": "observed storage overlays; bounds are candidates, not algorithm identities or proofs of executed coverage",
+        "indexRelationCandidates": 0,
+        "indexRelationPolicy": "index-derived storage overlays; reciprocal formulas and executed comparisons are evidence, not algorithm identities",
+        "linkRoleCandidates": 0,
+        "linkedStorageSupport": "record ranges, pointer slots and direct-call argument recurrence; indirect calls, return-value aliases/recurrence and arbitrary index links unresolved",
+        "linkRootAliasPolicy": "transitive field-free declaration and direct-call argument dependencies nominate roots; actual object/offset/lifetime determines each root state",
+        "relationPolicy": "candidate roles are separate from actual connectivity and lifetime"
+      },
+      "expressionEvaluations": {
+        "source": "AST expression identity + observed LLVM values and edges",
+        "help": "stub",
+        "unbound": []
+      },
+      "observationMappingHistory": [],
+      "resolvedObservations": []
+    },
+    "compileTimeSelections": [],
+    "enumDeclarations": [],
+    "evaluations": [],
+    "processInstructions": {
+      "WRITE:output": "i19",
+      "READ:input": "i20",
+      "SPACE:object.end": "i21",
+      "SPACE:frame.end": "i22",
+      "ERROR:fault": "i23"
+    },
+    "functionDeclarations": [
+      {
+        "nodeId": "ast1408",
+        "canonicalDeclarationId": "ast1408",
+        "previousDeclarationNodeId": null,
+        "name": "main",
+        "type": "int ()",
+        "source": {
+          "file": "main.c",
+          "line": 3,
+          "column": 1,
+          "start": {
+            "line": 3,
+            "column": 1,
+            "byte": 20,
+            "editorColumn": 1
+          },
+          "end": {
+            "line": 9,
+            "column": 2,
+            "byte": 97,
+            "editorColumn": 2
+          },
+          "endExclusive": true,
+          "editorRange": {
+            "startLineNumber": 3,
+            "startColumn": 1,
+            "endLineNumber": 9,
+            "endColumn": 2
+          },
+          "evidence": "compiler location with bounded token-end lookup"
+        },
+        "specifiers": {
+          "inline": false,
+          "storageClass": null
+        },
+        "isDefinition": true,
+        "functionId": "fn1",
+        "allocatesFrame": false,
+        "evidence": "compiler AST function declaration"
+      }
+    ],
+    "conditionGuards": [],
+    "conditionConsumers": [],
+    "assertions": [],
+    "structureBindings": {
+      "arrayRoles": [],
+      "indexedStorageRoles": [],
+      "unresolvedArrayRoles": [],
+      "evidence": "compiler member identities and operator roles",
+      "embeddedArrayRoles": [],
+      "arrayWork": {
+        "accesses": [],
+        "ranges": [],
+        "comparisonNodeIds": [],
+        "evidence": "compiler declaration/index/bound identities and direct-call parameter mapping"
+      },
+      "indexRelations": {
+        "candidates": [],
+        "evidence": "compiler array index expressions and declaration dependencies"
+      },
+      "linkRoles": [],
+      "linkRecurrences": [],
+      "linkAnchors": [],
+      "linkRoleGroups": [],
+      "linkBoundarySpecs": [],
+      "linkRootDeclarations": [],
+      "linkRootOrigins": [],
+      "linkRootFields": []
+    },
+    "controlFlow": {
+      "labels": [],
+      "edges": [],
+      "functions": [
+        {
+          "functionId": "fn1",
+          "blocks": [
+            {
+              "id": "entry",
+              "successors": [],
+              "mergeBlock": "@exit"
+            }
+          ]
+        }
+      ],
+      "gaps": []
+    },
+    "presentation": {
+      "version": 1,
+      "recording": "detailed",
+      "animation": "stub",
+      "defaults": {
+        "mode": "detailed",
+        "logicalExplanation": "both-operands"
+      },
+      "compact": {
+        "scope": "presentation-only",
+        "mayShorten": [
+          "travel",
+          "operand-transfer",
+          "calculation-steps",
+          "loop-transitions",
+          "technical-detail"
+        ],
+        "preserve": [
+          "source-position",
+          "value-changes",
+          "reference-changes",
+          "object-lifetime",
+          "faults"
+        ],
+        "discardRecordedWork": false
+      },
+      "rules": {
+        "blueprints": "static-type-description-without-storage",
+        "assignment": "visit-target-read-calculate-write",
+        "targetAvailability": "observed-address-only",
+        "compoundUpdate": "update-at-target-after-operands-are-observed",
+        "initialization": "create-at-declaration-before-initializer",
+        "returnDelivery": "direct-to-observed-next-consumer",
+        "order": "preserve-observed-read-calculate-write-and-call-lifetime-order",
+        "skippedOperand": "explanation-only-never-execute",
+        "previewEvaluation": "not-implemented"
+      }
+    },
+    "typeBlueprints": [],
+    "compoundUpdates": [],
+    "resultDeliveries": [],
+    "sourceMap": {
+      "version": 1,
+      "analysisOrder": [
+        "compiler-source-links",
+        "compiler-semantics",
+        "bounded-source-fallback"
+      ],
+      "macroExpansions": [],
+      "coordinateSystem": {
+        "compiler": "one-based UTF-8 byte columns",
+        "editor": "one-based UTF-16 columns",
+        "end": "exclusive"
+      },
+      "snapshot": {
+        "file": "main.c",
+        "sha256": "dfa7bb27f6a0bc075adbfd5435100e88b71c71e402ab54c07c9f45477db85d55",
+        "text": "#include <stdio.h>\n\nint main(){\n    int a = 10;\n    int b = 20;\n    int c = a+b;\n\n    return 0;\n}\n",
+        "byteLength": 98
+      },
+      "compilerSites": [
+        {
+          "llvmLine": 7,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 3,
+            "column": 0
+          },
+          "astNodeIds": []
+        },
+        {
+          "llvmLine": 14,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 4,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1411",
+            "ast1410",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 15,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 4,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1411",
+            "ast1410",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 16,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 4,
+            "column": 9
+          },
+          "astNodeIds": [
+            "ast1411",
+            "ast1410",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 17,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 4,
+            "column": 9
+          },
+          "astNodeIds": [
+            "ast1411",
+            "ast1410",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 18,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 5,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1414",
+            "ast1413",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 19,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 5,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1414",
+            "ast1413",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 20,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 5,
+            "column": 9
+          },
+          "astNodeIds": [
+            "ast1414",
+            "ast1413",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 21,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 5,
+            "column": 9
+          },
+          "astNodeIds": [
+            "ast1414",
+            "ast1413",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 22,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 6,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 23,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 6,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 24,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 6,
+            "column": 9
+          },
+          "astNodeIds": [
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 25,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 6,
+            "column": 13
+          },
+          "astNodeIds": [
+            "ast1420",
+            "ast1419",
+            "ast1418",
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 26,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 6,
+            "column": 15
+          },
+          "astNodeIds": [
+            "ast1422",
+            "ast1421",
+            "ast1418",
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 27,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 6,
+            "column": 14
+          },
+          "astNodeIds": [
+            "ast1418",
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 28,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 6,
+            "column": 9
+          },
+          "astNodeIds": [
+            "ast1417",
+            "ast1416",
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 29,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 9,
+            "column": 1
+          },
+          "astNodeIds": [
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 30,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 9,
+            "column": 1
+          },
+          "astNodeIds": [
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 31,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 9,
+            "column": 1
+          },
+          "astNodeIds": [
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 32,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 9,
+            "column": 1
+          },
+          "astNodeIds": [
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 33,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 9,
+            "column": 1
+          },
+          "astNodeIds": [
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 34,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 9,
+            "column": 1
+          },
+          "astNodeIds": [
+            "ast1409",
+            "ast1408"
+          ]
+        },
+        {
+          "llvmLine": 35,
+          "functionName": "main",
+          "location": {
+            "file": "/main.c",
+            "line": 8,
+            "column": 5
+          },
+          "astNodeIds": [
+            "ast1423",
+            "ast1409",
+            "ast1408"
+          ]
+        }
+      ],
+      "sourceQueries": [
+        {
+          "reason": "token-end-not-in-compiler-dump",
+          "startByte": 96,
+          "endByte": 97
+        },
+        {
+          "reason": "token-end-not-in-compiler-dump",
+          "startByte": 44,
+          "endByte": 46
+        },
+        {
+          "reason": "token-end-not-in-compiler-dump",
+          "startByte": 60,
+          "endByte": 62
+        },
+        {
+          "reason": "token-end-not-in-compiler-dump",
+          "startByte": 78,
+          "endByte": 79
+        },
+        {
+          "reason": "display-source-text",
+          "startByte": 36,
+          "endByte": 46
+        },
+        {
+          "reason": "display-source-text",
+          "startByte": 52,
+          "endByte": 62
+        },
+        {
+          "reason": "display-source-text",
+          "startByte": 68,
+          "endByte": 79
+        },
+        {
+          "reason": "token-end-not-in-compiler-dump",
+          "startByte": 76,
+          "endByte": 77
+        },
+        {
+          "reason": "display-source-text",
+          "startByte": 76,
+          "endByte": 77
+        },
+        {
+          "reason": "display-source-text",
+          "startByte": 78,
+          "endByte": 79
+        },
+        {
+          "reason": "display-source-text",
+          "startByte": 76,
+          "endByte": 79
+        },
+        {
+          "reason": "token-end-not-in-compiler-dump",
+          "startByte": 93,
+          "endByte": 94
+        },
+        {
+          "reason": "display-source-text",
+          "startByte": 86,
+          "endByte": 94
+        }
+      ],
+      "stats": {
+        "compilerLocationQueries": 207,
+        "compilerLocationCacheHits": 195,
+        "rangeQueries": 42,
+        "rangeCacheHits": 30,
+        "tokenBoundaryScans": 6,
+        "textExtractions": 7,
+        "semanticSourceScans": 0,
+        "macroRangeScans": 0,
+        "compilerTokenMappings": 0,
+        "compilerMacroTokenPasses": 0,
+        "macroInvocationScans": 0
+      },
+      "gaps": [],
+      "unmappedInstructions": []
+    }
+  },
+  "trace": {
+    "schemaVersion": 3,
+    "programId": "dfa7bb27f6a0bc075adbfd5435100e88b71c71e402ab54c07c9f45477db85d55",
+    "runId": "2ffa33fb-fbc8-4a0c-bf2d-4c8a4689dbc3",
+    "backend": {
+      "compiler": "bundled Clang 8.0.1",
+      "target": "wasm32-unknown-wasi",
+      "pointerBits": 32,
+      "byteOrder": "little",
+      "method": "automatic LLVM observation"
+    },
+    "status": "completed",
+    "exitCode": 0,
+    "events": [
+      {
+        "schemaVersion": 3,
+        "eventId": "x1",
+        "executionId": "x1",
+        "instructionId": "i1",
+        "activationId": "f1",
+        "kind": "SPACE",
+        "action": "frame.begin",
+        "phase": "complete",
+        "observationIds": [
+          "e1"
+        ],
+        "dataInputs": [],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed",
+        "frameId": "f1",
+        "inputs": [],
+        "parameters": []
+      },
+      {
+        "schemaVersion": 3,
+        "eventId": "x2",
+        "executionId": "x2",
+        "instructionId": "i2",
+        "activationId": "f1",
+        "kind": "FLOW",
+        "action": "enter",
+        "phase": "complete",
+        "observationIds": [
+          "e2"
+        ],
+        "dataInputs": [],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed",
+        "frameId": "f1",
+        "inputs": []
+      },
+      {
+        "schemaVersion": 3,
+        "eventId": "x3",
+        "executionId": "x3",
+        "instructionId": "i3",
+        "activationId": "f1",
+        "kind": "SPACE",
+        "action": "object.begin",
+        "phase": "complete",
+        "observationIds": [
+          "e4",
+          "e10",
+          "e11"
+        ],
+        "dataInputs": [],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed source declaration with observed storage",
+        "storage": "automatic",
+        "initialized": false,
+        "size": 4,
+        "address": "0x001005e8",
+        "objectId": "o2",
+        "reservationObservationId": "e4",
+        "inputs": [],
+        "storageObservationId": "e10",
+        "declarationObservationId": "e11"
+      },
+      {
+        "schemaVersion": 3,
+        "eventId": "x4",
+        "executionId": "x4",
+        "instructionId": "i6",
+        "activationId": "f1",
+        "kind": "WRITE",
+        "action": "write",
+        "phase": "complete",
+        "observationIds": [
+          "e12",
+          "e13"
+        ],
+        "dataInputs": [],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed",
+        "target": {
+          "objectId": "o2",
+          "address": "0x001005e8",
+          "offset": 0,
+          "size": 4
+        },
+        "value": {
+          "type": "i32",
+          "bytesHex": "0a000000",
+          "byteLength": 4,
+          "truncated": false,
+          "bits": "0x0000000a",
+          "unsigned": "10",
+          "signed": "10",
+          "cType": {
+            "id": "debug:11",
+            "name": "int",
+            "sizeBits": 32,
+            "signedness": "signed",
+            "encoding": "DW_ATE_signed",
+            "display": {
+              "label": "int",
+              "badges": []
+            },
+            "evidence": "compiler"
+          },
+          "decimal": "10"
+        },
+        "initializationEvidence": "tracked",
+        "inputs": [
+          {
+            "value": {
+              "type": "i32",
+              "bits": "0x0000000a",
+              "unsigned": "10",
+              "signed": "10",
+              "literal": "10",
+              "evidence": "compiler operand"
+            },
+            "observationId": null
+          }
+        ]
+      },
+      {
+        "schemaVersion": 3,
+        "eventId": "x5",
+        "executionId": "x5",
+        "instructionId": "i4",
+        "activationId": "f1",
+        "kind": "SPACE",
+        "action": "object.begin",
+        "phase": "complete",
+        "observationIds": [
+          "e5",
+          "e15",
+          "e16"
+        ],
+        "dataInputs": [],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed source declaration with observed storage",
+        "storage": "automatic",
+        "initialized": false,
+        "size": 4,
+        "address": "0x001005e4",
+        "objectId": "o3",
+        "reservationObservationId": "e5",
+        "inputs": [],
+        "storageObservationId": "e15",
+        "declarationObservationId": "e16"
+      },
+      {
+        "schemaVersion": 3,
+        "eventId": "x6",
+        "executionId": "x6",
+        "instructionId": "i7",
+        "activationId": "f1",
+        "kind": "WRITE",
+        "action": "write",
+        "phase": "complete",
+        "observationIds": [
+          "e17",
+          "e18"
+        ],
+        "dataInputs": [],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed",
+        "target": {
+          "objectId": "o3",
+          "address": "0x001005e4",
+          "offset": 0,
+          "size": 4
+        },
+        "value": {
+          "type": "i32",
+          "bytesHex": "14000000",
+          "byteLength": 4,
+          "truncated": false,
+          "bits": "0x00000014",
+          "unsigned": "20",
+          "signed": "20",
+          "cType": {
+            "id": "debug:11",
+            "name": "int",
+            "sizeBits": 32,
+            "signedness": "signed",
+            "encoding": "DW_ATE_signed",
+            "display": {
+              "label": "int",
+              "badges": []
+            },
+            "evidence": "compiler"
+          },
+          "decimal": "20"
+        },
+        "initializationEvidence": "tracked",
+        "inputs": [
+          {
+            "value": {
+              "type": "i32",
+              "bits": "0x00000014",
+              "unsigned": "20",
+              "signed": "20",
+              "literal": "20",
+              "evidence": "compiler operand"
+            },
+            "observationId": null
+          }
+        ]
+      },
+      {
+        "schemaVersion": 3,
+        "eventId": "x7",
+        "executionId": "x7",
+        "instructionId": "i5",
+        "activationId": "f1",
+        "kind": "SPACE",
+        "action": "object.begin",
+        "phase": "complete",
+        "observationIds": [
+          "e6",
+          "e20",
+          "e21"
+        ],
+        "dataInputs": [],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed source declaration with observed storage",
+        "storage": "automatic",
+        "initialized": false,
+        "size": 4,
+        "address": "0x001005e0",
+        "objectId": "o4",
+        "reservationObservationId": "e6",
+        "inputs": [],
+        "storageObservationId": "e20",
+        "declarationObservationId": "e21"
+      },
+      {
+        "schemaVersion": 3,
+        "eventId": "x8",
+        "executionId": "x8",
+        "instructionId": "i8",
+        "activationId": "f1",
+        "kind": "READ",
+        "action": "read",
+        "phase": "complete",
+        "observationIds": [
+          "e22",
+          "e23"
+        ],
+        "dataInputs": [
+          "x4"
+        ],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed",
+        "target": {
+          "objectId": "o2",
+          "address": "0x001005e8",
+          "offset": 0,
+          "size": 4
+        },
+        "value": {
+          "type": "i32",
+          "bytesHex": "0a000000",
+          "byteLength": 4,
+          "truncated": false,
+          "bits": "0x0000000a",
+          "unsigned": "10",
+          "signed": "10",
+          "cType": {
+            "id": "debug:11",
+            "name": "int",
+            "sizeBits": 32,
+            "signedness": "signed",
+            "encoding": "DW_ATE_signed",
+            "display": {
+              "label": "int",
+              "badges": []
+            },
+            "evidence": "compiler"
+          },
+          "decimal": "10"
+        },
+        "initializationEvidence": "tracked",
+        "inputs": []
+      },
+      {
+        "schemaVersion": 3,
+        "eventId": "x9",
+        "executionId": "x9",
+        "instructionId": "i9",
+        "activationId": "f1",
+        "kind": "READ",
+        "action": "read",
+        "phase": "complete",
+        "observationIds": [
+          "e24",
+          "e25"
+        ],
+        "dataInputs": [
+          "x6"
+        ],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed",
+        "target": {
+          "objectId": "o3",
+          "address": "0x001005e4",
+          "offset": 0,
+          "size": 4
+        },
+        "value": {
+          "type": "i32",
+          "bytesHex": "14000000",
+          "byteLength": 4,
+          "truncated": false,
+          "bits": "0x00000014",
+          "unsigned": "20",
+          "signed": "20",
+          "cType": {
+            "id": "debug:11",
+            "name": "int",
+            "sizeBits": 32,
+            "signedness": "signed",
+            "encoding": "DW_ATE_signed",
+            "display": {
+              "label": "int",
+              "badges": []
+            },
+            "evidence": "compiler"
+          },
+          "decimal": "20"
+        },
+        "initializationEvidence": "tracked",
+        "inputs": []
+      },
+      {
+        "schemaVersion": 3,
+        "eventId": "x10",
+        "executionId": "x10",
+        "instructionId": "i10",
+        "activationId": "f1",
+        "kind": "CALC",
+        "action": "expression",
+        "phase": "complete",
+        "observationIds": [
+          "e26"
+        ],
+        "dataInputs": [
+          "x8",
+          "x9"
+        ],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed",
+        "steps": [
+          {
+            "observationId": "e26",
+            "observationIds": [
+              "e26"
+            ],
+            "nodeId": "ast1418",
+            "operator": "+",
+            "value": {
+              "type": "i32",
+              "bits": "0x0000001e",
+              "unsigned": "30",
+              "signed": "30",
+              "cType": {
+                "id": "debug:11",
+                "name": "int",
+                "sizeBits": 32,
+                "signedness": "signed",
+                "encoding": "DW_ATE_signed",
+                "display": {
+                  "label": "int",
+                  "badges": []
+                },
+                "evidence": "compiler"
+              },
+              "decimal": "30"
+            },
+            "inputs": [
+              {
+                "value": {
+                  "type": "i32",
+                  "bytesHex": "0a000000",
+                  "byteLength": 4,
+                  "truncated": false,
+                  "bits": "0x0000000a",
+                  "unsigned": "10",
+                  "signed": "10",
+                  "cType": {
+                    "id": "debug:11",
+                    "name": "int",
+                    "sizeBits": 32,
+                    "signedness": "signed",
+                    "encoding": "DW_ATE_signed",
+                    "display": {
+                      "label": "int",
+                      "badges": []
+                    },
+                    "evidence": "compiler"
+                  },
+                  "decimal": "10"
+                },
+                "observationId": "e23",
+                "executionId": "x8"
+              },
+              {
+                "value": {
+                  "type": "i32",
+                  "bytesHex": "14000000",
+                  "byteLength": 4,
+                  "truncated": false,
+                  "bits": "0x00000014",
+                  "unsigned": "20",
+                  "signed": "20",
+                  "cType": {
+                    "id": "debug:11",
+                    "name": "int",
+                    "sizeBits": 32,
+                    "signedness": "signed",
+                    "encoding": "DW_ATE_signed",
+                    "display": {
+                      "label": "int",
+                      "badges": []
+                    },
+                    "evidence": "compiler"
+                  },
+                  "decimal": "20"
+                },
+                "observationId": "e25",
+                "executionId": "x9"
+              }
+            ]
+          }
+        ],
+        "value": {
+          "type": "i32",
+          "bits": "0x0000001e",
+          "unsigned": "30",
+          "signed": "30",
+          "cType": {
+            "id": "debug:11",
+            "name": "int",
+            "sizeBits": 32,
+            "signedness": "signed",
+            "encoding": "DW_ATE_signed",
+            "display": {
+              "label": "int",
+              "badges": []
+            },
+            "evidence": "compiler"
+          },
+          "decimal": "30"
+        },
+        "operator": "+",
+        "inputs": [
+          {
+            "value": {
+              "type": "i32",
+              "bytesHex": "0a000000",
+              "byteLength": 4,
+              "truncated": false,
+              "bits": "0x0000000a",
+              "unsigned": "10",
+              "signed": "10",
+              "cType": {
+                "id": "debug:11",
+                "name": "int",
+                "sizeBits": 32,
+                "signedness": "signed",
+                "encoding": "DW_ATE_signed",
+                "display": {
+                  "label": "int",
+                  "badges": []
+                },
+                "evidence": "compiler"
+              },
+              "decimal": "10"
+            },
+            "observationId": "e23",
+            "executionId": "x8"
+          },
+          {
+            "value": {
+              "type": "i32",
+              "bytesHex": "14000000",
+              "byteLength": 4,
+              "truncated": false,
+              "bits": "0x00000014",
+              "unsigned": "20",
+              "signed": "20",
+              "cType": {
+                "id": "debug:11",
+                "name": "int",
+                "sizeBits": 32,
+                "signedness": "signed",
+                "encoding": "DW_ATE_signed",
+                "display": {
+                  "label": "int",
+                  "badges": []
+                },
+                "evidence": "compiler"
+              },
+              "decimal": "20"
+            },
+            "observationId": "e25",
+            "executionId": "x9"
+          }
+        ]
+      },
+      {
+        "schemaVersion": 3,
+        "eventId": "x11",
+        "executionId": "x11",
+        "instructionId": "i11",
+        "activationId": "f1",
+        "kind": "WRITE",
+        "action": "write",
+        "phase": "complete",
+        "observationIds": [
+          "e27",
+          "e28"
+        ],
+        "dataInputs": [
+          "x10"
+        ],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed",
+        "target": {
+          "objectId": "o4",
+          "address": "0x001005e0",
+          "offset": 0,
+          "size": 4
+        },
+        "value": {
+          "type": "i32",
+          "bytesHex": "1e000000",
+          "byteLength": 4,
+          "truncated": false,
+          "bits": "0x0000001e",
+          "unsigned": "30",
+          "signed": "30",
+          "cType": {
+            "id": "debug:11",
+            "name": "int",
+            "sizeBits": 32,
+            "signedness": "signed",
+            "encoding": "DW_ATE_signed",
+            "display": {
+              "label": "int",
+              "badges": []
+            },
+            "evidence": "compiler"
+          },
+          "decimal": "30"
+        },
+        "initializationEvidence": "tracked",
+        "inputs": [
+          {
+            "value": {
+              "type": "i32",
+              "bits": "0x0000001e",
+              "unsigned": "30",
+              "signed": "30",
+              "cType": {
+                "id": "debug:11",
+                "name": "int",
+                "sizeBits": 32,
+                "signedness": "signed",
+                "encoding": "DW_ATE_signed",
+                "display": {
+                  "label": "int",
+                  "badges": []
+                },
+                "evidence": "compiler"
+              },
+              "decimal": "30"
+            },
+            "observationId": "e26",
+            "executionId": "x10"
+          }
+        ]
+      },
+      {
+        "schemaVersion": 3,
+        "eventId": "x12",
+        "executionId": "x12",
+        "instructionId": "i15",
+        "activationId": "f1",
+        "kind": "WRITE",
+        "action": "return.value",
+        "phase": "complete",
+        "observationIds": [
+          "e35"
+        ],
+        "dataInputs": [],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed",
+        "value": {
+          "type": "i32",
+          "bits": "0x00000000",
+          "unsigned": "0",
+          "signed": "0",
+          "cType": {
+            "id": "debug:11",
+            "name": "int",
+            "sizeBits": 32,
+            "signedness": "signed",
+            "encoding": "DW_ATE_signed",
+            "display": {
+              "label": "int",
+              "badges": []
+            },
+            "evidence": "compiler"
+          },
+          "decimal": "0"
+        },
+        "inputs": [
+          {
+            "value": {
+              "type": "i32",
+              "bits": "0x00000000",
+              "unsigned": "0",
+              "signed": "0",
+              "literal": "0",
+              "evidence": "compiler operand",
+              "cType": {
+                "id": "debug:11",
+                "name": "int",
+                "sizeBits": 32,
+                "signedness": "signed",
+                "encoding": "DW_ATE_signed",
+                "display": {
+                  "label": "int",
+                  "badges": []
+                },
+                "evidence": "compiler"
+              },
+              "decimal": "0"
+            },
+            "observationId": null
+          }
+        ],
+        "target": {
+          "kind": "return-port",
+          "activationId": "f1"
+        }
+      },
+      {
+        "schemaVersion": 3,
+        "eventId": "x13",
+        "executionId": "x13",
+        "instructionId": "i16",
+        "activationId": "f1",
+        "kind": "FLOW",
+        "action": "return",
+        "phase": "complete",
+        "observationIds": [
+          "e36"
+        ],
+        "dataInputs": [],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed",
+        "frameId": "f1",
+        "inputs": [
+          {
+            "value": {
+              "type": "i32",
+              "bits": "0x00000000",
+              "unsigned": "0",
+              "signed": "0",
+              "literal": "0",
+              "evidence": "compiler operand"
+            },
+            "observationId": null
+          }
+        ]
+      },
+      {
+        "schemaVersion": 3,
+        "eventId": "x14",
+        "executionId": "x14",
+        "instructionId": "i18",
+        "activationId": "f1",
+        "kind": "SPACE",
+        "action": "frame.end",
+        "phase": "complete",
+        "observationIds": [
+          "e38",
+          "e30",
+          "e32",
+          "e34"
+        ],
+        "dataInputs": [],
+        "addressInputs": [],
+        "controlInputs": [],
+        "calleeInputs": [],
+        "evidence": "observed",
+        "frameId": "f1",
+        "inputs": [
+          {
+            "value": {
+              "type": "i32",
+              "bits": "0x00000000",
+              "unsigned": "0",
+              "signed": "0",
+              "literal": "0",
+              "evidence": "compiler operand"
+            },
+            "observationId": null
+          }
+        ],
+        "endedObjects": [
+          "o4",
+          "o3",
+          "o2"
+        ]
+      }
+    ],
+    "flowTransitions": [],
+    "objects": [
+      {
+        "id": "o2",
+        "address": 1050088,
+        "size": 4,
+        "storage": "automatic",
+        "name": "a",
+        "type": "i32",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "debugTypeId": "debug:11",
+        "frameId": "f1",
+        "lifecycle": "ended",
+        "constant": false,
+        "createdBy": "x3",
+        "endedBy": "x14",
+        "initializationRanges": [
+          {
+            "start": 0,
+            "end": 4,
+            "writer": "x4"
+          }
+        ],
+        "bitInitializationRanges": [
+          {
+            "start": 0,
+            "end": 32,
+            "writer": "x4"
+          }
+        ]
+      },
+      {
+        "id": "o3",
+        "address": 1050084,
+        "size": 4,
+        "storage": "automatic",
+        "name": "b",
+        "type": "i32",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "debugTypeId": "debug:11",
+        "frameId": "f1",
+        "lifecycle": "ended",
+        "constant": false,
+        "createdBy": "x5",
+        "endedBy": "x14",
+        "initializationRanges": [
+          {
+            "start": 0,
+            "end": 4,
+            "writer": "x6"
+          }
+        ],
+        "bitInitializationRanges": [
+          {
+            "start": 0,
+            "end": 32,
+            "writer": "x6"
+          }
+        ]
+      },
+      {
+        "id": "o4",
+        "address": 1050080,
+        "size": 4,
+        "storage": "automatic",
+        "name": "c",
+        "type": "i32",
+        "cType": {
+          "id": "debug:11",
+          "name": "int",
+          "sizeBits": 32,
+          "signedness": "signed",
+          "encoding": "DW_ATE_signed",
+          "display": {
+            "label": "int",
+            "badges": []
+          },
+          "evidence": "compiler"
+        },
+        "debugTypeId": "debug:11",
+        "frameId": "f1",
+        "lifecycle": "ended",
+        "constant": false,
+        "createdBy": "x7",
+        "endedBy": "x14",
+        "initializationRanges": [
+          {
+            "start": 0,
+            "end": 4,
+            "writer": "x11"
+          }
+        ],
+        "bitInitializationRanges": [
+          {
+            "start": 0,
+            "end": 32,
+            "writer": "x11"
+          }
+        ]
+      }
+    ],
+    "resultDeliveries": [],
+    "frames": [
+      {
+        "id": "f1",
+        "functionId": "fn1",
+        "functionName": "main",
+        "parent": null,
+        "variadic": false,
+        "fixedParameterCount": 0,
+        "ended": true,
+        "block": "entry"
+      }
+    ],
+    "views": [
+      {
+        "id": "v2",
+        "objectId": "o2",
+        "address": 1050088,
+        "offset": 0,
+        "type": "i32",
+        "kind": "integer",
+        "size": 4,
+        "evidence": "observed typed address"
+      },
+      {
+        "id": "v3",
+        "objectId": "o3",
+        "address": 1050084,
+        "offset": 0,
+        "type": "i32",
+        "kind": "integer",
+        "size": 4,
+        "evidence": "observed typed address"
+      },
+      {
+        "id": "v4",
+        "objectId": "o4",
+        "address": 1050080,
+        "offset": 0,
+        "type": "i32",
+        "kind": "integer",
+        "size": 4,
+        "evidence": "observed typed address"
+      },
+      {
+        "id": "v5",
+        "objectId": "o4",
+        "address": 1050080,
+        "offset": 0,
+        "type": "i8",
+        "kind": "integer",
+        "size": 1,
+        "evidence": "observed typed address"
+      },
+      {
+        "id": "v6",
+        "objectId": "o3",
+        "address": 1050084,
+        "offset": 0,
+        "type": "i8",
+        "kind": "integer",
+        "size": 1,
+        "evidence": "observed typed address"
+      },
+      {
+        "id": "v7",
+        "objectId": "o2",
+        "address": 1050088,
+        "offset": 0,
+        "type": "i8",
+        "kind": "integer",
+        "size": 1,
+        "evidence": "observed typed address"
+      }
+    ],
+    "references": [],
+    "structures": [],
+    "diagnostics": [],
+    "coverage": {
+      "memory": "user LLVM accesses and linked WASM scalar accesses to tracked objects; allocation contracts remain explicit",
+      "lifetime": "observed Clang lifetime and stack restore intrinsics for automatic objects; remaining unmarked storage falls back to function return",
+      "calculations": "compiled operations; source expressions may be lowered or constant-folded by Clang",
+      "unsupported": [
+        "atomic/volatile accesses",
+        "inline assembly",
+        "vector and extended floating-point values"
+      ],
+      "libraryInternals": "linked scalar memory reads/stores observed; library arithmetic and source frames are not instrumented",
+      "pointerProvenance": "best effort from observed pointer operations; not a complete C provenance model",
+      "cConversions": {
+        "source": "Clang AST + DWARF encoding",
+        "sameWidthSignednessCasts": 0,
+        "inserted": 0,
+        "unobserved": [],
+        "initiallyUnobserved": [],
+        "resolved": [],
+        "notExecuted": []
+      },
+      "shortCircuits": {
+        "mode": "literal constant-left decisions at observed consumers",
+        "expressions": [],
+        "foldedSkips": 0,
+        "inserted": 0,
+        "unobserved": []
+      },
+      "automaticLifetimes": {
+        "source": "Clang lifetime and stack save/restore intrinsics; LLVM optimization passes disabled",
+        "stackRestores": 0,
+        "managedAllocations": 3,
+        "unmarkedLocals": []
+      },
+      "ir": "source work with explicit LLVM observation bindings",
+      "unboundSourceWork": [],
+      "unmappedObservations": [],
+      "compilerTypeQueries": {
+        "source": "compiler record layout + target ABI",
+        "unresolved": [
+          {
+            "nodeId": "ast349",
+            "type": "__wasi_dirent_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 287,
+                "column": 16
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 287,
+                "column": 40
+              }
+            }
+          },
+          {
+            "nodeId": "ast405",
+            "type": "__wasi_event_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 308,
+                "column": 16
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 308,
+                "column": 39
+              }
+            }
+          },
+          {
+            "nodeId": "ast477",
+            "type": "__wasi_prestat_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 328,
+                "column": 5
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 328,
+                "column": 30
+              }
+            }
+          },
+          {
+            "nodeId": "ast488",
+            "type": "__wasi_prestat_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 330,
+                "column": 5
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 330,
+                "column": 30
+              }
+            }
+          },
+          {
+            "nodeId": "ast533",
+            "type": "__wasi_fdstat_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 347,
+                "column": 16
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 347,
+                "column": 40
+              }
+            }
+          },
+          {
+            "nodeId": "ast606",
+            "type": "__wasi_filestat_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 374,
+                "column": 16
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 374,
+                "column": 42
+              }
+            }
+          },
+          {
+            "nodeId": "ast674",
+            "type": "__wasi_ciovec_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 390,
+                "column": 5
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 390,
+                "column": 29
+              }
+            }
+          },
+          {
+            "nodeId": "ast685",
+            "type": "__wasi_ciovec_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 392,
+                "column": 5
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 392,
+                "column": 29
+              }
+            }
+          },
+          {
+            "nodeId": "ast753",
+            "type": "__wasi_iovec_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 408,
+                "column": 5
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 408,
+                "column": 28
+              }
+            }
+          },
+          {
+            "nodeId": "ast764",
+            "type": "__wasi_iovec_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 410,
+                "column": 5
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 410,
+                "column": 28
+              }
+            }
+          },
+          {
+            "nodeId": "ast843",
+            "type": "__wasi_subscription_t",
+            "source": {
+              "file": "/sys/include/wasi/core.h",
+              "start": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 449,
+                "column": 16
+              },
+              "end": {
+                "file": "/sys/include/wasi/core.h",
+                "line": 449,
+                "column": 46
+              }
+            }
+          }
+        ]
+      },
+      "compilerEnums": {
+        "declarations": 0,
+        "unresolved": []
+      },
+      "sourceTemporaries": {
+        "bound": 0,
+        "unresolved": []
+      },
+      "bitfields": {
+        "accesses": 0,
+        "unresolved": []
+      },
+      "foldedCalculations": {
+        "defined": 0,
+        "source": "AST expressions at literal LLVM consumers",
+        "operands": []
+      },
+      "callABI": {
+        "source": "compiler AST and LLVM slots",
+        "mapped": 0,
+        "unresolved": []
+      },
+      "structureInference": {
+        "arrayRoleCandidates": 0,
+        "indexedStorageCandidates": 0,
+        "unresolvedArrayRoles": 0,
+        "source": "compiler operator roles + field identities + observed range evidence",
+        "classification": "candidates, not a proof of algorithm identity",
+        "embeddedArrayCandidates": 0,
+        "embeddedArrayPolicy": "recorded endpoint operations and compiler bounds; multi-write prefix operations retain intermediate states",
+        "arrayWorkAccessSites": 0,
+        "arrayWorkRangeCandidates": 0,
+        "arrayWorkPolicy": "observed storage overlays; bounds are candidates, not algorithm identities or proofs of executed coverage",
+        "indexRelationCandidates": 0,
+        "indexRelationPolicy": "index-derived storage overlays; reciprocal formulas and executed comparisons are evidence, not algorithm identities",
+        "linkRoleCandidates": 0,
+        "linkedStorageSupport": "record ranges, pointer slots and direct-call argument recurrence; indirect calls, return-value aliases/recurrence and arbitrary index links unresolved",
+        "linkRootAliasPolicy": "transitive field-free declaration and direct-call argument dependencies nominate roots; actual object/offset/lifetime determines each root state",
+        "relationPolicy": "candidate roles are separate from actual connectivity and lifetime"
+      },
+      "expressionEvaluations": {
+        "source": "AST expression identity + observed LLVM values and edges",
+        "help": "stub",
+        "unbound": []
+      },
+      "observationMappingHistory": [],
+      "resolvedObservations": [],
+      "linkedMemory": {
+        "method": "linked wasm32 scalar memory operations",
+        "functions": 21,
+        "loads": 290,
+        "stores": 380,
+        "source": "observed memory access; no function-name classifier"
+      },
+      "observationBytes": 14595,
+      "maxObservationBytes": 16777216,
+      "memorySnapshots": {
+        "format": "memory-ranges-v1",
+        "maxEncodedBytes": 8388608,
+        "usedEncodedBytes": 0,
+        "captures": 0,
+        "capturedBytes": 0,
+        "omittedInitializedBytes": 0,
+        "programReadEventsAdded": 0
+      },
+      "gaps": [],
+      "irEvents": 14,
+      "observationEvents": 38,
+      "irGaps": [],
+      "observationAccounting": {
+        "total": 38,
+        "represented": 28,
+        "forwarded": 3,
+        "administrative": 7,
+        "deferredStorage": 0,
+        "unexplained": []
+      },
+      "pendingCleanup": [],
+      "sourceOrder": {
+        "automaticBoxes": "observed declaration entry; no sorting by source line",
+        "hiddenCompilerObjects": 1,
+        "unreachedDeclarations": 0,
+        "declarationReentries": [],
+        "lifetime": "observed Clang lifetime and stack restore intrinsics for automatic objects; remaining unmarked storage falls back to function return"
+      },
+      "stdioOutput": [],
+      "controlFlow": {
+        "method": "observed edges with postdominator regions per activation",
+        "pendingTransitions": []
+      },
+      "seek": "not implemented; IR and state effects are recorded for a future consumer",
+      "animation": "stub",
+      "workContracts": {
+        "scope": "observed payload, storage range/lifetime, dependency order, output bytes and conditional decision",
+        "storageLedger": "checked",
+        "semanticCompleteness": "not established by structural validation"
+      }
+    }
+  }
+}

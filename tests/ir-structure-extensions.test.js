@@ -3,14 +3,15 @@ import {test} from 'node:test';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import {extensionCases} from './fixtures/structure-extensions.mjs';
-import {traceModel} from '../scripts/model/index.mjs';
+import {testExecution} from './helpers/test-execution.mjs';
 import {inferStructures,createInferenceView,queryInferredSemantics,queryManagementRoles,validateStructureTrace,recommendStructureViews,setStructurePresentation,resolveStructurePresentation,queryStructureConditions} from '../scripts/inference/index.mjs';
 const dir='test-results/structure-extensions-2026-11-12',cache=new Map(),hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 async function load(id,source,stdout){
  if(cache.has(id))return cache.get(id);const c=extensionCases.find(c=>c.id===id);source??=c.source;stdout??=c.stdout;
- let r;try{const expected=JSON.parse(await fs.readFile(`${dir}/expected.json`)).find(c=>c.id===id)??JSON.parse(await fs.readFile(`${dir}/${id}.expected.json`));if(expected?.sourceHash===hash(source))r=JSON.parse(await fs.readFile(`${dir}/${id}.execution.json`));}catch{}
+ const expected={sourceHash:hash(source),stdout};await fs.mkdir(dir,{recursive:true});
+ try{await fs.writeFile(`${dir}/${id}.expected.json`,JSON.stringify(expected,null,2),{flag:'wx'});}catch(e){if(e.code!=='EEXIST')throw e;assert.deepEqual(JSON.parse(await fs.readFile(`${dir}/${id}.expected.json`)),expected,'source prediction changed; review independently');}
  const sourceDir='example/c/codex_code/structure_extensions_20261112';await fs.mkdir(sourceDir,{recursive:true});await fs.writeFile(`${sourceDir}/${id}.c`,source);
- if(!r){await fs.mkdir(dir,{recursive:true});await fs.writeFile(`${dir}/${id}.expected.json`,JSON.stringify({sourceHash:hash(source),stdout},null,2));r=await traceModel(source,{filename:`${id}.c`,includeObservations:true});await fs.writeFile(`${dir}/${id}.execution.json`,JSON.stringify(r));}
+ const r=await testExecution({source,options:{filename:`${id}.c`,includeObservations:true},expected,file:`${dir}/${id}.cache.json`});await fs.writeFile(`${dir}/${id}.execution.json`,JSON.stringify(r));
  assert.equal(r.trace.status,'completed',id);assert.equal(r.stdout,stdout,id);const before=hash(JSON.stringify(r)),i=inferStructures(r.plan,r.trace,{observationPlan:r.observations?.plan,observedTrace:r.observations?.trace});
  assert.equal(i.status,'completed',JSON.stringify(i.diagnostics));assert.equal(hash(JSON.stringify(r)),before,'inference changed IR');await fs.writeFile(`${dir}/${id}.inference.json`,JSON.stringify(i));const view=createInferenceView(r,i),result={...view,inference:i};cache.set(id,result);return result;
 }
@@ -93,9 +94,16 @@ int main(void){for(int i=0;i<4;i++){p[i]=i;s[i]=1;}join(0,1);join(2,3);join(0,2)
  const r=await load('array-management',source,'4 2 2 '),roles=queryManagementRoles(r.trace),objectName=id=>r.trace.objects.find(o=>o.id===of(r,'array').find(a=>a.id===id).objectId).name;
  assert.deepEqual(roles.map(p=>[p.role,objectName(p.binding.arrayId)]).sort(),[['component-size','s'],['rank','r']]);
 });
-test('non-lexicographic policies are left unknown; coupled updates alone do not assert propagation',async()=>{
+test('parity keys preserve their transformed order; coupled updates alone do not assert propagation',async()=>{
  const source=extensionCases.find(c=>c.id==='composite-heap').source.replace('if(x.k!=y.k)return x.k<y.k;return x.t>y.t;','if((x.k%2)!=(y.k%2))return (x.k%2)<(y.k%2);if(x.k!=y.k)return x.k<y.k;return x.t>y.t;');
- const r=await load('parity-priority',source,'2:9 2:5 4:1 3:7 ');assert.equal(of(r,'composite-priority-candidate').length,0);
+ // Now supported by EXT-07: parity ascending, raw key ascending, tie descending.
+ // These expectations follow the source, not the order of component storage.
+ const r=await load('parity-priority',source,'2:9 2:5 4:1 3:7 '),[priority]=of(r,'composite-priority-candidate');assert.ok(priority);
+ const full=priority.states.findLast(st=>st.nodes.length===4&&st.keyOrder?.length===3&&st.min==='satisfied');assert.ok(full);
+ assert.deepEqual(full.keyOrder.map(k=>k.direction),[1,1,-1]);
+ assert.equal(full.keyOrder[0].domain,'transformed-integer');assert.equal(full.keyOrder[0].transform.operator,'%');assert.equal(full.keyOrder[0].transform.args[1].value,'2');
+ assert.deepEqual(full.keyOrder.slice(1).map(k=>k.offset),[0,4]);
+ const ordered=full.nodes[0].values,slots=full.keyOrder.map(k=>full.components.findIndex(c=>c.id===k.id));assert.deepEqual(slots.map(i=>ordered[i]),['0',2,9]);
  const base=extensionCases.find(c=>c.id==='range-lazy').source.replace('push(1,0,4);push(3,2,4);',''),lazy=await load('unpropagated-update',base,'30 5 4 '),[s]=of(lazy,'deferred-update-candidate');assert.ok(s);assert.equal(s.propagations.length,0);assert.equal(last(s).status,'coupled-update-candidate');
 });
 test('pointer key comparisons preserve unsigned values above signed int range',async()=>{

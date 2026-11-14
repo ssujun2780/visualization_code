@@ -12,18 +12,24 @@ const canonical=id=>id?.replace(/:slot:\d+$/,'');
 
 export function pointerTreeStructures(plan,context,{maxStates=2048,maxRoots=256}={}){
   const {events,objects,structures,valueFlow}=context,raw=structures.find(s=>s.kind==='storage-reference-graph');if(!raw)return [];
+  const objectById=new Map(objects.map(o=>[o.id,o]));
   const defs=new Map(plan.instructions.map(d=>[d.id,d])),byId=new Map(events.map(e=>[e.eventId,e])),pos=new Map(events.map((e,i)=>[e.eventId,i])),
     records=raw.nodes.filter(n=>n.kind==='record'),nodes=new Map(records.map(n=>[n.id,n])),slots=new Map(),proofs=[],rootBindings=new Map(),relations=new Map(),out=[];
   let omittedRoots=0;const ownedRoles=new Map();
   const allEdges=raw.changes.flatMap(c=>c.upsertEdges);
+  const firstTypedEdge=new Map(),recordsByObject=new Map(),inputReads=new Map(),embeddedFields=new Map();
+  for(const edge of allEdges)if(edge.targetTypeId&&!firstTypedEdge.has(key(edge.source)))firstTypedEdge.set(key(edge.source),edge);
+  for(const n of records){if(!recordsByObject.has(n.range.objectId))recordsByObject.set(n.range.objectId,[]);recordsByObject.get(n.range.objectId).push(n);}
+  const reads=id=>{if(!inputReads.has(id))inputReads.set(id,valueFlow.reads(id));return inputReads.get(id);};
+  const recordField=id=>{if(!embeddedFields.has(id))embeddedFields.set(id,walk(defs.get(id)?.expression).find(n=>n.kind==='MemberExpr'&&n.cType?.kind==='array'&&n.cType.elementType?.kind==='record'));return embeddedFields.get(id);};
   for(const edge of allEdges)if(nodes.has(edge.from)&&edge.sourceTypeId===edge.targetTypeId)slots.set(key(edge.source),edge);
   // Embedded edge records may hold the child pointer on behalf of their
   // containing node. Require compiler array-of-record layout and real use.
-  for(const access of events)if(access.kind==='READ')for(const id of access.addressInputs??[])for(const read of valueFlow.reads(id)){
-    const edge=allEdges.find(e=>key(e.source)===key(read.target??{})&&e.targetTypeId),
-      field=walk(defs.get(read.instructionId)?.expression).find(n=>n.kind==='MemberExpr'&&n.cType?.kind==='array'&&n.cType.elementType?.kind==='record'),
-      owner=edge&&records.find(n=>n.cType.recordTypeId===edge.targetTypeId&&contains(n.range,edge.source)),
-      ref=read.value?.reference,target=ref&&records.find(n=>n.cType.recordTypeId===edge?.targetTypeId&&n.range.objectId===ref.targetObjectId&&n.range.offset===ref.targetOffset&&contains(n.range,access.target));
+  for(const access of events)if(access.kind==='READ')for(const id of access.addressInputs??[])for(const read of reads(id)){
+    const field=recordField(read.instructionId);if(!field)continue;
+    const edge=firstTypedEdge.get(key(read.target??{})),
+      owner=edge&&recordsByObject.get(edge.source.objectId)?.find(n=>n.cType.recordTypeId===edge.targetTypeId&&contains(n.range,edge.source)),
+      ref=read.value?.reference,target=ref&&recordsByObject.get(ref.targetObjectId)?.find(n=>n.cType.recordTypeId===edge?.targetTypeId&&n.range.offset===ref.targetOffset&&contains(n.range,access.target));
     if(!field||!owner||!target)continue;
     const role=canonical(edge.roleId),k=`${edge.targetTypeId}:${role}`;
     if(!ownedRoles.has(k))ownedRoles.set(k,{role,family:edge.targetTypeId,fieldNodeId:field.fieldNodeId,evidence:[]});
@@ -31,18 +37,18 @@ export function pointerTreeStructures(plan,context,{maxStates=2048,maxRoots=256}
   }
   // A pointer field must actually feed a dereference, not merely be printed.
   for(const access of events)if(access.kind==='READ'&&access.target){
-    for(const id of access.addressInputs??[])for(const read of valueFlow.reads(id)){
-      const edge=slots.get(key(read.target)),ref=read.value?.reference,target=ref&&records.find(n=>n.range.objectId===ref.targetObjectId&&n.range.offset===(ref.targetOffset??0)&&contains(n.range,access.target));
+    for(const id of access.addressInputs??[])for(const read of reads(id)){
+      const edge=slots.get(key(read.target)),ref=read.value?.reference,target=ref&&recordsByObject.get(ref.targetObjectId)?.find(n=>n.range.offset===(ref.targetOffset??0)&&contains(n.range,access.target));
       if(!edge||!target)continue;
       proofs.push({roleId:canonical(edge.roleId),sourceExecutionId:read.eventId,targetAccessExecutionId:access.eventId,source:edge.source,
-        from:edge.from,to:target.id,slotIndex:/:slot:(\d+)$/.exec(edge.roleId)?.[1]*1});
+        from:edge.from,to:target.id,slotIndex:/:slot:(\d+)$/.test(edge.roleId)?Number(/:slot:(\d+)$/.exec(edge.roleId)[1]):null});
     }
   }
   // Call argument identity supplies roots, including pointer-array children.
   const calls=new Map();
   for(const e of events)if(e.action==='call')for(const input of e.inputs??[]){
-    const reads=valueFlow.reads(input.executionId),read=reads.find(r=>slots.has(key(r.target))),edge=read&&slots.get(key(read.target));
-    for(const r of reads){if(slots.has(key(r.target)))break;
+    const inputs=reads(input.executionId),read=inputs.find(r=>slots.has(key(r.target))),edge=read&&slots.get(key(read.target));
+    for(const r of inputs){if(slots.has(key(r.target)))break;
       const o=objects.find(o=>o.id===r.target?.objectId),ref=r.value?.reference;
       if(o?.cType?.kind!=='pointer'||!ref?.targetObjectId||!records.some(n=>n.range.objectId===ref.targetObjectId&&n.range.offset===(ref.targetOffset??0)))continue;
       const k=key(r.target);if(!rootBindings.has(k)){if(rootBindings.size<maxRoots)rootBindings.set(k,{kind:'pointer-slot',...r.target,discovered:e.eventId});else{omittedRoots++;context.inferenceBudget?.report('pointer-roots',maxRoots,e.eventId);}}
@@ -96,24 +102,26 @@ export function pointerTreeStructures(plan,context,{maxStates=2048,maxRoots=256}
   // A source-level pointer initialized to a record is a persistent record root;
   // it does not disappear merely because a traversal cursor's frame ends.
   for(const e of events)if(e.kind==='WRITE'&&e.value?.reference?.status==='in-bounds'&&e.value.cType?.pointee?.kind==='record'&&
-    !(e.dataInputs??[]).flatMap(id=>valueFlow.reads(id)).some(r=>slots.has(key(r.target??{})))){
+    !(e.dataInputs??[]).flatMap(id=>reads(id)).some(r=>slots.has(key(r.target??{})))){
     const ref=e.value.reference,n=records.find(n=>n.range.objectId===ref.targetObjectId&&n.range.offset===ref.targetOffset&&n.cType.recordTypeId===e.value.cType.pointee.recordTypeId);
     if(!n||!['VarDecl','DeclRefExpr'].includes(unwrap(defs.get(e.instructionId)?.expression)?.kind))continue;
     const k=key(n.range);if(!rootBindings.has(k)){if(rootBindings.size<maxRoots)rootBindings.set(k,{kind:'record-root',...n.range,discovered:e.eventId});else{omittedRoots++;context.inferenceBudget?.report('pointer-roots',maxRoots,e.eventId);}}
   }
-  const live=(n,at)=>{const o=objects.find(o=>o.id===n.range.objectId);return pos.get(n.discoveredAtExecutionId)<=at&&(!o.endedBy||pos.get(o.endedBy)>at);};
+  const live=(n,at)=>{const o=objectById.get(n.range.objectId);return pos.get(n.discoveredAtExecutionId)<=at&&(!o.endedBy||pos.get(o.endedBy)>at);};
+  const rootDiscovery=new Set([...rootBindings.values()].map(r=>r.discovered));
   for(const spec of modes){
-    const family=records.filter(n=>n.cType.recordTypeId===spec.family),edges=new Map(),candidates=new Map(),proofAt=new Map();
+    const family=records.filter(n=>n.cType.recordTypeId===spec.family),edges=new Map(),edgeBySource=new Map(),candidates=new Map(),proofAt=new Map();
     for(const p of proofs.filter(p=>spec.roles.includes(p.roleId)))if(!proofAt.has(p.sourceExecutionId))proofAt.set(p.sourceExecutionId,p.targetAccessExecutionId);
     const updates=new Map(raw.changes.map(c=>[c.afterExecutionId,c]));
     const evidence=[...proofAt.values(),...(spec.pattern?.evidence??[]),...(spec.owned?.evidence??[]).map(p=>p.targetAccessExecutionId),...prefix.proofs.filter(p=>p.relationId===spec.relation?.id).map(p=>p.afterExecutionId)];
+    const evidenceIds=new Set(evidence);
     const knownRoles=at=>spec.owned?spec.owned.evidence.some(p=>pos.get(p.targetAccessExecutionId)<=at):spec.roles.every(r=>proofs.some(p=>p.roleId===r&&pos.get(p.targetAccessExecutionId)<=at));
     for(const e of events){
-      const change=updates.get(e.eventId);for(const edge of change?.upsertEdges??[])edges.set(edge.id,edge);
+      const change=updates.get(e.eventId);for(const edge of change?.upsertEdges??[]){edges.set(edge.id,edge);if(!edgeBySource.has(key(edge.source)))edgeBySource.set(key(edge.source),edge.id);}
       const written=e.target??(e.memoryState&&e.objectId?{objectId:e.objectId,offset:0,size:e.memoryState.byteLength}:null),
         countChanged=['WRITE','SPACE'].includes(e.kind)&&prefix.proofs.some(p=>p.relationId===spec.relation?.id&&written?.objectId===p.countSource.objectId&&
           written.offset<p.countSource.offset+p.countSource.size&&p.countSource.offset<written.offset+written.size);
-      if(!change&&!countChanged&&!evidence.includes(e.eventId)&&!rootBindingsHas(e.eventId))continue;
+      if(!change&&!countChanged&&!evidenceIds.has(e.eventId)&&!rootDiscovery.has(e.eventId))continue;
       const at=pos.get(e.eventId);if(!knownRoles(at)||spec.pattern&&at<pos.get(spec.pattern.after))continue;
       const active=family.filter(n=>live(n,at)),ids=new Set(active.map(n=>n.id)),selected=[...edges.values()].filter(x=>spec.roles.includes(canonical(x.roleId))).flatMap(x=>{
           if(spec.owned){const owner=active.find(n=>contains(n.range,x.source));return owner&&x.targetTypeId===spec.family?[{...x,from:owner.id,ownerRange:owner.range}]:[];}
@@ -121,6 +129,9 @@ export function pointerTreeStructures(plan,context,{maxStates=2048,maxRoots=256}
         }),
         normalize=x=>({...x,status:x.status==='null'?'observed-termination':x.status==='in-bounds'&&ids.has(x.to)?'observed':'unknown'}),stored=selected.map(normalize),
         members=prefix.at(e.eventId),snapshots=[];
+      const activeByRange=new Map(active.map(n=>[key(n.range),n])),outgoingByNode=new Map(),firstByRole=new Map();
+      for(const x of stored){if(!outgoingByNode.has(x.from))outgoingByNode.set(x.from,[]);outgoingByNode.get(x.from).push(x);
+        if(!firstByRole.has(x.from))firstByRole.set(x.from,new Map());if(!firstByRole.get(x.from).has(x.roleId))firstByRole.get(x.from).set(x.roleId,x);}
       if(spec.mode==='inverse-parent'&&!proofs.some(p=>p.roleId!==spec.roles[0]&&slots.get(key(p.source))?.sourceTypeId===spec.family&&pos.get(p.targetAccessExecutionId)<=at)){
         // Components are independent. An unrelated record cannot invalidate a
         // complete parent forest or be silently added to its membership.
@@ -135,25 +146,25 @@ export function pointerTreeStructures(plan,context,{maxStates=2048,maxRoots=256}
         }
       }else if(spec.mode!=='inverse-parent')for(const root of rootBindings.values()){
         if(at<pos.get(root.discovered))continue;
-        const rootEdge=[...edges.values()].find(x=>key(x.source)===key(root)),start=root.kind==='record-root'?active.find(n=>key(n.range)===key(root))?.id:rootEdge?.to;if(!ids.has(start))continue;
+        const rootEdge=edges.get(edgeBySource.get(key(root))),start=root.kind==='record-root'?activeByRange.get(key(root))?.id:rootEdge?.to;if(!ids.has(start))continue;
         const reached=new Set(),links=[],pending=[start],used=[],conflicts=[];let complete=true;
         while(pending.length){const id=pending.pop();if(reached.has(id))continue;reached.add(id);
           if(spec.mode==='counted-children'){
             const m=members.find(m=>m.nodeId===id&&m.relationId===spec.relation.id);
             if(!m){complete=false;continue;}used.push(...m.evidenceExecutionIds);
-            for(let i=0;i<m.count;i++){const x=stored.find(x=>x.from===id&&x.roleId===`${spec.relation.id}:slot:${i}`);
+            for(let i=0;i<m.count;i++){const x=firstByRole.get(id)?.get(`${spec.relation.id}:slot:${i}`);
               if(!x||x.status==='unknown'){complete=false;continue;}
               if(x.to){links.push({...x,storedEdgeIds:[x.id]});pending.push(x.to);}
             }
           }else if(['sparse-children','owned-edge-records'].includes(spec.mode)){
-            const outgoing=stored.filter(x=>x.from===id);complete=false;
+            const outgoing=outgoingByNode.get(id)??[];complete=false;
             used.push(...(spec.owned?.evidence??spec.relation?.evidence??[]).filter(p=>pos.get(p.targetAccessExecutionId)<=at).flatMap(p=>[p.sourceExecutionId,p.targetAccessExecutionId]));
             for(const x of outgoing)if(x.to&&x.status==='observed'){links.push({...x,storedEdgeIds:[x.id]});pending.push(x.to);}
           }else{
-            let x=stored.find(x=>x.from===id&&x.roleId===spec.pattern.child),path=[],seen=new Set();
+            let x=firstByRole.get(id)?.get(spec.pattern.child),path=[],seen=new Set();
             while(x&&x.status==='observed'&&!seen.has(x.to)){
               seen.add(x.to);path.push(x.id);links.push({...x,from:id,storedEdgeIds:[...path]});pending.push(x.to);
-              x=stored.find(y=>y.from===x.to&&y.roleId===spec.pattern.sibling);
+              x=firstByRole.get(x.to)?.get(spec.pattern.sibling);
             }
             if(!x||x.status!=='observed-termination')complete=false;
             if(x?.status==='observed'&&seen.has(x.to))conflicts.push({kind:'sibling-cycle',sourceEdgeId:x.id,executionId:x.lastObservationExecutionId});
@@ -186,5 +197,4 @@ export function pointerTreeStructures(plan,context,{maxStates=2048,maxRoots=256}
   }
   return out;
   function append(candidate,row){appendStateSnapshot(candidate.states,row,candidate.coverage);}
-  function rootBindingsHas(id){return [...rootBindings.values()].some(r=>r.discovered===id);}
 }

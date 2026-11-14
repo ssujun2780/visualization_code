@@ -1,10 +1,22 @@
 // A completed [0,bound) scan can describe the current logical range even when
 // the program never inserts/removes elements. Values and maxima are not proof.
+import {callContext} from './call-context.mjs';
+import {indexedAddress} from './address-index-evidence.mjs';
 const unwrap=n=>{while(n&&['ImplicitCastExpr','CStyleCastExpr','ParenExpr'].includes(n.kind))n=n.children?.[0];return n;};
 const number=v=>{const n=Number(v?.decimal??v?.signed??v?.unsigned??NaN);return Number.isSafeInteger(n)?n:null;};
 const overlap=(a,b)=>a&&b&&a.objectId===b.objectId&&a.offset<b.offset+b.size&&b.offset<a.offset+a.size;
-export function observedArrayPrefixes(plan,{events,valueFlow},array,{start=0}={}){
+export function observedArrayPrefixes(plan,{events,valueFlow},array,{start=0,accesses=[]}={}){
   const defs=new Map(plan.instructions.map(d=>[d.id,d])),byId=new Map(events.map(e=>[e.eventId,e])),pos=new Map(events.map((e,i)=>[e.eventId,i])),rounds=new Map(),proofs=[];
+  const calls=callContext(events),indices=new Map(),walk=n=>{if(!n)return;const a=indexedAddress(n);if(a)indices.set(n.nodeId,unwrap(a.index)?.declarationId);for(const x of n.children??[])walk(x);};
+  for(const d of plan.instructions){walk(d.expression);for(const a of d.arguments??[])walk(a);}
+  const indexed=accesses.filter(a=>a.target.arrayId===array.id&&byId.get(a.executionId)?.kind==='READ').map(a=>({a,e:byId.get(a.executionId)})),argumentsRead=[];
+  for(const e of events){
+    const r=e.copiedFrom,call=byId.get(e.callExecutionId);if(e.action!=='argument'||!r||call?.action!=='call'||r.objectId!==array.objectId||r.size!==array.elementBytes)continue;
+    let arg=unwrap(defs.get(call.instructionId)?.arguments?.[e.parameterIndex]);if(arg?.kind==='UnaryOperator'&&arg.operator==='*')arg=unwrap(arg.children?.[0]);
+    const syntax=indexedAddress(arg),index=(r.offset-array.range.offset)/array.elementBytes,input=call.inputs?.find(i=>i.parameterIndex===e.parameterIndex);
+    if(!syntax||!Number.isSafeInteger(index)||index<0||index>=array.capacity||input?.objectId!==r.objectId||input.offset!==r.offset||input.size!==r.size)continue;
+    argumentsRead.push({e,call,index,indexDeclarationId:unwrap(syntax.index)?.declarationId});
+  }
   for(const branch of events){if(branch.action!=='branch'||!['ForStmt','WhileStmt','DoStmt'].includes(defs.get(branch.instructionId)?.controlKind))continue;
     const calc=(branch.dataInputs??[]).map(id=>byId.get(id)).find(e=>e?.kind==='CALC'),ast=unwrap(defs.get(calc?.instructionId)?.expression),
       step=calc?.steps?.find(s=>s.nodeId===ast?.nodeId),op=step?.operator;
@@ -24,7 +36,9 @@ export function observedArrayPrefixes(plan,{events,valueFlow},array,{start=0}={}
       return e.kind==='READ'&&e.controlInputs?.includes(event.eventId)&&e.target?.objectId===array.objectId&&
         e.target.offset===array.range.offset+index*array.elementBytes&&e.target.size===array.elementBytes&&
         expr?.kind==='ArraySubscriptExpr'&&unwrap(expr.children[1])?.declarationId===round.indexDeclarationId;
-    }));
+    })??indexed.find(({a,e})=>pos.get(e.eventId)<pos.get(branch.eventId)&&a.target.index===index&&calls.controls(e).includes(event.eventId)&&
+      (a.indexActivationIds??[a.activationId]).includes(branch.activationId)&&a.sourceNodeIds.some(id=>indices.get(id)===round.indexDeclarationId))?.e??
+      argumentsRead.find(a=>pos.get(a.e.eventId)<pos.get(branch.eventId)&&a.index===index&&a.call.activationId===branch.activationId&&a.indexDeclarationId===round.indexDeclarationId&&calls.controls(a.call).includes(event.eventId))?.e);
     if(reads.some(r=>!r))continue;
     proofs.push({count,start,scanInstructionId:branch.instructionId,countSource:{...round.source},countReadExecutionId:round.read.eventId,
       countSources:valueFlow.reads(round.read.eventId).filter(r=>r.target).map(r=>({range:r.target,executionId:r.eventId})),afterExecutionId:branch.eventId,

@@ -9,8 +9,10 @@ const incomplete=reason=>result('incomplete',[],reason);
 // Used both while recording BST semantics and by composed queries. Actual key
 // values and comparison contracts are supplied by the observation adapter.
 export function checkBSTOrder({relation,nodes,contracts,keyOrder=[{index:0,direction:1}],composite=false,complete=true,unsupported=false,conflict=false}){
+  if(relation.historyGap&&relation.lifetimeStatus!=='ended')return incomplete('missing state history');
   if(!relation.alive)return result('ended');
   if(conflict||unsupported||!keyOrder)return result('not-checkable');
+  if(relation.nodes?.length===0&&!nodes.length&&!relation.edges.length)return complete&&relation.complete?good():incomplete('missing empty-tree contract');
   const top=relation.topology,topologyOK=!!top&&!top.cyclic&&!top.sharedChildren?.length&&
     (top.rootNodeId||top.roots?.length===1)&&!['partial','unknown'].includes(top.status);
   if(!complete||!relation.complete||!topologyOK||nodes.some(n=>(n.components??[n]).some(c=>c.value===null)))return incomplete('missing relation, role or key evidence');
@@ -18,17 +20,19 @@ export function checkBSTOrder({relation,nodes,contracts,keyOrder=[{index:0,direc
   for(const e of relation.edges){if(!out.has(e.from))out.set(e.from,[]);out.get(e.from).push(e);}
   const stack=[{id:top.rootNodeId??top.roots[0],bounds:[],path:[]}],seen=new Set();
   while(stack.length){const item=stack.pop(),n=byId.get(item.id);if(!n||seen.has(item.id))continue;seen.add(item.id);
-    for(const bound of item.bounds){const compared=compareKeyValues(composite?n.value:[n.value],composite?bound.value:[bound.value],keyOrder),
+    const payloads=n.components?n.components.map(c=>c.payload??c.value):[n.payload??n.value];
+    if(compareKeyValues(payloads,payloads,keyOrder).sign===null)status='incomplete';
+    for(const bound of item.bounds){const compared=compareKeyValues(payloads,bound.payloads,keyOrder),
         bad=bound.direction==='less'?compared.sign>0:compared.sign<0,equal=compared.sign===0;
       if(bad||equal&&bound.duplicates==='excluded-by-insertion-rule')violations.push({code:'bst-ancestor-order',nodeId:n.id,ancestorId:bound.ancestorId,
         roleId:bound.roleId,direction:bound.direction,value:n.value,bound:bound.value,
         keyRange:n.components?.[compared.componentIndex??0].keyRange??n.keyRange,
         valueExecutionId:n.components?.[compared.componentIndex??0].valueExecutionId??n.valueExecutionId,
         ...(composite?{componentIndex:compared.componentIndex}:{}),path:[...item.path,n.id]});
-      else if(equal&&bound.duplicates==='unknown')status='incomplete';}
+      else if(compared.sign===null||equal&&bound.duplicates==='unknown')status='incomplete';}
     for(const edge of out.get(n.id)??[]){const contract=contracts.find(c=>c.roleId===edge.roleId);
       if(!contract){status='incomplete';continue;}
-      stack.push({id:edge.to,bounds:[...item.bounds,{...contract,ancestorId:n.id,value:n.value}],path:[...item.path,n.id]});}
+      stack.push({id:edge.to,bounds:[...item.bounds,{...contract,ancestorId:n.id,value:n.value,payloads}],path:[...item.path,n.id]});}
   }
   return result(violations.length?'violated':status,violations);
 }
@@ -104,14 +108,19 @@ const definitions={
 for(const id of ['min-heap','max-heap','disjoint-set','segment-tree','fenwick-tree','range-aggregate','queue','stack','deque','array-membership','hash-table','trie'])
  definitions[id]={requires:[],check:c=>semanticCondition(c.relation,id,c.properties)};
 export const STRUCTURE_CONDITIONS=Object.freeze(Object.fromEntries(Object.entries(definitions).map(([id,d])=>[id,Object.freeze({requires:Object.freeze([...d.requires])})])));
-export function evaluateStructureConditions(relation,{expected,order=null,properties={}}={}){
+export function evaluateStructureConditions(relation,{expected,order=null,properties={},customConditions=null}={}){
   const checks=[],done=new Map();
-  function visit(id){if(done.has(id))return done.get(id);const d=definitions[id];
+  function visit(id){if(done.has(id))return done.get(id);const custom=customConditions&&Object.hasOwn(customConditions,id)?customConditions[id]:null,
+    d=Object.hasOwn(definitions,id)?definitions[id]:custom?{requires:custom.requires,check:()=>custom.result}:null;
     if(!d){const r={conditionId:id,...result('not-checkable',[],'unsupported structure condition'),requires:[]};done.set(id,r);checks.push(r);return r;}
     const dependencies=d.requires.map(visit),blocked=dependencies.filter(r=>r.status!=='satisfied-observed');
-    const state=blocked.length?result(blocked.some(r=>r.status==='ended')?'ended':blocked.some(r=>r.status==='violated')?'violated':
+    const state=relation.lifetimeStatus==='not-created'?incomplete('storage not yet created'):
+      relation.historyGap&&relation.lifetimeStatus!=='ended'?incomplete('missing state history'):
+      relation.lifetimeStatus==='ended'?result('ended'):
+      blocked.length?result(blocked.some(r=>r.status==='ended')?'ended':blocked.some(r=>r.status==='violated')?'violated':
       blocked.some(r=>r.status==='incomplete')?'incomplete':'not-checkable',[],'required conditions are not satisfied',
-      {blockedBy:blocked.map(r=>r.conditionId)}):d.check({relation,order,properties});
+      {blockedBy:blocked.map(r=>r.conditionId)}):relation.violations?.length?
+      result('violated',relation.violations,'observed relation contradicts the selected mapping'):d.check({relation,order,properties});
     const r={conditionId:id,requires:[...d.requires],...state};done.set(id,r);checks.push(r);return r;
   }
   const final=visit(expected);

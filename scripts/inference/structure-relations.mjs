@@ -1,14 +1,13 @@
 // Representation adapters only. No key, balance, colour or algorithm policy.
 import {structureTouches,structureRootRange} from './structure-storage.mjs';
-import {structureStateAt} from './state-history.mjs';
+import {structureStateAt,stateHistoryGapAt} from './state-history.mjs';
 import {semanticKinds,projectSemanticRelation} from './semantic-relations.mjs';
+import {queryUserRelation} from './user-relations.mjs';
+import {structureQueryContext} from './query-index.mjs';
 const equal=(a,b)=>a.length===b.length&&a.every(id=>b.includes(id));
 const role=e=>e.fieldNodeId??e.roleId??e.relationId;
 export function relationContext(trace,afterExecutionId){
-  const positions=new Map(trace.events.map((e,i)=>[e.eventId,i])),at=afterExecutionId===undefined?trace.events.length-1:positions.get(afterExecutionId);
-  if(at===undefined)throw new RangeError('관측한 실행 식별자가 필요합니다.');
-  return {positions,at,occurred:id=>positions.has(id)&&positions.get(id)<=at,
-    state:s=>structureStateAt(s,positions,at,trace.objects)};
+  return structureQueryContext(trace,afterExecutionId);
 }
 export function projectStructureRelation(source,state,{roleIds=null}={}){
   if(!state)return null;
@@ -34,29 +33,34 @@ export function projectStructureRelation(source,state,{roleIds=null}={}){
       !(top.unknownRelations?.length||top.endedTargetNodeIds?.length)&&nodes.length===ids.size;
   return {id:`relation:${source.id}:${[...roles].sort().join('|')}`,sourceStructureId:source.id,sourceKind:source.kind,
     afterExecutionId:state.afterExecutionId,roleIds:[...roles],alive:!!alive,complete,roleComplete,historyGap,
+    ...(state.lifetimeStatus?{lifetimeStatus:state.lifetimeStatus}:{}),
     rootNodeIds:top?.status==='empty'?[]:top?.rootNodeId?[top.rootNodeId]:top?.roots??[],nodes,edges,terminals,
     terminalNodeIds:[...top?.terminalNodeIds??[]],topology:top??null,
     evidenceExecutionIds:[...state.evidenceExecutionIds??[]],scopeRanges:state.scopeRanges??[],
     ...(source.kind==='sequence-lookup-candidate'?{sequenceConditions:state.conditions}:{}),
     interpretation:'logical relation only; source storage and edge directions are unchanged'};
 }
-export function queryStructureRelations(trace,{target,candidateId,roleIds=null,afterExecutionId}={}){
-  const ctx=relationContext(trace,afterExecutionId),all=trace.structures??[],selected=all.find(s=>s.id===(candidateId??target?.structureId)),
+export function queryStructureRelations(trace,{target,candidateId,roleIds=null,afterExecutionId,relationBinding=null,relationLimits={}}={}){
+  const ctx=relationContext(trace,afterExecutionId);
+  if(relationBinding)return structuredClone({afterExecutionId:trace.events[ctx.at]?.eventId??null,
+    relations:[queryUserRelation(trace,relationBinding,{...relationLimits,at:ctx.at,roleIds})]});
+  const all=trace.structures??[],selected=all.find(s=>s.id===(candidateId??target?.structureId)),
     ordered=selected?.kind==='ordered-tree-candidate'?selected:null,orderState=ordered&&ctx.state(ordered),
     sourceId=ordered?.sourceStructureId??candidateId,
     wanted=roleIds??orderState?.contracts?.map(c=>c.roleId)??null,
     normalized=target?.objectId?{ranges:[{objectId:target.objectId,offset:0,size:trace.objects.find(o=>o.id===target.objectId)?.size}]}:target;
-  let relations=[];
+  let relations=[],historyGap=false;
   for(const source of all){
     if(!semanticKinds.has(source.kind)&&!['linked-structure','rooted-index-structure','pointer-tree-projection','sequence-lookup-candidate'].includes(source.kind))continue;
     if(sourceId&&source.id!==sourceId||ordered&&!orderState||source.discoveredAtExecutionId&&!ctx.occurred(source.discoveredAtExecutionId))continue;
     if(sourceId&&normalized?.ranges&&!structureTouches(source,normalized,trace,ctx))continue;
     if(sourceId&&normalized?.structureId&&![source.id,ordered?.id].includes(normalized.structureId))continue;
     if(!sourceId&&normalized&&!structureTouches(source,normalized,trace,ctx))continue;
-    const state=ctx.state(source);if(!state)continue;
+    const state=ctx.state(source);if(!state){historyGap||=stateHistoryGapAt(source,ctx.positions,ctx.at);continue;}
     const choices=wanted?[wanted]:source.kind==='linked-structure'&&state.roleTopologies?.length?
       state.roleTopologies.map(p=>p.fieldNodeIds):[null];
     for(const roles of choices){const relation=projectStructureRelation(source,state,{roleIds:roles});if(!relation)continue;
+      if(state.lifetimeStatus)relation.lifetimeStatus=state.lifetimeStatus;
       if(source.coverage?.omittedStates&&!Object.hasOwn(source.coverage,'historyGapFromExecutionId')&&ctx.positions.get(state.afterExecutionId)<ctx.at){relation.complete=false;relation.historyGap=true;}
       const root=structureRootRange(source,trace),object=trace.objects.find(o=>o.id===source.objectId);
       if(object&&ctx.occurred(object.endedBy))relation.alive=false;
@@ -66,5 +70,5 @@ export function queryStructureRelations(trace,{target,candidateId,roleIds=null,a
     }
   }
   if(relations.some(r=>r.exactRoot))relations=relations.filter(r=>r.exactRoot);
-  return structuredClone({afterExecutionId:trace.events[ctx.at]?.eventId??null,relations});
+  return structuredClone({afterExecutionId:trace.events[ctx.at]?.eventId??null,relations,...historyGap?{historyGap:true}:{}});
 }

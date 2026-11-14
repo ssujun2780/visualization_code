@@ -24,7 +24,11 @@ test('No12 preserves row access types, folded divisions, one pure comparison and
   const call=at(13).find(e=>e.action==='call');for(const c of folded)assert.ok(call.dataInputs.includes(c.eventId));
   const comparison=r.events.filter(e=>e.kind==='CALC'&&[15,16].includes(r.line(e)));assert.equal(comparison.length,1);assert.equal(comparison[0].operator,'==');assert.equal(comparison[0].value.decimal,'1');
   for(const e of r.events.filter(e=>['return','return.value'].includes(e.action)))assert.equal(r.line(e),17);
-  assert.equal(r.line(r.events.at(-1)),18);
+  const returned=r.events.findLast(e=>e.action==='return'),ended=r.events.at(-1);
+  assert.equal(ended.kind,'SPACE');assert.equal(ended.action,'frame.end');
+  assert.equal(ended.activationId,returned.activationId);
+  assert.equal(r.line(ended),17);
+  assert.equal(r.defs.get(ended.instructionId).sourceNodeId,r.defs.get(returned.instructionId).sourceNodeId);
 });
 
 test('qualified pointers to arrays keep their shape through scalar reads and prefix updates',async()=>{
@@ -59,6 +63,11 @@ test('return carrier writes select the executed ReturnStmt and do not invent an 
   const r=await inspect('int pick(int n){int a[2]={4,8};\n if(n)return a[1]+n;\n return a[0];\n}\nint main(){return pick(0)+pick(1);}');
   assert.equal(r.trace.exitCode,13);
   const returns=r.events.filter(e=>e.action==='return.value');assert.deepEqual(returns.map(e=>[r.line(e),e.value.decimal??e.value.signed]),[[3,'4'],[2,'9'],[5,'13']]);
+  for(const e of r.events.filter(e=>e.action==='frame.end')){
+    const returned=r.events.find(x=>x.action==='return'&&x.activationId===e.activationId);
+    assert.equal(r.defs.get(e.instructionId).sourceNodeId,r.defs.get(returned.instructionId).sourceNodeId);
+    assert.equal(r.line(e),r.line(returned));
+  }
   const implicit=await inspect('int main(){\n if(0)return 17;\n}');assert.equal(implicit.trace.exitCode,0);
   assert.ok(implicit.events.filter(e=>e.action==='return.value').every(e=>implicit.line(e)!==2));
 });

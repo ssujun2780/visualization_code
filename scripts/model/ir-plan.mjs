@@ -17,7 +17,7 @@ import {booleanRepresentationBindings} from './boolean-representation.mjs';
 import {bindFunctionDeclarations} from './function-declarations.mjs';
 const position=(a,b)=>a.line-b.line||a.column-b.column;
 const contains=(range,p)=>!!range&&!!p&&range.file===p.file&&position(range.start,p)<=0&&position(p,range.end)<=0;
-const operator=n=>n?.kind==='UnaryOperator'?/\b(?:prefix|postfix) '([^']+)'/.exec(n.details)?.[1]??null:
+const operator=n=>n?.kind==='UnaryExprOrTypeTraitExpr'&&/\bsizeof\b/.test(n.details)?'sizeof':n?.kind==='UnaryOperator'?/\b(?:prefix|postfix) '([^']+)'/.exec(n.details)?.[1]??null:
   ['BinaryOperator','CompoundAssignOperator'].includes(n?.kind)?/ '([+*/%&|^<>=!,?:~-]+)'(?:\s|$)/.exec(n.details)?.[1]??null:null;
 const name=n=>/\s([^\s']+)\s+'/.exec(n?.details??'')?.[1]??null;
 const visibleOperator=n=>{
@@ -33,7 +33,7 @@ const visibleOperator=n=>{
 const visibleEvaluation=n=>{while(n){const selected=selectedExpression(n);if(selected){n=selected;continue;}
   if(['ImplicitCastExpr','ParenExpr'].includes(n.kind)&&n.children.length===1){n=n.children[0];continue;}break;}
   return evaluationKind(n)?n:null;};
-const expressionKinds=new Set(['BinaryOperator','UnaryOperator','ImplicitCastExpr','CStyleCastExpr','ParenExpr','ConditionalOperator','BinaryConditionalOperator']);
+const expressionKinds=new Set(['UnaryExprOrTypeTraitExpr','BinaryOperator','UnaryOperator','ImplicitCastExpr','CStyleCastExpr','ParenExpr','ConditionalOperator','BinaryConditionalOperator']);
 const leafKinds=new Set(['DeclRefExpr','IntegerLiteral','FloatingLiteral','CharacterLiteral','StringLiteral','GNUNullExpr','MemberExpr','ArraySubscriptExpr','OffsetOfExpr']);
 const mutation=n=>n.kind==='CompoundAssignOperator'||n.kind==='BinaryOperator'&&operator(n)==='='||n.kind==='UnaryOperator'&&['++','--'].includes(operator(n));
 const selectedExpression=n=>n.kind==='GenericSelectionExpr'?n.selectedAssociation?.children.at(-1):n.kind==='GenericAssociation'&&n.selected?n.children.at(-1):null;
@@ -54,7 +54,11 @@ function groupExpression(node,callResults){
     // The call remains a FLOW boundary; its observed return is a fixed input
     // to the surrounding calculation. Never group the call's argument work
     // into its consumer, or treat the call itself as a pure expression.
-    const returnedValue=child=>(callResults||n.builtin?.pure)&&child.kind==='CallExpr'&&!child.builtin;
+    // Mutation work keeps its own READ/CALC/WRITE. Its yielded value can feed
+    // an enclosing expression just like a returned call value; it must not
+    // truncate the enclosing logical expression's ownership.
+    const returnedValue=child=>(callResults||n.builtin?.pure)&&
+      (child.kind==='CallExpr'&&!child.builtin||callResults&&mutation(child));
     if(entry.children){cache.set(n,children.every(child=>returnedValue(child)||cache.get(child)));stack.pop();}
     else{entry.children=true;for(const child of children)if(!returnedValue(child)&&!cache.has(child))stack.push({node:child,children:false});}
   }
@@ -248,7 +252,7 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
     [...(o.inputs??[]),...(o.args??[]),...(o.incoming??[]),o.pointer].filter(Boolean).map(v=>`${o.functionId}:${v.value}`)));
   const valueProducers=new Map(observations.instructions.filter(o=>o.result).map(o=>[`${o.functionId}:${o.result}`,o])),returnStores=new Map(),returnAnchors=[];
   const valueUsers=new Map();
-  for(const o of observations.instructions)for(const value of new Set([...o.inputs??[],...o.args??[],...o.incoming??[],o.pointer].filter(Boolean).map(i=>i.value))){
+  for(const o of observations.instructions)for(const value of new Set([...o.inputs??[],...o.args??[],...o.incoming??[],o.pointer,o.count].filter(Boolean).map(i=>i.value))){
     const key=`${o.functionId}:${value}`,list=valueUsers.get(key)??[];list.push(o);valueUsers.set(key,list);
   }
   // LLVM GEP adapts narrow source indices to its address-index width even
@@ -277,6 +281,21 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
       }
     }
   }
+  // Dynamic allocation extents are compiler work only when the AST has no
+  // source operator and every use is an alloca count (or another such helper).
+  const allocationExtents=new Map();let extentChanged=true;
+  while(extentChanged){extentChanged=false;
+    for(const o of observations.instructions){
+      if(allocationExtents.has(o.id)||!o.result||!['calculate','convert'].includes(o.action)||
+        !['mul','zext','sext'].includes(o.opcode)||visibleOperator(expressionOwner(o)?.node??semanticExpression(o)))continue;
+      const users=valueUsers.get(`${o.functionId}:${o.result}`)??[];
+      if(!users.length||!users.every(u=>allocationExtents.has(u.id)||u.action==='object.begin'&&u.count?.value===o.result&&u.cType?.kind==='array'))continue;
+      const allocations=[...new Set(users.flatMap(u=>allocationExtents.get(u.id)?.allocationObservationIds??[u.id]))];
+      allocationExtents.set(o.id,{kind:'runtime-allocation-extent',allocationObservationIds:allocations,
+        evidence:'LLVM def-use to dynamic alloca count; no AST source operator'});extentChanged=true;
+    }
+  }
+  plan.coverage.compilerHelpers=[...allocationExtents].map(([observationId,proof])=>({observationId,...proof}));
   const runtimeArrayScales=new Map();
   for(const o of observations.instructions.filter(o=>addressScales.has(o.id)&&o.opcode==='mul')){
     const n=nearest(o,n=>n.kind==='ArraySubscriptExpr'&&variableArray(types.spelling(n.type,n.canonical))),
@@ -431,7 +450,10 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
         const defaults={...binding.roles};binding.returnSites={};
         for(const {store,node:site}of returnStores.get(op.id)){
           const roles={};if(op.type!=='void'||op.aggregateReturn)roles['WRITE:return.value']=put('WRITE:return.value','WRITE','return.value',site,{returnType}).id;
-          roles['FLOW:return']=put('FLOW:return','FLOW','return',site).id;binding.returnSites[site.id]=roles;
+          roles['FLOW:return']=put('FLOW:return','FLOW','return',site).id;
+          roles['SPACE:object.end']=put('SPACE:object.end','SPACE','object.end',site,{reason:'function-return'}).id;
+          roles['SPACE:frame.end']=put('SPACE:frame.end','SPACE','frame.end',site).id;
+          binding.returnSites[site.id]=roles;
           returnAnchors.push({storeId:store.id,returnObservationId:op.id,sourceNodeId:site.id});
         }
         binding.roles=defaults;
@@ -478,12 +500,13 @@ export function buildIRPlan(observations,{nodes,types,sourceMap,typeQueries},sou
         explicitAddress=pointerOperation&&!pointerOperation.children.some(c=>contains(c.source,point));
       // A GEP located in the lvalue child is storage selection, not another
       // source operator step. The verified binding still describes its target.
-      if(addressScales.has(op.id)||op.action==='address'&&!explicitAddress||
+      if(allocationExtents.has(op.id)||addressScales.has(op.id)||op.action==='address'&&!explicitAddress||
         ['bitcast','addrspacecast','ptrtoint','inttoptr'].includes(op.opcode)&&!nearest(op,n=>n.kind==='CStyleCastExpr'&&
           !/<(?:NoOp|LValueToRValue)>/.test(n.details)&&types.spelling(n.type,n.canonical)?.kind==='pointer'===op.type.endsWith('*')&&
           (op.opcode!=='bitcast'||types.spelling(n.children[0]?.type,n.children[0]?.canonical)?.kind==='pointer'))||
         op.action==='merge'&&!nearest(op,n=>['ConditionalOperator','BinaryConditionalOperator'].includes(n.kind)||['&&','||'].includes(operator(n)))){
         binding.administrative=true;
+        if(allocationExtents.has(op.id))binding.compilerHelper=allocationExtents.get(op.id);
         if(runtimeArrayScales.has(op.id))binding.runtimeArrayScale=runtimeArrayScales.get(op.id);
       }else{
         const grouped=owner?.kind==='expression'||owner?.kind==='update'&&owner.node.children.every(canCompose);

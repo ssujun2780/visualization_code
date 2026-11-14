@@ -6,6 +6,8 @@
 
 ## 현재 구현 범위 — v1 기본 경로
 
+2026-11-12: v2의 구조 대응 입력에 [수동 관계 어댑터](user-structure-relations.md#ur-06-실행-관계-분석과-연결)를 연결할 수 있습니다. 자동 호출은 하지 않습니다. `structure-access.details.matchedRange`는 전체 실제 접근 중 해당 구성원 저장소와 겹치는 구간이며, 원래 접근 범위는 `participants`에 유지합니다. 한 접근의 여러 구간을 구별하고 완전히 같은 대응만 중복 제거합니다. `mappingOrigin`은 user/inferred를 구분합니다.
+
 - `scripts/execution-relations/`는 생성 모델·자료구조 추론기·시각화 코드를 가져오지 않는 별도 모듈입니다. 기존 실행 경로에는 자동 연결하지 않았습니다.
 - `inferExecutionRelations(plan, trace, {structureInference?})`는 독립 복사본을 동결해 판정기에 제공하며 호출자 원본은 수정하거나 동결하지 않습니다. 구조 추론 결과는 선택 입력이며 실행 식별자가 맞아야 합니다.
 - `inferExecutionRelationsAsync`는 같은 API를 독립 Worker와 별도 시간 제한으로 실행합니다. 실패는 부가 결과의 진단으로 반환하며 C 실행 ERROR를 만들지 않습니다.

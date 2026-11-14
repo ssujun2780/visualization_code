@@ -5,9 +5,11 @@ import {stateHistoryGapAt} from './state-history.mjs';
 import {validateBSTOverlays} from './bst-contract.mjs';
 import {validateGraphStorage} from './graph-storage-contract.mjs';
 import {validateNeighborhoodProof} from './neighborhood-proofs.mjs';
+import {validateIndexedNeighborhoodProof} from './indexed-neighborhood-proofs.mjs';
 import {createValueFlow} from './observed-value-flow.mjs';
-export function validateStructureOverlays(trace){
-  validateBSTOverlays(trace);
+import {verificationStates} from './history-evidence.mjs';
+export function validateStructureOverlays(trace,plan){
+  validateBSTOverlays(trace,plan);
   const events=new Map(trace.events.map(e=>[e.eventId,e])),objects=new Map(trace.objects.map(o=>[o.id,o])),
     structures=new Map(trace.structures.map(s=>[s.id,s])),positions=new Map(trace.events.map((e,i)=>[e.eventId,i]));
   const fail=message=>{throw new Error(`자료구조 후보: ${message}`);};
@@ -69,7 +71,7 @@ export function validateStructureOverlays(trace){
       }
       const nodes=new Map(s.logicalNodes.map(n=>[n.id,n]));for(const n of nodes.values())range(n);
       let before=-1;
-      for(const state of s.states){evidence([state.afterExecutionId,state.rootValueExecutionId]);const at=positions.get(state.afterExecutionId);
+      for(const state of verificationStates(s,positions)){evidence([state.afterExecutionId,state.rootValueExecutionId]);const at=positions.get(state.afterExecutionId);
         if(at<=before||state.rootValueExecutionId&&positions.get(state.rootValueExecutionId)>at)fail('인덱스 시작점의 시점이 다릅니다.');before=at;
         if((s.roleCombinationEvidence??[]).some(id=>positions.get(id)>at))fail('여러 역할의 결합 근거가 상태보다 뒤에 있습니다.');
         for(const order of state.orders){
@@ -87,13 +89,15 @@ export function validateStructureOverlays(trace){
       for(const p of s.evidence){
         evidence(p.evidenceExecutionIds);
         const at=positions.get(p.executionId),target=events.get(p.targetAccessExecutionId);
-        if(!['computed-index-transfer','bounded-index-walk','matrix-operand-pair','matrix-gated-access','counted-row-access'].includes(p.kind)||
+        if(!['computed-index-transfer','bounded-index-walk','matrix-operand-pair','matrix-gated-access','counted-row-access','indexed-list-access'].includes(p.kind)||
           !p.evidenceExecutionIds.includes(p.executionId)||p.evidenceExecutionIds.some(id=>positions.get(id)>at)||
           ![p.fromIndex,p.toIndex].every(i=>Number.isInteger(i)&&i>=0&&i<a.capacity)||
           target?.target?.objectId!==a.objectId||Math.floor((target.target.offset-a.range.offset)/a.elementBytes)!==p.toIndex)
           fail('순회 후보의 대상 좌표 또는 실행 근거가 다릅니다.');
         for(const r of [...p.sourceSlots,...p.properties.map(p=>p.source)])range(r);
-        if(['matrix-gated-access','counted-row-access'].includes(p.kind))validateNeighborhoodProof(p,{events,relations,fail,trace,
+        if(p.kind==='indexed-list-access')validateIndexedNeighborhoodProof(p,{events,relations,fail,trace,
+          accesses:new Map((trace.structures.find(s=>s.kind==='array-work')?.accesses??[]).map(a=>[a.executionId,a]))});
+        else if(['matrix-gated-access','counted-row-access'].includes(p.kind))validateNeighborhoodProof(p,{events,relations,fail,trace,
           accesses:new Map((trace.structures.find(s=>s.kind==='array-work')?.accesses??[]).map(a=>[a.executionId,a]))});
         else if(p.kind!=='matrix-operand-pair'){
           const r=relations.get(p.relationId);
@@ -192,6 +196,19 @@ export function validateStructureOverlays(trace){
           fail('큐 작업과 실제 접근이 일치하지 않습니다.');
       }
       for(const c of s.comparisons){range(c.left);range(c.right);evidence([c.executionId,...c.readExecutionIds]);}
+      if(s.fifoProofs){
+        const pending=[],matched=[];
+        for(const op of s.operations.filter(o=>o.status==='supported')){
+          if(op.kind==='enqueue'){pending.push(op);continue;}
+          if(op.kind!=='dequeue')continue;
+          const oldest=pending.shift(),write=events.get(oldest?.accessExecutionId),read=events.get(op.accessExecutionId);
+          if(oldest&&oldest.index===op.index&&write.target.objectId===read.target.objectId&&write.target.offset===read.target.offset&&
+            write.target.size===read.target.size&&read.dataInputs?.includes(write.eventId))
+            matched.push({enqueueExecutionId:write.eventId,dequeueExecutionId:read.eventId,index:op.index,completedAtExecutionId:op.completedAtExecutionId});
+        }
+        if(JSON.stringify(matched)!==JSON.stringify(s.fifoProofs)||!s.comparisons.length&&!matched.length)
+          fail('FIFO 소비 순서와 실제 삽입 WRITE의 출처가 다릅니다.');
+      }
       for(const state of s.states){
         evidence([state.executionId,...state.pendingAccessExecutionIds,...state.contradictingExecutionIds]);
         if(!['supported','contradicted','intermediate','partial','ended'].includes(state.status))fail('큐 상태 분류가 올바르지 않습니다.');

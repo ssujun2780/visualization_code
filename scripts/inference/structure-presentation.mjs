@@ -4,7 +4,13 @@ import {topology} from '../shared/topology.mjs';
 import {queryCoindexedRecords} from './coindexed-record-views.mjs';
 import {queryBSTOrder} from './bst-views.mjs';
 import {queryStructureConditions,validateConditionBindings} from './condition-query.mjs';
+import {queryStructureRelations} from './structure-relations.mjs';
+import {defineStructureRelation} from './relation-binding.mjs';
+import {defineStructureConditionRules} from './user-conditions.mjs';
+import {captureStructurePresentationAnchor,reconnectStructureSetting} from './presentation-reconnect.mjs';
 import {structureStateAt,stateHistoryGapAt} from './state-history.mjs';
+import {structureQueryContext} from './query-index.mjs';
+import {inverseRoleCoverage} from './inverse-role-coverage.mjs';
 export const STRUCTURE_RECOMMENDATION_LIMIT=5;
 const unique=a=>[...new Set(a)];
 const labels={array:'배열',grid:'격자',tree:'트리',trie:'트라이','binary-tree':'이진 트리',forest:'포레스트',graph:'그래프',dag:'방향 비순환 그래프',
@@ -30,25 +36,33 @@ const sameScope=(a,b)=>a?.programId===b.programId&&a?.runId===b.runId;
 const key=(target,slot)=>JSON.stringify([slot,target]);
 function entries(preferences){if(preferences===undefined||preferences===null)return [];
   if(preferences.schemaVersion!==1||!Array.isArray(preferences.overrides))throw new TypeError('지원하지 않는 표현 설정입니다.');return preferences.overrides;}
-export function setStructurePresentation(preferences,trace,{target,view,slot='primary',roleIds=null,expected=undefined,conditionBindings=null}){
+function matchesReconnectedTarget(trace,setting,id,options){
+  if(setting.key===id)return true;
+  // The target may be known while a condition range no longer fits. This is
+  // selection identity only; no relation/property is partially applied.
+  const r=reconnectStructureSetting(trace,{...setting,roleIds:null,relationBinding:null,conditionRules:null,conditionBindings:null},options);
+  return r.status==='connected'&&r.setting.key===id;
+}
+export function setStructurePresentation(preferences,trace,{target,view,slot='primary',roleIds=null,expected=undefined,conditionBindings=null,relationBinding=null,conditionRules=null,plan=null,afterExecutionId}){
   const binding=targetOf(trace,target,true),run=scope(trace);text(slot,'보기');text(view,'표현');
-  if(view==='auto')return clearStructurePresentation(preferences,trace,{target:binding,slot});
+  if(view==='auto')return clearStructurePresentation(preferences,trace,{target:binding,slot,plan,afterExecutionId});
   if(roleIds!==null&&(!Array.isArray(roleIds)||roleIds.some(id=>typeof id!=='string'||!id)))throw new TypeError('역할 식별자 배열이 필요합니다.');
   if(expected!==undefined&&expected!==null)text(expected,'기대 조건');
   const id=key(binding,slot),override={scope:run,key:id,target:binding,slot,view,roleIds:roleIds===null?null:unique(roleIds).sort(),
+    wholeObjectTargets:unique([...(target.objectIds??[]),...(target.objectId?[target.objectId]:[])]),
     expected:expected===undefined?expectedFor(view):expected,origin:'user',
-    ...(conditionBindings?{conditionBindings:validateConditionBindings(conditionBindings)}:{})};
-  return {schemaVersion:1,overrides:[...entries(preferences).filter(x=>!(sameScope(x.scope,run)&&x.key===id)),override]};
+    ...(conditionBindings?{conditionBindings:validateConditionBindings(conditionBindings)}:{}),
+    ...(relationBinding?{relationBinding:defineStructureRelation(trace,relationBinding)}:{}),
+    ...(conditionRules?{conditionRules:defineStructureConditionRules(trace,conditionRules)}:{})};
+  if(plan)override.reconnectAnchor=captureStructurePresentationAnchor(plan,trace,override,{afterExecutionId});
+  return {...preferences,schemaVersion:1,overrides:[...entries(preferences).filter(x=>!(sameScope(x.scope,run)&&x.slot===slot&&matchesReconnectedTarget(trace,x,id,{plan,afterExecutionId}))),override]};
 }
-export function clearStructurePresentation(preferences,trace,{target,slot='primary'}){
+export function clearStructurePresentation(preferences,trace,{target,slot='primary',plan=null,afterExecutionId}){
   const run=scope(trace),id=key(targetOf(trace,target),slot);
-  return {schemaVersion:1,overrides:entries(preferences).filter(x=>!(sameScope(x.scope,run)&&x.key===id))};
+  return {...preferences,schemaVersion:1,overrides:entries(preferences).filter(x=>!(sameScope(x.scope,run)&&x.slot===slot&&matchesReconnectedTarget(trace,x,id,{plan,afterExecutionId})))};
 }
 function context(trace,afterExecutionId){
-  const positions=new Map((trace.events??[]).map((e,i)=>[e.eventId,i])),at=afterExecutionId===undefined?(trace.events?.length??0)-1:positions.get(afterExecutionId);
-  if(at===undefined)throw new RangeError('관측한 실행 식별자가 필요합니다.');
-  const occurred=id=>positions.has(id)&&positions.get(id)<=at;
-  return {at,positions,occurred,state:s=>structureStateAt(s,positions,at,trace.objects)};
+  return structureQueryContext(trace,afterExecutionId);
 }
 function graphSnapshot(s,ctx,roleIds,target,typeIds=null){
   const edges=new Map(),ended=new Set();for(const c of s.changes??[]){if(!ctx.occurred(c.afterExecutionId))continue;
@@ -69,7 +83,7 @@ function graphSnapshot(s,ctx,roleIds,target,typeIds=null){
       // Only roles actually declared on this record are required. A
       // heterogeneous target record need not have the source record's field.
       !selected.some(e=>e.from===n.id&&e.roleId===r.id)).map(r=>({nodeId:n.id,roleId:r.id,status:'unobserved-slot'})));
-  return {...shape,reachableNodeIds:nodes.map(n=>n.id),unknownRelations:missing,maxChildren:Math.max(0,...nodes.map(n=>links.filter(e=>e.from===n.id).length)),
+  return {...shape,roleIds:unique(selected.filter(e=>e.sourceTypeId).map(e=>e.roleId)),reachableNodeIds:nodes.map(n=>n.id),unknownRelations:missing,maxChildren:Math.max(0,...nodes.map(n=>links.filter(e=>e.from===n.id).length)),
     sharedChildren:nodes.filter(n=>links.filter(e=>e.to===n.id).length>1),
     status:missing.length||selected.some(e=>!['in-bounds','null'].includes(e.status)||e.to&&!ids.has(e.to))?'partial':'observed'};
 }
@@ -151,7 +165,12 @@ export function recommendStructureViews(trace,{target,afterExecutionId,roleIds=n
       const object=trace.objects?.find(o=>o.id===s.objectId),seen=s.runtimeShape&&ctx.occurred(s.discoveredAtExecutionId)?[s.discoveredAtExecutionId]:object&&ctx.occurred(object.createdBy)?(object.cType?.kind==='array'?[object.createdBy]:
         (trace.events??[]).filter(e=>ctx.occurred(e.eventId)&&e.value?.reference?.targetObjectId===object.id&&e.value?.cType?.pointee?.sizeBits===s.elementBytes*8).map(e=>e.eventId)):[];
       if(s.storageEvidence&&ctx.occurred(s.storageEvidence.executionId))seen.push(s.storageEvidence.executionId);
+      const start=candidates.length;
       offer(s,'array',2,seen);if(s.geometry?.rank>=2)offer(s,'grid',3,seen);
+      for(const c of candidates.slice(start)){
+        const chosen=selected.ranges?.find(r=>r.objectId===s.range.objectId&&r.offset<=s.range.offset&&r.offset+r.size>=s.range.offset+s.range.size);
+        if(chosen){c.selectedStorageBytes=chosen.size;c.representedStorageBytes=s.range.size;}
+      }
     }else if(s.kind==='associative-lookup-candidate'){
       const hashed=(s.lookupEvidence??[]).some(p=>ctx.occurred(p.executionId)&&p.bucketTransformExecutionIds?.some(ctx.occurred));
       if(hashed&&state?.alive&&state.entries.some(e=>e.alive))offer(s,'hash-table',5,[s.discoveredAtExecutionId,...proof],null,'partial');
@@ -166,7 +185,7 @@ export function recommendStructureViews(trace,{target,afterExecutionId,roleIds=n
         present=(t,ids)=>{if(!ids?.length||!ids.every(id=>observed.includes(id))){if(t?.nodeCount)offer(s,'graph',1,proof,ids);return;}
           const data=logical(t);if(data?.status==='empty'){offer(s,'linked-list',3,proof,ids,'supported',null);candidates.at(-1).representedNodeCount=0;return;}
           shape(s,data,proof,ids);};
-      familyRoles=unique((state.roleTopologies??[]).flatMap(p=>p.fieldNodeIds));
+      familyRoles=unique([...(state.roleTopologies??[]).flatMap(p=>p.fieldNodeIds),...(state.storageTopology?.edges??[]).map(e=>e.fieldNodeId??e.roleId).filter(Boolean)]);
       familyNodeCount=unique([state.storageTopology,state.topology,...(state.roleTopologies??[]).map(p=>p.topology)]
         .flatMap(t=>logical(t)?.reachableNodeIds??[])).length;
       if(!roleIds)present(state.topology,state.roleTopologies?.find(p=>p.roleGroupId===state.selectedRoleGroupId)?.fieldNodeIds??familyRoles);
@@ -211,11 +230,16 @@ export function recommendStructureViews(trace,{target,afterExecutionId,roleIds=n
       // Allocation/alias topology alone does not prove a container relation.
       // Typed traversal projections below can supply the missing role evidence.
       const t=graphSnapshot(s,ctx,roleIds,selected);
-      if(t.nodeCount>0)offer(s,'graph',1,(s.changes??[]).filter(c=>ctx.occurred(c.afterExecutionId)).slice(-1).map(c=>c.afterExecutionId),roleIds);
+      familyRoles=t.roleIds;familyNodeCount=t.nodeCount;
+      if(t.nodeCount>0){
+        const traversed=(s.roleProjections??[]).filter(p=>p.roleIds.some(id=>t.roleIds.includes(id))).flatMap(p=>p.supportingExecutionIds.filter(ctx.occurred));
+        const c=offer(s,'graph',t.edgeCount&&t.roleIds.length?(traversed.length?3:2):1,[...(s.changes??[]).filter(c=>ctx.occurred(c.afterExecutionId)).slice(-1).map(c=>c.afterExecutionId),...traversed],roleIds);
+        if(c){c.representedNodeCount=t.nodeCount;c.memberNodeIds=t.reachableNodeIds;}
+      }
       for(const p of s.roleProjections??[]){
         if(!p.supportingExecutionIds.some(ctx.occurred))continue;
-        familyRoles=unique((s.roleProjections??[]).filter(q=>q.typeIds.some(id=>p.typeIds.includes(id))&&q.supportingExecutionIds.some(ctx.occurred)).flatMap(q=>q.roleIds));
-        familyNodeCount=graphSnapshot(s,ctx,null,selected,p.typeIds).nodeCount;
+        const whole=graphSnapshot(s,ctx,null,selected,p.typeIds);
+        familyRoles=whole.roleIds;familyNodeCount=whole.nodeCount;
         const t=graphSnapshot(s,ctx,p.roleIds,selected,p.typeIds);
         // Projections show observed relations. Missing unvisited fields are
         // still unknown, so topology is a suggestion, never an invariant proof.
@@ -238,7 +262,9 @@ export function recommendStructureViews(trace,{target,afterExecutionId,roleIds=n
       }
     }else if(s.kind==='queue-candidate'){
       const good=(s.operations??[]).filter(o=>ctx.occurred(o.completedAtExecutionId)&&o.status==='supported'),bad=(s.operations??[]).some(o=>ctx.occurred(o.completedAtExecutionId)&&o.status==='contradicted');
-      if(!bad&&['enqueue','dequeue'].every(k=>good.some(o=>o.kind===k)))offer(s,'queue',4,good.map(o=>o.completedAtExecutionId));
+      const unexplained=(s.assessment?.unexplainedAccessExecutionIds??[]).filter(id=>ctx.occurred(id));
+      if(!bad&&['enqueue','dequeue'].every(k=>good.some(o=>o.kind===k)))
+        offer(s,'queue',unexplained.length?1:4,good.map(o=>o.completedAtExecutionId),null,unexplained.length?'partial':'supported');
     }else if(s.kind==='index-tree'){
       const formulas=(s.formulaEvidence??[]).filter(f=>ctx.occurred(f.executionId));
       if(formulas.length&&!formulas.some(f=>f.status==='contradicted')){
@@ -307,29 +333,50 @@ export function recommendStructureViews(trace,{target,afterExecutionId,roleIds=n
     const canon=id=>id.replace(/^field:/,''),all=unique([...(family?.roleIds??[]),...c.familyRoleIds]),
       excluded=c.roleIds?all.filter(id=>!c.roleIds.some(r=>canon(r)===canon(id))):[],
       omitted=c.familyNodeCount===null||c.representedNodeCount==null?null:Math.max(0,c.familyNodeCount-c.representedNodeCount);
-    c.coverage={scope:c.containedRoot?'contained-root':excluded.length||omitted?'role-projection':'candidate',selectedRoleIds:c.roleIds,
-      excludedRoleIds:excluded,representedNodeCount:c.representedNodeCount??null,familyNodeCount:c.familyNodeCount,omittedNodeCount:omitted};
+    const omittedBytes=c.selectedStorageBytes===undefined?null:c.selectedStorageBytes-c.representedStorageBytes;
+    c.coverage={scope:c.containedRoot?'contained-root':omittedBytes>0?'storage-subrange':excluded.length||omitted?'role-projection':'candidate',selectedRoleIds:c.roleIds,
+      excludedRoleIds:excluded,representedNodeCount:c.representedNodeCount??null,familyNodeCount:c.familyNodeCount,omittedNodeCount:omitted,
+      selectedStorageBytes:c.selectedStorageBytes??null,representedStorageBytes:c.representedStorageBytes??null,omittedStorageBytes:omittedBytes};
+    if(['tree','binary-tree','bst'].includes(c.view)&&c.status==='supported'&&omitted===0){
+      const s=trace.structures.find(s=>s.id===c.candidateId),inverse=inverseRoleCoverage(ctx.state(s),c.roleIds,excluded,c.memberNodeIds);
+      if(inverse&&inverse.evidenceExecutionIds.every(ctx.occurred)){
+        c.coverage.auxiliaryInverseRoles=inverse;c.strength=Math.max(c.strength,5);
+        c.evidenceExecutionIds=unique([...c.evidenceExecutionIds,...inverse.evidenceExecutionIds]);
+      }
+    }
+    delete c.selectedStorageBytes;delete c.representedStorageBytes;
     delete c.familyRoleIds;delete c.familyNodeCount;
   }
   const sites=c=>Math.min(3,new Set(c.evidenceExecutionIds.map(id=>trace.events[ctx.positions.get(id)]?.instructionId??id)).size);
   const omission=c=>c.coverage.familyNodeCount>0&&c.coverage.omittedNodeCount!==null?c.coverage.omittedNodeCount/c.coverage.familyNodeCount:null;
   const order=(a,b)=>Number(b.exactRoot)-Number(a.exactRoot)||Number(a.containedRoot)-Number(b.containedRoot)||(a.coverage.omittedNodeCount>0)-(b.coverage.omittedNodeCount>0)||
-    (omission(a)!==null&&omission(b)!==null?omission(a)-omission(b):0)||b.strength-a.strength||sites(b)-sites(a)||compare(a.view,b.view)||compare(a.candidateId,b.candidateId)||compare(JSON.stringify(a.roleIds),JSON.stringify(b.roleIds));
+    (omission(a)!==null&&omission(b)!==null?omission(a)-omission(b):0)||(a.coverage.omittedStorageBytes>0)-(b.coverage.omittedStorageBytes>0)||
+    b.strength-a.strength||Number(a.coverage.excludedRoleIds.length>0)-Number(b.coverage.excludedRoleIds.length>0)||sites(b)-sites(a)||compare(a.view,b.view)||compare(a.candidateId,b.candidateId)||compare(JSON.stringify(a.roleIds),JSON.stringify(b.roleIds));
   candidates.sort(order);const views=new Map();for(const c of candidates){if(!views.has(c.view))views.set(c.view,{...c,alternatives:[]});views.get(c.view).alternatives.push(c);}
-  return [...views.values()].slice(0,STRUCTURE_RECOMMENDATION_LIMIT).map((c,i)=>({...c,rank:i+1,origin:'inferred',intent:'unconfirmed',rankingPolicy:'exact-root-selection-scope-node-coverage-behavior-strength-stable-id-v7'}));
+  return [...views.values()].slice(0,STRUCTURE_RECOMMENDATION_LIMIT).map((c,i)=>({...c,rank:i+1,origin:'inferred',intent:'unconfirmed',rankingPolicy:'exact-root-selection-node-storage-role-coverage-behavior-stable-id-v8'}));
 }
 
-export function resolveStructurePresentation(trace,{target,afterExecutionId,preferences,slot='primary',roleIds=null}={}){
+export function resolveStructurePresentation(trace,{target,afterExecutionId,preferences,slot='primary',roleIds=null,relationLimits={},plan=null}={}){
   const binding=targetOf(trace,target),id=key(binding,slot),run=scope(trace),
-    chosen=entries(preferences).find(x=>sameScope(x.scope,run)&&x.key===id),
-    recommendations=recommendStructureViews(trace,{target:binding,afterExecutionId,roleIds:chosen?chosen.roleIds:roleIds}),best=recommendations[0],
+    resolved=entries(preferences).filter(x=>sameScope(x.scope,run)&&x.slot===slot).map(original=>({original,result:reconnectStructureSetting(trace,original,{plan,afterExecutionId})})),
+    matches=resolved.filter(x=>x.original.key===id||x.result.status==='connected'&&x.result.setting.key===id||x.result.status==='reconnect-needed'&&matchesReconnectedTarget(trace,x.original,id,{plan,afterExecutionId})),
+    selected=matches.length===1?matches[0]:null,
+    reconnection=matches.length>1?{status:'reconnect-needed',diagnostics:[{code:'conflicting-user-settings'}]}:selected?.result,
+    blocked=reconnection?.status==='reconnect-needed',chosen=selected?(blocked?selected.original:selected.result.setting):null,
+    resolvedTarget=chosen&&!blocked?chosen.target:binding,
+    recommendations=recommendStructureViews(trace,{target:resolvedTarget,afterExecutionId,roleIds:chosen?chosen.roleIds:roleIds}),best=recommendations[0],
     expected=chosen?chosen.expected:best?.expected,
-    check=expected?queryStructureConditions(trace,{target:binding,afterExecutionId,expected,
-      candidateId:chosen?null:best?.candidateId,roleIds:chosen?chosen.roleIds:best?.roleIds??roleIds,bindings:chosen?.conditionBindings}):null;
-  return {target:binding,slot,mode:chosen?'manual':'auto',source:chosen?'user':best?'candidate':'fallback',locked:!!chosen,
-    view:chosen?.view??best?.view??'boxes',roleIds:chosen?(chosen.roleIds?[...chosen.roleIds]:null):best?.roleIds??null,
+    check=expected&&!blocked?queryStructureConditions(trace,{target:resolvedTarget,afterExecutionId,expected,
+      candidateId:chosen?null:best?.candidateId,roleIds:chosen?chosen.roleIds:best?.roleIds??roleIds,bindings:chosen?.conditionBindings,
+      relationBinding:chosen?.relationBinding,relationLimits,conditionRules:chosen?.conditionRules}):null,
+    relationView=chosen&&(chosen.relationBinding||chosen.roleIds?.length)&&!blocked?(check?{afterExecutionId:check.candidates[0]?.relation.afterExecutionId??afterExecutionId,relations:check.candidates.map(c=>c.relation)}:
+      queryStructureRelations(trace,{target:resolvedTarget,afterExecutionId,roleIds:chosen.roleIds,relationBinding:chosen.relationBinding,relationLimits})):null;
+  return {target:resolvedTarget,slot,mode:chosen?'manual':blocked?'reconnect-needed':'auto',source:chosen||blocked?'user':best?'candidate':'fallback',locked:!!chosen||blocked,
+    view:chosen?.view??(blocked?'boxes':best?.view)??'boxes',roleIds:chosen?(chosen.roleIds?[...chosen.roleIds]:null):best?.roleIds??null,
     expected:chosen?chosen.expected:best?.expected??null,recommendations,recommendationLimit:STRUCTURE_RECOMMENDATION_LIMIT,
     inferredCandidateId:chosen?null:best?.candidateId??null,
     contractPolicy:chosen?'selected-view-only; no inherited inferred subtype constraints':'selected-candidate-only',
-    ...(check?{expectationCheck:check}:{})};
+    ...(reconnection?{reconnection:{status:reconnection.status,objectMappings:reconnection.objectMappings??[],recordMappings:reconnection.recordMappings??[],roleMappings:reconnection.roleMappings??[],fieldMappings:reconnection.fieldMappings??[],evidence:reconnection.evidence??[],diagnostics:reconnection.diagnostics??[]}}:{}),
+    pendingReconnections:structuredClone((preferences?.pending??[]).filter(p=>sameScope(p.scope,run))),
+    ...(check?{expectationCheck:check}:{}),...(relationView?{relationView}:{})};
 }

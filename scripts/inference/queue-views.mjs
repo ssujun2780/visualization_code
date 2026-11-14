@@ -72,6 +72,12 @@ export function queueStructures(plan,trace){
     }
     for(const id of update?.dataInputs??[]){const found=search(id);if(found)return found;}return null;
   }
+  const frameEnds=new Map(),missingDependencyPrefix=[0],operationCache=new Map();
+  for(const [index,e]of events.entries()){
+    if(e.action==='frame.end')frameEnds.set(e.activationId??e.frameId,e);
+    missingDependencyPrefix.push(missingDependencyPrefix[index]+Number((e.dataInputs??[]).some(id=>!byEvent.has(id))));
+  }
+  const lifetime=id=>{const o=byObject.get(id);return [byEvent.get(o?.createdBy)?.index??Infinity,byEvent.get(o?.endedBy)?.index??Infinity];};
   const results=[];
   for(const array of arrays.values()){
     const own=accesses.filter(a=>a.target.arrayId===array.id),readKeys=unique(own.filter(a=>a.direction==='read').map(a=>a.cursorKey)),
@@ -80,18 +86,22 @@ export function queueStructures(plan,trace){
       if(frontKey===backKey)continue;
       const compare=comparisons.filter(c=>(key(c.left)===frontKey&&key(c.right)===backKey&&c.operator!=='>' )||
         (key(c.left)===backKey&&key(c.right)===frontKey&&c.operator!=='<'));
-      if(!compare.length)continue;
       const frontAccesses=own.filter(a=>a.direction==='read'&&a.cursorKey===frontKey),backAccesses=own.filter(a=>a.direction==='write'&&a.cursorKey===backKey),
         offsets=unique([...frontAccesses,...backAccesses].map(a=>a.indexOffset));
       if(offsets.length!==1)continue;
       const offset=offsets[0],front=frontAccesses[0].cursor,back=backAccesses[0].cursor;
       if(!byObject.has(front.objectId)||!byObject.has(back.objectId))continue;
+      const fl=lifetime(front.objectId),bl=lifetime(back.objectId);
+      if(Math.max(fl[0],bl[0])>=Math.min(fl[1],bl[1]))continue;
       function operations(list,role){
-        return list.map((a,i)=>{
+        const cacheKey=JSON.stringify([array.id,role,list[0]?.cursorKey]);
+        if(operationCache.has(cacheKey))return operationCache.get(cacheKey);
+        const result=list.map((a,i)=>{
           const start=byEvent.get(a.cursorReadExecutionId).index,at=byEvent.get(a.executionId).index,
             next=i+1<list.length?byEvent.get(list[i+1].cursorReadExecutionId).index:Infinity;
           const accessEvent=byEvent.get(a.executionId).event,
-            closure=events.find(e=>e.action==='frame.end'&&e.activationId===accessEvent.activationId&&byEvent.get(e.eventId).index>at);
+            end=frameEnds.get(accessEvent.activationId),
+            closure=end&&byEvent.get(end.eventId).index>at?end:null;
           // The update may precede the array access (postfix lowering) or
           // follow it as a separate statement. Preserve both observed times.
           const writeList=writes.get(a.cursorKey)??[],following=writeList[firstAfter(writeList,start)],
@@ -99,7 +109,7 @@ export function queueStructures(plan,trace){
               (!closure||byEvent.get(following.eventId).index<byEvent.get(closure.eventId).index)?following:null;
           // A completed read-only activation is a peek, not an unfinished
           // removal. Incomplete/dangling observations cannot prove a peek.
-          const intact=closure&&events.slice(start,byEvent.get(closure.eventId).index+1).every(e=>(e.dataInputs??[]).every(id=>byEvent.has(id))),
+          const intact=closure&&missingDependencyPrefix[byEvent.get(closure.eventId).index+1]===missingDependencyPrefix[start],
             peek=role==='front'&&!update&&intact;
           const after=number(update?.value),origin=updateOrigin(update,a),
             status=!update||after===null?'partial':after!==a.cursorValue+1?'contradicted':origin?'supported':'partial';
@@ -113,6 +123,7 @@ export function queueStructures(plan,trace){
             reason:!update?'missing-update':after===null?'unobserved-update-value':after!==a.cursorValue+1?'unexpected-cursor-progress':!origin?'unproven-update-origin':null,
             evidence:'observed array access and cursor write; supported updates retain value dependency on the same cursor version',sourceNodeIds:a.sourceNodeIds};
         });
+        operationCache.set(cacheKey,result);return result;
       }
       const ops=[...operations(frontAccesses,'front'),...operations(backAccesses,'back')].sort((a,b)=>byEvent.get(a.accessExecutionId).index-byEvent.get(b.accessExecutionId).index);
       if(!ops.some(o=>o.kind==='dequeue'&&o.status==='supported')||!ops.some(o=>o.kind==='enqueue'&&o.status==='supported'))continue;
@@ -120,6 +131,20 @@ export function queueStructures(plan,trace){
         copyReads=new Set((work.transfers??[]).filter(t=>t.target?.arrayId&&t.wholeElement).map(t=>t.readExecutionId)),
         onlyCopies=consumption.every(o=>copyReads.has(o.accessExecutionId)),
         coveredAccesses=new Set(ops.map(o=>o.accessExecutionId)),unexplained=own.filter(a=>!coveredAccesses.has(a.executionId)).map(a=>a.executionId);
+      // A comparison is one form of evidence, not a required coding idiom.
+      // Match removals to the oldest still pending insertion by storage and
+      // observed writer identity. Equal payloads alone never prove FIFO.
+      const fifoProofs=[],fifoViolations=[],pending=[];
+      for(const op of ops.filter(o=>o.status==='supported')){
+        if(op.kind==='enqueue'){pending.push(op);continue;}
+        if(op.kind!=='dequeue')continue;
+        const expected=pending.shift(),read=byEvent.get(op.accessExecutionId).event,
+          write=expected&&byEvent.get(expected.accessExecutionId).event;
+        if(expected&&expected.index===op.index&&key(write.target)===key(read.target)&&read.dataInputs?.includes(write.eventId))
+          fifoProofs.push({enqueueExecutionId:write.eventId,dequeueExecutionId:read.eventId,index:op.index,completedAtExecutionId:op.completedAtExecutionId});
+        else fifoViolations.push(op.completedAtExecutionId);
+      }
+      if(!compare.length&&(!fifoProofs.length||onlyCopies||frontAccesses[0].cursorValue!==backAccesses[0].cursorValue))continue;
       const changes=new Set([...writes.get(frontKey)??[],...writes.get(backKey)??[]].map(e=>e.eventId));
       for(const o of ops){changes.add(o.accessExecutionId);if(o.updateExecutionId)changes.add(o.updateExecutionId);}
       for(const c of compare)changes.add(c.executionId);
@@ -143,7 +168,7 @@ export function queueStructures(plan,trace){
         const pending=[...pendingOperations.values()];
         const start=frontValue===null?null:frontValue+offset,end=backValue===null?null:backValue+offset,
           valid=start!==null&&end!==null&&start>=0&&end>=start&&end<=array.capacity,
-          mismatch=contradictions.get(i)??[],
+          mismatch=[...contradictions.get(i)??[],...(!compare.length?fifoViolations.filter(id=>byEvent.get(id).index<=i):[])],
           ended=endedBy.some(id=>byEvent.get(id)?.index<=i),status=ended?'ended':pending.some(o=>['unproven-update-origin','unobserved-update-value'].includes(o.reason))?'partial':pending.length?'intermediate':start===null||end===null?'partial':!valid||mismatch.length?'contradicted':'supported';
         states.push({executionId:e.eventId,status,front:frontValue,back:backValue,capacity:array.capacity,
           activeRange:start===null||end===null?null:{start,end,interval:'half-open',valid},
@@ -152,7 +177,7 @@ export function queueStructures(plan,trace){
           validityScope:'observed cursor interval and completed endpoint operations; not proof of queue intent or all slot initialization',
           physicalValues:'unchanged; refer to the array storage at this execution'});
       }
-      const supporting=['dequeue','enqueue'].map(kind=>ops.find(o=>o.kind===kind&&o.status==='supported').completedAtExecutionId).concat(compare[0].executionId),
+      const supporting=['dequeue','enqueue'].map(kind=>ops.find(o=>o.kind===kind&&o.status==='supported').completedAtExecutionId).concat(compare.length?[compare[0].executionId]:[fifoProofs[0].completedAtExecutionId]),
         inferredAt=supporting.reduce((a,b)=>byEvent.get(a).index>byEvent.get(b).index?a:b);
       results.push({id:`queue:${array.id}:${frontKey}:${backKey}`,kind:onlyCopies?'cursor-interval-candidate':'queue-candidate',
         views:onlyCopies?['array-cursor-interval']:['fifo-candidate'],classification:'candidate',origin:'inferred',intent:'unconfirmed',
@@ -161,8 +186,8 @@ export function queueStructures(plan,trace){
           contradictingExecutionIds:ops.filter(o=>o.status==='contradicted').map(o=>o.accessExecutionId),
           unexplainedAccessExecutionIds:unexplained,consumption:onlyCopies?'array copies do not establish logical removal':'endpoint access/update candidate'},
         arrayId:array.id,objectId:array.objectId,range:array.range,elementBytes:array.elementBytes,capacity:array.capacity,nodes:array.nodes??[],edges:[],
-        roles:{front,back,indexOffset:offset},inferredAtExecutionId:inferredAt,operations:ops,comparisons:compare,states,
-        evidence:['compiler array-index identities','recorded cursor reads and writes','executed comparison between cursor storage'],
+        roles:{front,back,indexOffset:offset},inferredAtExecutionId:inferredAt,operations:ops,comparisons:compare,fifoProofs,states,
+        evidence:['compiler array-index identities','recorded cursor reads and writes',compare.length?'executed comparison between cursor storage':'observed FIFO insertion-write provenance'],
         limitations:['linear cursors only; wraparound and prefix-index conventions remain unclassified','candidate does not establish user intent','incomplete updates remain intermediate; invalid states are not repaired']});
     }
   }

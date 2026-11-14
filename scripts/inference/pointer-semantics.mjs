@@ -47,13 +47,15 @@ export function pointerPartitionStructures(plan,trace,{maxStates=2048}={}){
 // Shared reachable storage is a fact; persistence/immutability is not implied.
 export function sharedRecordStructures(plan,trace,{maxStates=2048}={}){
  const c=recordEvidence(plan,trace),states=[],proofs=[],history=stateHistoryCoverage(maxStates);
- for(const e of c.events){if(!['WRITE','SPACE'].includes(e.kind))continue;const at=c.pos.get(e.eventId),edges=c.edgesAt(at),roots=edges.filter(x=>!x.recordFrom&&x.recordTo&&c.objects.find(o=>o.id===x.source.objectId)?.cType?.kind==='pointer');
+ const objectById=new Map(c.objects.map(o=>[o.id,o]));let graph=null,adjacency=new Map(),reachCache=new Map();
+ for(const e of c.events){if(!['WRITE','SPACE'].includes(e.kind))continue;const at=c.pos.get(e.eventId),edges=c.edgesAt(at),roots=edges.filter(x=>!x.recordFrom&&x.recordTo&&objectById.get(x.source.objectId)?.cType?.kind==='pointer');
+  if(graph!==edges){graph=edges;adjacency=new Map();reachCache=new Map();for(const x of edges)if(x.recordFrom&&x.recordTo){if(!adjacency.has(x.recordFrom))adjacency.set(x.recordFrom,[]);adjacency.get(x.recordFrom).push(x.recordTo);}}
   // A partial reachability prefix must never be reported as the exact shared
   // set. The inference worker's deadline handles excessive work independently.
-  const reach=id=>{const seen=new Set(),pending=[id];while(pending.length){const n=pending.pop();if(seen.has(n))continue;seen.add(n);pending.push(...edges.filter(x=>x.recordFrom===n&&x.recordTo).map(x=>x.recordTo));}return seen;};
+  const reach=id=>{if(reachCache.has(id))return reachCache.get(id);const seen=new Set(),pending=[id];while(pending.length){const n=pending.pop();if(seen.has(n))continue;seen.add(n);pending.push(...adjacency.get(n)??[]);}reachCache.set(id,seen);return seen;};
   const pairs=[];for(let i=0;i<roots.length;i++)for(let j=i+1;j<roots.length;j++){const a=roots[i],b=roots[j];if(a.recordTo===b.recordTo)continue;
    // Stable peer handles, not a recursive call's temporary traversal cursors.
-   const oa=c.objects.find(o=>o.id===a.source.objectId),ob=c.objects.find(o=>o.id===b.source.objectId);if(oa.frameId!==ob.frameId)continue;
+   const oa=objectById.get(a.source.objectId),ob=objectById.get(b.source.objectId);if(oa.frameId!==ob.frameId)continue;
    const ra=reach(a.recordTo),rb=reach(b.recordTo),shared=[...ra].filter(id=>rb.has(id));if(!shared.length||ra.has(b.recordTo)||rb.has(a.recordTo))continue;
    pairs.push({rootSlots:[a.source,b.source],rootNodeIds:[a.recordTo,b.recordTo],sharedNodeIds:shared,exclusiveNodeIds:[[...ra].filter(id=>!rb.has(id)),[...rb].filter(id=>!ra.has(id))],evidenceExecutionIds:unique([a.lastObservationExecutionId,b.lastObservationExecutionId,...edges.filter(x=>ra.has(x.recordFrom)||rb.has(x.recordFrom)).map(x=>x.lastObservationExecutionId)])});
   }
@@ -61,5 +63,5 @@ export function sharedRecordStructures(plan,trace,{maxStates=2048}={}){
   if(e.action==='copy'&&c.recordAt(e.target,at)&&c.recordAt({objectId:e.sourceObjectId,offset:e.sourceOffset,size:e.sourceSize},at-1))proofs.push({writeExecutionId:e.eventId,target:e.target,source:{objectId:e.sourceObjectId,offset:e.sourceOffset,size:e.sourceSize}});
   appendStateSnapshot(states,{afterExecutionId:e.eventId,alive:!!pairs.length,status:pairs.length?'supported-observed':'no-current-sharing',pairs,evidenceExecutionIds:unique(pairs.flatMap(p=>p.evidenceExecutionIds))},history);
  }
- return states.length?[{id:'shared-record-substructures',kind:'shared-substructure-candidate',intent:'unconfirmed',nodes:[],edges:[],states,copyEvidence:proofs,discoveredAtExecutionId:history.firstStateExecutionId,coverage:history,limitations:['shared storage identity does not prove persistence or immutability','root handles must be live peers in the same frame or static storage']}]:[];
+ return states.length?[{id:'shared-record-substructures',kind:'shared-substructure-candidate',sharingScope:'all-observed-peer-roots',intent:'unconfirmed',nodes:[],edges:[],states,copyEvidence:proofs,discoveredAtExecutionId:history.firstStateExecutionId,coverage:history,limitations:['shared storage identity does not prove persistence or immutability','root handles must be live peers in the same frame or static storage']}]:[];
 }

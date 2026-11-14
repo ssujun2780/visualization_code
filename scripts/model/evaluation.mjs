@@ -47,7 +47,10 @@ export function evaluationBindings(observations,nearest,nodes=[]){
     }
     return byNode.get(o?.semanticNodeId)??owners.get(o?.id)??(o&&nearest(o));
   };
-  for(const o of observations.instructions.filter(o=>o.opcode==='phi'&&o.type==='i1'&&!result.has(o.id))){
+  // Even a PHI already identified through zext needs all of its CFG operand
+  // evidence. Identity discovery and dependency discovery are separate steps.
+  for(const o of observations.instructions.filter(o=>o.opcode==='phi'&&o.type==='i1'&&
+    (!result.has(o.id)||result.get(o.id).role==='result'&&evaluationKind(result.get(o.id).node)==='logical'))){
     if(o.incoming.length===2){
       const candidates=[...new Set(o.incoming.flatMap(i=>{
         const d=decisions.get(`${o.functionId}:${i.block}`);if(!d||evaluationKind(d.node)!=='logical')return [];
@@ -55,7 +58,7 @@ export function evaluationBindings(observations,nearest,nodes=[]){
         return i.value===constant&&d.op.destinations.includes(o.block)?[d.node]:[];
       }))];
       if(candidates.length===1&&o.incoming.every(i=>['false','true'].includes(i.value)||contains(candidates[0],valueNode(producer(o,i))))){
-        mark(o,candidates[0],'result');continue;
+        mark(o,candidates[0],'result');
       }
     }
     const incoming=o.incoming.map(input=>{
@@ -128,7 +131,7 @@ const conditionalEvaluation=(spec,state)=>{
     skipped:selected==='true'?'false':selected==='false'?'true':null,decisionObservationId:state?.decisionId??null};
 };
 export function createEvaluationTracker(plan,operandValue){
-  const states=new Map(),decisions=new Map(),completedPhis=new Map(),specs=new Map((plan.evaluations??[]).map(s=>[s.nodeId,s]));let decisionOrder=0;
+  const states=new Map(),decisions=new Map(),completedPhis=new Map(),completedValues=new Map(),specs=new Map((plan.evaluations??[]).map(s=>[s.nodeId,s]));let decisionOrder=0;
   function completeConditional(e,nodeId,conditionTruth=truth(e.condition)){
     const spec=specs.get(nodeId),state={truth:conditionTruth,decisionId:e.eventId};
     states.set(`${e.activationId}:${nodeId}`,state);
@@ -139,7 +142,7 @@ export function createEvaluationTracker(plan,operandValue){
   return {
     completeConditional,
     decorate(e,op,b){
-      if(e.action==='frame.end')for(const table of [states,decisions,completedPhis])for(const k of table.keys())if(k.startsWith(`${e.activationId}:`))table.delete(k);
+      if(e.action==='frame.end')for(const table of [states,decisions,completedPhis,completedValues])for(const k of table.keys())if(k.startsWith(`${e.activationId}:`))table.delete(k);
       if(!b?.evaluation)return e;
       const {nodeId,role}=b.evaluation,spec=specs.get(nodeId);if(!spec)return e;
       const key=`${e.activationId}:${nodeId}`;
@@ -150,6 +153,12 @@ export function createEvaluationTracker(plan,operandValue){
         return {...e,evaluation:{...state,nodeId,kind:spec.kind}};
       }
       if(role==='truth-test')return e;
+      const materialized=role==='result'&&op.opcode==='zext'&&completedValues.get(`${e.activationId}:${op.inputs?.[0]?.value}`);
+      if(materialized?.evaluation?.nodeId===nodeId&&materialized.eventId===operandValue(op.inputs[0],e.activationId)?.observationId){
+        const result={...e,value:cResult(e.value,spec.cType,true),evaluation:materialized.evaluation,
+          ...(materialized.helpMarker?{helpMarker:materialized.helpMarker}:{})};
+        completedValues.set(`${e.activationId}:${op.result}`,result);return result;
+      }
       let state=states.get(key),leftTruth=state?.truth??spec.leftTruth??null;
       const edge=role==='result'&&op.opcode==='phi'&&b.evaluation.phiIncoming?.find(i=>
         i.block===e.selectedInput?.block&&i.value===e.selectedInput?.value);
@@ -173,10 +182,12 @@ export function createEvaluationTracker(plan,operandValue){
       const helpMarker=skip?{kind:'logical-short-circuit',status:'stub',reason,evaluationNodeId:nodeId,
         highlight:spec.source,skippedSource:spec.right.source}:undefined;
       const value=role==='folded'?e.observedConsumerValue:e.value;
-      return {...e,value:spec.kind==='logical'?cResult(value,spec.cType,true):value,evaluation,
+      const result={...e,value:spec.kind==='logical'?cResult(value,spec.cType,true):value,evaluation,
         ...(op.opcode==='select'&&spec.kind==='conditional'?{backendCondition:selectCondition,
           condition:cResult(selectCondition,spec.truthType,true),selectedOutcome:evaluation.selected}:{}),
         ...(helpMarker?{helpMarker}:{}),controlInputs:[...new Set([...(e.controlInputs??[]),state?.decisionId].filter(id=>id&&id!==e.eventId))]};
+      if(role==='result'&&op.result)completedValues.set(`${e.activationId}:${op.result}`,result);
+      return result;
     }
   };
 }

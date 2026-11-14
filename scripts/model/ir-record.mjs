@@ -11,6 +11,7 @@ import {orderReturnCleanup,remapExecutionReferences} from './return-sequence.mjs
 import {resolvedCoverage} from './coverage-resolution.mjs';
 import {attachConversionConsumers} from './conversion-consumers.mjs';
 import {createObservationResolver,createAliasResolver} from './observation-dependencies.mjs';
+import {addressOriginKeys} from '../shared/address-origin.mjs';
 const unique=list=>[...new Set(list.filter(Boolean))];
 const sourceBoolean=(value,spec)=>{const bit=BigInt(value.bits)!==0n,source=spec.invert?!bit:bit;
   return cResult({...value,bits:source?'0x1':'0x0',evidence:'AST truth mapped from observed LLVM boolean',
@@ -26,6 +27,7 @@ const copyFields=['target','value','memoryState','previousMemoryState','sourceAd
 
 export function recordIR(plan,observations,raw) {
   const instructions=new Map(plan.instructions.map(i=>[i.id,i])),ops=new Map(observations.instructions.map(o=>[o.id,o])),rawEvents=new Map(raw.events.map(e=>[e.eventId,e])),
+    rawObjects=new Map(raw.objects.map(o=>[o.id,o])),
     definitions=new Map(),rawToExecution=new Map(),aliases=new Map(),aliasRoles=new Map(),events=[],executions=new Map(),attempts=new Map(),gaps=new Set(),
     pendingArguments=new Map(),cleanup=new Map(),calls=new Map(),callBySite=new Map(),activeCalls=[],frameCalls=new Map(),
     pendingStorage=new Map(),storageEvents=new Map(),hiddenObjects=new Set(),declarationReentries=[],returnSources=new Map(),foldedResults=new Map(),
@@ -78,6 +80,14 @@ export function recordIR(plan,observations,raw) {
     while(pending){
       const ids=new Set(pending.events.map(s=>s.eventId));
       if(belongsToPendingExpression(e)&&!(e.addressInputs??[]).some(id=>ids.has(id)))break;
+      flushCurrent();pending=suspended.pop()??null;
+    }
+  }
+  function finishBeforeWrite(e){
+    while(pending){
+      // Commit the mutation's calculation, while keeping its enclosing source
+      // expression pending. A WRITE is a boundary, not that parent's result.
+      if(belongsToPendingExpression(e)&&instructions.get(pending.instructionId)?.sourceNodeId!==instructions.get(role(e))?.sourceNodeId)break;
       flushCurrent();pending=suspended.pop()??null;
     }
   }
@@ -585,7 +595,7 @@ export function recordIR(plan,observations,raw) {
       // not depend on the completed value. Do not sort by source line: two
       // expressions can share a line, and loops reuse the same source nodes.
       finishBeforeRead(e);
-    }else if(e.action==='call.begin')holdForCall(e);else flushPending();
+    }else if(e.action==='call.begin')holdForCall(e);else if(e.kind==='WRITE')finishBeforeWrite(e);else flushPending();
     if(e.kind==='WRITE'&&e.action==='output'){
       emitOutput(e,ordered[index-1]);
     }else if(e.action==='call.begin'){
@@ -647,6 +657,34 @@ export function recordIR(plan,observations,raw) {
   const boundary=(id,actions)=>{const direct=rawToExecution.get(id),e=executions.get(direct);return e?.kind==='FLOW'&&actions.includes(e.action)?direct:null;};
   for(const command of events){
     const dependency=createObservationResolver({rawToExecution,executions,aliases,aliasRoles,valueForwardings,rawEvents,eventOrder},command);
+    const preserveAddressOrigin=input=>{
+      const observed=rawEvents.get(input.observationId),op=ops.get(observed?.instructionId);
+      if(op?.action!=='address'||!plan.bindings[op.id]?.administrative){
+        if(input.observationId||input.executionId||!input.value?.reference?.targetObjectId)return false;
+        const call=command.action==='call'?command:executions.get(command.callExecutionId),
+          callObservationId=call?.observationIds.find(id=>rawEvents.get(id)?.action==='call.begin'),callOp=ops.get(rawEvents.get(callObservationId)?.instructionId),
+          object=rawObjects.get(input.value.reference.targetObjectId);
+        if(!callObservationId||!callOp||!object)return false;
+        input.addressOrigin={schemaVersion:1,kind:'observed-address',observationKind:'call-argument',observationId:callObservationId,instructionId:callOp.id,
+          observedAt:{executionId:call.eventId},parameterIndex:input.parameterIndex,evidence:'address observed in actual call argument',
+          dataInputs:[],addressInputs:dependency(object.createdBy,'addressInputs').filter(id=>id!==command.eventId),controlInputs:[],calleeInputs:[]};
+        input.executionId=null;
+        command.addressInputs=unique([...command.addressInputs,...input.addressOrigin.addressInputs]);return true;
+      }
+      const related={},origin={schemaVersion:1,kind:'observed-address',observationKind:'elided-calculation',observationId:input.observationId,instructionId:op.id,
+        evidence:'observed address folded into consumer'};
+      // Resolve the intrinsic roles once. Asking for 'controlInputs' would
+      // reinterpret the entire expression as a condition, inventing control.
+      origin.dataInputs=dependency(input.observationId,'dataInputs',related).filter(id=>id!==command.eventId);
+      for(const key of addressOriginKeys)origin[key]=unique([...origin[key]??[],...related[key]??[]]).filter(id=>id!==command.eventId);
+      const storageBases=origin.dataInputs.filter(id=>executions.get(id)?.action==='object.begin');
+      origin.dataInputs=origin.dataInputs.filter(id=>!storageBases.includes(id));origin.addressInputs=unique([...origin.addressInputs,...storageBases]);
+      input.addressOrigin=origin;input.executionId=null;
+      if(observed.value?.reference)input.value={...input.value,reference:structuredClone(observed.value.reference)};
+      command.addressInputs=unique([...command.addressInputs,...origin.addressInputs]);
+      command.controlInputs=unique([...command.controlInputs,...origin.controlInputs]);
+      return true;
+    };
     const related={};
     for(const key of references)command[key]=unique(command[key].flatMap(id=>dependency(id,key,related))).filter(id=>id!==command.eventId);
     for(const key of references)command[key]=unique([...command[key],...related[key]??[]]).filter(id=>id!==command.eventId);
@@ -667,17 +705,13 @@ export function recordIR(plan,observations,raw) {
     }
     for(const input of command.inputs??[])if(input.observationId){input.executionId=resolve(input.observationId)[0]??null;
       const privateOp=ops.get(rawEvents.get(input.observationId)?.instructionId),producer=executions.get(input.executionId);
-      if(privateOp?.action==='address'&&plan.bindings[privateOp.id]?.administrative){
-        // The hidden address has no public value-producing event. Do not name
-        // its first base/index dependency as if it had produced this address.
-        input.executionId=null;const related={};
-        command.addressInputs=unique([...command.addressInputs,...dependency(input.observationId,'addressInputs',related)]);
-        command.controlInputs=unique([...command.controlInputs,...related.controlInputs??[]]);
-      }
+      // Never name the hidden address's first dependency as its value producer.
+      preserveAddressOrigin(input);
       if(command.kind==='CALC'&&!rawToExecution.has(input.observationId)&&privateOp?.opcode==='bitcast'&&(producer?.value?.bits||producer?.value?.address)){
         input.backendValue=input.value;input.value=producer.value;
       }
     }
+    for(const input of command.inputs??[])if(!input.observationId)preserveAddressOrigin(input);
     if(command.kind==='CALC'){const seen=new Set();command.inputs=(command.inputs??[]).filter(input=>{
       if(!input.executionId)return true;if(seen.has(input.executionId))return false;seen.add(input.executionId);return true;
     });}
@@ -687,11 +721,11 @@ export function recordIR(plan,observations,raw) {
       if(item.resultObservationId)item.resultExecutionIds=unique(observationInputs(item.resultObservationId)
         .flatMap(input=>input.observationId?resolve(input.observationId):[]));
     }
-    for(const step of command.steps??[])for(const input of step.inputs??[])if(input.observationId)input.executionId=resolve(input.observationId)[0]??null;
+    for(const step of command.steps??[])for(const input of step.inputs??[])if(input.observationId){input.executionId=resolve(input.observationId)[0]??null;preserveAddressOrigin(input);}
     for(const region of command.readRegions??[])if(region.dataInputs)region.dataInputs=unique(region.dataInputs.flatMap(id=>resolve(id))).filter(id=>id!==command.eventId);
     for(const region of [...command.streamReadRegions??[],...command.libraryReadRegions??[]])region.dataInputs=unique(region.dataInputs.flatMap(id=>resolve(id))).filter(id=>id!==command.eventId);
   }
-  const executionIds=orderReturnCleanup(events,buildResultDeliveries(plan,{events}),plan);
+  const executionIds=orderReturnCleanup(events,buildResultDeliveries(plan,{events}),plan,{running:raw.status==='running'});
   remapExecutionReferences(control.transitions,executionIds);
   for(const [id,executionId]of rawToExecution)rawToExecution.set(id,executionIds.get(executionId)??executionId);
   executions.clear();for(const e of events)executions.set(e.eventId,e);

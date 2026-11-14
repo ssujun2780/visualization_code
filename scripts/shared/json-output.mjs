@@ -5,21 +5,21 @@ import {pipeline} from 'node:stream/promises';
 // Shared artifact writer: no dependency on either model.
 // Stream JSON-compatible artifacts without constructing one giant string.
 // Backpressure bounds the write queue; the trace itself remains in memory.
-function* tokens(value,depth=0){
+function* tokens(value,depth=0,pretty=true){
   if(value===null||typeof value!=='object'){yield JSON.stringify(value)??'null';return;}
   const array=Array.isArray(value),keys=array?null:Object.keys(value).filter(k=>value[k]!==undefined&&typeof value[k]!=='function'&&typeof value[k]!=='symbol'),
     length=array?value.length:keys.length;
   yield array?'[':'{';
   for(let i=0;i<length;i++){
-    yield `${i?',':''}\n${'  '.repeat(depth+1)}`;
-    if(!array)yield JSON.stringify(keys[i])+': ';
-    yield* tokens(value[array?i:keys[i]],depth+1);
+    yield `${i?',':''}${pretty?'\n'+'  '.repeat(depth+1):''}`;
+    if(!array)yield JSON.stringify(keys[i])+(pretty?': ':':');
+    yield* tokens(value[array?i:keys[i]],depth+1,pretty);
   }
-  if(length)yield '\n'+'  '.repeat(depth);
+  if(length&&pretty)yield '\n'+'  '.repeat(depth);
   yield array?']':'}';
 }
 function* chunks(parts){let chunk='';for(const part of parts){chunk+=part;if(chunk.length>=65536){yield chunk;chunk='';}}if(chunk)yield chunk;yield '\n';}
-export async function writeJSON(path,value){await pipeline(Readable.from(chunks(tokens(value))),createWriteStream(path));}
+export async function writeJSON(path,value,{pretty=true}={}){await pipeline(Readable.from(chunks(tokens(value,0,pretty))),createWriteStream(path));}
 export async function writeJSONLines(path,events){
   function* lines(){for(const event of events)yield JSON.stringify(event)+'\n';}
   await pipeline(Readable.from(lines()),createWriteStream(path));

@@ -1,6 +1,7 @@
 import {sequenceEvidence,unwrap,key,contains,num} from './sequence-evidence.mjs';
 import {sequenceConditions} from './sequence-conditions.mjs';
 import {validateStateHistory} from './state-history.mjs';
+import {sequenceSource} from './sequence-source.mjs';
 export function validateSequenceLookups(plan,trace){
  const candidates=trace.structures.filter(s=>s.kind==='sequence-lookup-candidate');if(!candidates.length)return;
  const historyPositions=new Map(trace.events.map((e,i)=>[e.eventId,i]));
@@ -11,7 +12,7 @@ export function validateSequenceLookups(plan,trace){
    event=id=>{need(byId.has(id),'사건');return byId.get(id);},
    range=r=>{const o=objects.get(r?.objectId);need(o&&Number.isSafeInteger(r.offset)&&r.offset>=0&&r.size>0&&r.offset+r.size<=o.size,'저장 범위');},
    equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b),stateAt=(s,at)=>s.states.findLast(s=>pos.get(s.afterExecutionId)<=at);
- for(const s of candidates){const source=sources.get(s.sourceStructureId);need(source&&s.intent==='unconfirmed','원본 관계와 의도');
+ for(const s of candidates){const source=sequenceSource(sources.get(s.sourceStructureId));need(source&&s.intent==='unconfirmed','원본 관계와 의도');
    event(s.discoveredAtExecutionId);
    for(const p of s.selectionEvidence){const input=event(p.inputReadExecutionId),a=advance(input,p.kind==='compared-segment'?p.observedLength:null);
      need(a&&a.cursorReadExecutionId===p.cursorReadExecutionId&&a.advanceExecutionId===p.advanceExecutionId&&a.bytes===p.bytes,'입력 이동 출처');
@@ -22,6 +23,14 @@ export function validateSequenceLookups(plan,trace){
        if(source.kind==='table-row-graph-candidate'){
          const array=trace.structures.find(a=>a.kind==='array'&&key(a.range)===key(source.range)),column=((access.target.offset-array.range.offset)%array.elementBytes)/access.target.size;
          need(contains(array.range,access.target)&&p.roleId===`${array.id}:column:${column}`,'문자 열');
+       }else if(source.kind==='record-index-graph-candidate'){
+         const base=stateAt(source,pos.get(p.slotObservationExecutionId)),edge=base?.edges.find(e=>key(e.source)===key(access.target));
+         need(edge&&edge.status==='observed'&&edge.toIndex===num(access.value)&&edge.roleId===p.roleId&&
+           edge.id===p.storedEdgeId&&edge.to===p.targetNodeId&&p.slotObservationExecutionId===base.afterExecutionId&&
+           key(p.slotRange)===key(access.target),'정수 연결 슬롯과 실제 접근 시점');
+         need(!trace.events.slice(pos.get(access.eventId)+1,pos.get(p.slotObservationExecutionId)+1).some(w=>
+           w.kind==='WRITE'&&w.target?.objectId===access.target.objectId&&w.target.offset<access.target.offset+access.target.size&&
+           access.target.offset<w.target.offset+w.target.size),'관계 발견 전에 변경된 정수 슬롯');
        }else {const raw=sources.get(source.sourceStructureId);let observed=null;
          for(const change of raw.changes){if(pos.get(change.afterExecutionId)>pos.get(access.eventId))break;
            for(const edge of change.upsertEdges)if(key(edge.source)===key(access.target))observed={edge,executionId:change.afterExecutionId};}

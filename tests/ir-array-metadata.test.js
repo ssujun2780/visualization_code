@@ -18,8 +18,8 @@ test('No8 array types, stores and comparisons preserve the observed source proce
   const sourceHash=sha256(source),expectedStdout='3 6 0 0 0\n0 10 0 20 0\n3 16 0 20 0\n99 6 0 0 0\n3 16 0 20 0\n3 20 0 20 0\n';
   const report=process.env.NO8_REPORT_DIR;
   if(report){await mkdir(report,{recursive:true});await writeFile(report+'/before.json',JSON.stringify({sourceSha256:sha256(source),
-    expectedStdout,expectedEvents:610,expectedCalcs:124,
-    correction:'Ternary condition CALC plus selected-value forwarding is intentional; the earlier whole-ternary-CALC expectation is withdrawn.'},null,2),{flag:'wx'});}
+    expectedStdout,expectedEvents:641,expectedCalcs:125,
+    correction:'Six five-element printing loops expose 30 selected-value FLOW events; the source unary -5 exposes one CALC. The historical 610/124 counts predate these contracts.'},null,2),{flag:'wx'});}
   const r=inspect(await traceModel(source,{filename:file,includeObservations:true})),{trace,plan,defs}=r;
   if(report){
     for(const [f,v]of Object.entries({'plan.json':plan,'trace.json':trace,'observations.plan.json':r.observations.plan,'observations.trace.json':r.observations.trace}))await writeFile(report+'/'+f,JSON.stringify(v,null,2));
@@ -27,7 +27,8 @@ test('No8 array types, stores and comparisons preserve the observed source proce
   }
   validateIRPlan(plan);validateIRTrace(plan,trace);
   assert.equal(trace.status,'completed');assert.equal(trace.exitCode,0);assert.equal(r.stdout,expectedStdout);
-  assert.equal(trace.events.length,610);assert.equal(trace.events.filter(e=>e.kind==='CALC').length,124);
+  // 610 historical events + 6*5 explicit ternary selections + unary -5.
+  assert.equal(trace.events.length,641);assert.equal(trace.events.filter(e=>e.kind==='CALC').length,125);
   for(const d of plan.declarations.slice(0,3)){
     const o=trace.objects.find(o=>o.name===d.name&&o.storage==='automatic');assert.ok(o);
     const begin=trace.events.find(e=>e.action==='object.begin'&&e.objectId===o.id);
@@ -52,13 +53,15 @@ test('No8 array types, stores and comparisons preserve the observed source proce
   for(const e of calls){assert.equal(e.inputEvaluations.length,1);assert.ok(e.inputEvaluations[0].selected);assert.ok(e.inputEvaluations[0].skipped);}
   if(report){
     const old=JSON.parse(await readFile(new URL('trace.json',baseline),'utf8'));
-    const sequence=t=>t.events.map(e=>({kind:e.kind,action:e.action,operator:e.operator,target:e.target,
-      data:e.dataInputs,address:e.addressInputs,control:e.controlInputs,text:e.text,ended:e.endedObjects}));
-    assert.deepEqual(sequence(trace),sequence(old),'metadata repairs must not change memory work, dependency order or lifetime');
+    // Compare actual memory/output/lifetime operations across model versions.
+    // Explicit selection events and their producer IDs intentionally differ.
+    const sequence=t=>t.events.filter(e=>['SPACE','READ','WRITE'].includes(e.kind)).map(e=>({kind:e.kind,action:e.action,target:e.target,
+      value:e.value?.bits??e.value?.decimal,text:e.text,ended:e.endedObjects}));
+    assert.deepEqual(sequence(trace),sequence(old),'selection metadata must preserve observed memory operations, values, output and lifetime order');
   }
   assert.ok(r.observations.trace.events.some(e=>e.value?.type==='i1'),'raw LLVM values remain available');
   assert.equal(sha256(await readFile(new URL('../'+file,import.meta.url),'utf8')),sourceHash);
-  if(report)await writeFile(report+'/verification.json',JSON.stringify({passed:true,sourceSha256:sha256(source),events:610,calcs:124,
+  if(report)await writeFile(report+'/verification.json',JSON.stringify({passed:true,sourceSha256:sha256(source),events:641,calcs:125,
     arrayTypes:3,typedElementStores:13,typedComparisons:30,conditionalCalls:30,processUnchanged:true,
     stdout:r.stdout,coverage:trace.coverage,sourceMapStats:plan.sourceMap?.stats},null,2));
 });

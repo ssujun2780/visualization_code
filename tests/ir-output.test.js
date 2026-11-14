@@ -10,7 +10,7 @@ function fixture(){
   ],bindings:{printf:{roles:{'FLOW:call.begin':'call','FLOW:call.end':'resume'}}},
     processInstructions:{'WRITE:output':'output','ERROR:fault':'error'},coverage:{}};
   const observations={instructions:[{id:'printf',action:'call',callee:'@printf',args:[],inputs:[],result:'%result'}]};
-  const raw={events:[],status:'completed',coverage:{}},offsets={stdout:0,stderr:0};
+  const raw={events:[],objects:[],frames:[],status:'completed',coverage:{}},offsets={stdout:0,stderr:0};
   let callEventId=null;
   const add=(kind,action,fields={})=>{
     const e={eventId:'e'+(raw.events.length+1),instructionId:'printf',activationId:'f1',kind,action,...fields};

@@ -1,5 +1,6 @@
 import {sequenceEvidence,walk,unwrap,key,contains,num} from './sequence-evidence.mjs';
 import {sequenceConditions} from './sequence-conditions.mjs';
+import {sequenceSource} from './sequence-source.mjs';
 import {stateHistoryCoverage,appendStateSnapshot,stateHistoryGapAt,structureStateAt} from './state-history.mjs';
 const uniq=a=>[...new Set(a)];
 const canon=id=>id?.replace(/:slot:\d+$/,'');
@@ -7,7 +8,8 @@ export function sequenceLookupStructures(plan,trace,{maxStates=2048,maxLabelUnit
  const ctx=sequenceEvidence(plan,trace),{events,byId,pos,defs,flow,deps,isInput,advance,scalar,depends,after,loopExits}=ctx,
    raw=trace.structures.find(s=>s.kind==='storage-reference-graph'),records=raw?.nodes.filter(n=>n.kind==='record')??[],
    rawEdges=raw?.changes.flatMap(c=>c.upsertEdges)??[],arrays=trace.structures.filter(s=>s.kind==='array'),
-   sources=trace.structures.filter(s=>s.kind==='pointer-tree-projection'&&s.mode!=='inverse-parent'||s.kind==='table-row-graph-candidate'),out=[],slotHistory=new Map();
+   sources=trace.structures.filter(s=>s.kind==='pointer-tree-projection'&&s.mode!=='inverse-parent'||s.kind==='table-row-graph-candidate'||s.kind==='record-index-graph-candidate').map(sequenceSource),out=[],slotHistory=new Map(),writesByObject=new Map();
+ for(const e of events)if(e.kind==='WRITE'&&e.target?.objectId){const rows=writesByObject.get(e.target.objectId)??[];rows.push(e);writesByObject.set(e.target.objectId,rows);}
  // Bind a label to the observed slot at the access time, not the first
  // historical spelling of its field role (which may lack an array index).
  for(const change of raw?.changes??[])for(const edge of change.upsertEdges){const id=key(edge.source);
@@ -19,17 +21,37 @@ export function sequenceLookupStructures(plan,trace,{maxStates=2048,maxLabelUnit
      return n?.kind==='MemberExpr'&&record?.kind==='record'&&p?.sizeBits>0?{nodeId:n.nodeId,fieldNodeId:n.fieldNodeId,family:record.recordTypeId,offset:p.offsetBits/8,size:p.sizeBits/8}:null;},
    inputProof=(r,kind,extra={})=>{const progress=advance(r);return progress?{kind,inputReadExecutionId:r.eventId,...progress,...extra,afterExecutionId:after([r.eventId,progress.advanceExecutionId,...extra.evidenceExecutionIds??[]])}:null;};
  for(const source of sources){
-   const indexed=source.kind==='table-row-graph-candidate',family=indexed?null:records.find(n=>source.states.some(s=>s.nodes.some(x=>x.id===n.id)))?.cType.recordTypeId,
+   const recordIndexed=source.kind==='record-index-graph-candidate',indexed=source.kind==='table-row-graph-candidate',
+     family=recordIndexed?arrays.find(a=>a.id===source.containerId)?.elementType?.recordTypeId:
+       indexed?null:records.find(n=>source.states.some(s=>s.nodes.some(x=>x.id===n.id)))?.cType.recordTypeId,
      sourceNodes=new Map(source.states.flatMap(s=>s.nodes).map(n=>[n.id,n])),proofs=[],terminalProofs=[];
    if(!sourceNodes.size)continue;
    const nodeFor=r=>[...sourceNodes.values()].find(n=>contains(n.range,r)),array=indexed?arrays.find(a=>key(a.range)===key(source.range)):null;
+   const indexedObservation=e=>{
+     const at=pos.get(e.eventId),matches=edge=>key(edge.source)===key(e.target)&&edge.toIndex===num(e.value);
+     const current=stateAt(source,at),edge=current?.edges.find(matches);
+     if(edge)return {edge,executionId:current.afterExecutionId};
+     // A destination record may be discovered by the subsequent dereference.
+     // Delay this evidence until then, and reject any intervening slot write.
+     const overwrite=(writesByObject.get(e.target.objectId)??[]).find(w=>pos.get(w.eventId)>at&&
+       w.target.offset<e.target.offset+e.target.size&&e.target.offset<w.target.offset+w.target.size),
+       until=pos.get(overwrite?.eventId)??Infinity;
+     for(const state of source.states){
+       const end=pos.get(state.afterExecutionId);if(end<=at)continue;
+       if(end>=until)return null;
+       const found=state.edges.find(matches);if(found)return {edge:found,executionId:state.afterExecutionId};
+     }
+     return null;
+   };
    // An observed symbol supplies a child slot's address. Preserve the actual
    // symbol -> slot transform; no alphabet, field name or radix is hardcoded.
    for(const e of events)if(['READ','WRITE'].includes(e.kind)&&e.target?.objectId){
-     const observed=indexed?null:slotHistory.get(key(e.target))?.findLast(x=>x.at<=pos.get(e.eventId)),edge=observed?.edge,
+     const symbolInputs=deps(e.addressInputs).filter(isInput);if(!symbolInputs.length)continue;
+     const observed=recordIndexed?indexedObservation(e):
+         indexed?null:slotHistory.get(key(e.target))?.findLast(x=>x.at<=pos.get(e.eventId)),edge=observed?.edge,
        column=indexed&&array&&contains(array.range,e.target)?((e.target.offset-array.range.offset)%array.elementBytes)/e.target.size:null;
      if(indexed?!Number.isSafeInteger(column):!edge||!source.roleIds.includes(canon(edge.roleId))||source.mode!=='sparse-children')continue;
-     for(const input of deps(e.addressInputs).filter(isInput)){
+     for(const input of symbolInputs){
        const p=inputProof(input,'indexed-symbol',{accessExecutionId:e.eventId,roleId:indexed?`${array.id}:column:${column}`:edge.roleId,
          ...indexed?{}:{storedEdgeId:edge.id,slotRange:{objectId:e.target.objectId,offset:e.target.offset,size:e.target.size},targetNodeId:edge.to,
            slotObservationExecutionId:observed.executionId},
@@ -78,7 +100,7 @@ export function sequenceLookupStructures(plan,trace,{maxStates=2048,maxLabelUnit
        (byId.get(p.inputReadExecutionId).target?.objectId===input.target.objectId||byId.get(p.inputReadExecutionId).value?.reference?.targetObjectId===input.target.objectId)))continue;
        for(const read of (ret.dataInputs??[]).flatMap(id=>flow.reads(id))){if(read.kind!=='READ'||num(read.value)===null||read.value?.cType?.kind==='pointer')continue;
          let role=null,node=null;const field=scalarField(read);
-         if(!indexed&&field?.family===family){node=nodeFor(read.target);if(node)role={kind:'record',...field};}
+         if(!indexed&&field&&(field.family===family||recordIndexed)){node=nodeFor(read.target);if(node)role={kind:'record',...field};}
          if(indexed){const a=arrays.find(a=>a.elementType?.kind!=='array'&&a.elementType?.kind!=='record'&&contains(a.range,read.target)),
            linked=(read.addressInputs??[]).flatMap(id=>flow.reads(id)).find(r=>contains(source.range,r.target)&&num(r.value)!==null);
            if(a&&linked){const index=(read.target.offset-a.range.offset)/a.elementBytes;node=[...sourceNodes.values()].find(n=>n.index===index&&index===num(linked.value));

@@ -3,12 +3,15 @@ import {validateWorkTrace} from './work-contracts.mjs';
 import {validatePresentationContract} from './presentation-contract.mjs';
 import {validateResultDeliveryPlan,validateResultDeliveries} from './result-delivery.mjs';
 import {validateReturnSequence} from './return-sequence.mjs';
+import {assertAddressOrigin} from '../shared/address-origin.mjs';
 import {validateConversionConsumers} from './conversion-consumers.mjs';
 import {validateFunctionDeclarations} from './function-declarations.mjs';
+import {validateEvaluationOrderPlan} from './evaluation-order.mjs';
 export const IR_VERSION=3;
 export const IR_KINDS=Object.freeze(['READ','WRITE','CALC','FLOW','SPACE','ERROR']);
 
 export function validateIRPlan(plan){
+  validateEvaluationOrderPlan(plan);
   if(plan.schemaVersion!==IR_VERSION)throw new Error('중간언어 버전이 일치하지 않습니다.');
   const ids=new Set();
   for(const instruction of plan.instructions){
@@ -87,6 +90,7 @@ export function validateIRTrace(plan,trace){
       throw new Error('함수 참조와 컴파일된 함수 정의의 연결이 올바르지 않습니다.');
   }
   const executions=new Map(trace.events.map(e=>[e.eventId,e]));
+  const positions=new Map(trace.events.map((e,i)=>[e.eventId,i])),objects=new Map(trace.objects.map(o=>[o.id,o]));
   const evaluations=new Map((plan.evaluations??[]).map(e=>[e.nodeId,e]));
   if(ids.size!==trace.events.length)throw new Error('중간언어 실행 식별자가 중복됐습니다.');
   for(const execution of trace.events){
@@ -105,6 +109,8 @@ export function validateIRTrace(plan,trace){
     }
     for(const key of ['dataInputs','addressInputs','controlInputs','calleeInputs'])for(const id of execution[key]??[])
       if(!ids.has(id)||id===execution.eventId)throw new Error(`실행 기록의 출처 연결이 올바르지 않습니다: ${id}`);
+    for(const input of [...execution.inputs??[],...(execution.steps??[]).flatMap(s=>s.inputs??[])])
+      assertAddressOrigin(input,{event:id=>executions.get(id),object:id=>objects.get(id),position:id=>positions.get(id),at:positions.get(execution.eventId),bindings:plan.bindings});
     for(const partial of execution.partialCalculationInputs??[]){
       const producer=executions.get(partial.executionId);
       if(producer?.kind!=='CALC'||!producer.steps?.some(s=>s.observationIds.includes(partial.observationId))||

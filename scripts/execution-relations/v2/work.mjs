@@ -125,9 +125,15 @@ export function structureRelations(c,access,emit){
     const list=indexed.get(b.objectId)??[];list.push({...b,known});indexed.set(b.objectId,list);
   }
   for(const list of indexed.values()){list.sort((a,b)=>a.offset-b.offset);let max=0;for(const b of list){max=Math.max(max,b.offset+b.size);b.prefixMaxEnd=max;}}
-  const emitBinding=(a,b)=>{const o=c.object(a.objectId);
+  const emittedBindings=new Set();
+  const emitBinding=(a,b)=>{const o=c.object(a.objectId),
+      start=Number.isSafeInteger(b.offset)?Math.max(a.offset,b.offset):a.offset,
+      end=Number.isSafeInteger(b.size)?Math.min(a.offset+a.size,b.offset+b.size):a.offset+a.size,
+      matchedRange={objectId:a.objectId,offset:start,size:end-start},
+      identity=JSON.stringify([a.executionId,a.mode,b.structureId,b.elementId,b.availableAtExecutionId,matchedRange]);
+      if(end<=start||emittedBindings.has(identity))return;emittedBindings.add(identity);
       emit.relation('structure-access',c.event(a.executionId),[{kind:'structure-element',role:a.mode,structureId:b.structureId,elementId:b.elementId,bindingExecutionId:b.availableAtExecutionId},
-        {kind:'storage',role:'backing',objectId:a.objectId,createdBy:o.createdBy,offset:a.offset,size:a.size}],{bindingId:b.id??null},[b.availableAtExecutionId,a.executionId]);
+        {kind:'storage',role:'backing',objectId:a.objectId,createdBy:o.createdBy,offset:a.offset,size:a.size}],{bindingId:b.id??null,matchedRange,mappingOrigin:b.origin??'inferred'},[b.availableAtExecutionId,a.executionId]);
   };
   for(const a of access.rows){if(!emit.tick(a.executionId))break;emit.progress('structures',c.event(a.executionId));
     const list=indexed.get(a.objectId)??[];let lo=0,hi=list.length;while(lo<hi){const mid=(lo+hi)>>>1;if(list[mid].offset<a.offset+a.size)lo=mid+1;else hi=mid;}

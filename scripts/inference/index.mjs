@@ -1,6 +1,8 @@
 import {Worker} from 'node:worker_threads';
 import {inferenceFailure,skippedInference} from './result.mjs';
 import {inferenceLimits} from './inference-limits.mjs';
+import {decodeInference} from './shared-values.mjs';
+export {encodeInference,decodeInference} from './shared-values.mjs';
 export {inferStructures} from './structure-inference.mjs';
 export {validateStructureTrace} from './structure-schema.mjs';
 export {createInferenceView} from './result.mjs';
@@ -14,6 +16,10 @@ export {queryRangeAggregate} from './range-aggregate-views.mjs';
 export {querySemanticStructure as queryInferredSemantics} from './storage-semantics.mjs';
 export {queryManagementRoles} from './management-roles.mjs';
 export {queryStructureRelations} from './structure-relations.mjs';
+export {defineStructureRelation} from './relation-binding.mjs';
+export {createStructureRelationInput} from './user-relation-history.mjs';
+export {defineStructureConditionRules} from './user-conditions.mjs';
+export {captureStructurePresentationAnchor,reconnectStructureSetting,reconnectStructurePresentation} from './presentation-reconnect.mjs';
 export {buildStructureStorageBindings} from './storage-bindings.mjs';
 export {queryStructureConditions} from './condition-query.mjs';
 export {evaluateStructureConditions,STRUCTURE_CONDITIONS} from './structure-conditions.mjs';
@@ -32,7 +38,7 @@ export function inferStructuresAsync(plan,trace,{timeoutMs=25000,observationPlan
     const timer=setTimeout(()=>finish(inferenceFailure(new Error('자료구조 추론 시간 제한에 도달했습니다.'),'structure-inference-time-limit')),timeoutMs);
     try{
       worker=new Worker(new URL('./worker.mjs',import.meta.url),{workerData:{plan,trace,options:{observationPlan,observedTrace,limits}},execArgv:[]});
-      worker.once('message',finish);
+      worker.once('message',result=>{try{finish(decodeInference(result));}catch(error){finish(inferenceFailure(error));}});
       worker.once('error',error=>finish(inferenceFailure(error)));
       worker.once('exit',code=>{if(!done)finish(inferenceFailure(new Error(`자료구조 추론 작업이 결과 없이 종료됐습니다 (${code}).`)));});
     }catch(error){finish(inferenceFailure(error));}

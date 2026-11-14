@@ -1,4 +1,5 @@
 // Abstract comparison signs, not execution of C code. Unknown paths stay unknown.
+import {keyPayload,comparePayload} from './scalar-domain.mjs';
 export function comparisonOperation(op,a,b,c){
   if(op==='?:')return a===null?(b===c?b:null):a!==0n?b:c;
   if(op==='&&'){if(a===0n||b===0n)return 0n;return a===null||b===null?null:1n;}
@@ -69,9 +70,9 @@ export function inferLexicographicOrder(diagram,routing,indices){
 export function compareKeyValues(a,b,order){
   for(const {index,direction}of order){
     if(a[index]===null||b[index]===null)return {sign:null,componentIndex:index,status:'unobserved'};
-    const floating=typeof a[index]==='number'&&!Number.isSafeInteger(a[index])||typeof b[index]==='number'&&!Number.isSafeInteger(b[index])||['NaN','Infinity','-Infinity'].includes(a[index])||['NaN','Infinity','-Infinity'].includes(b[index]),
-      x=floating?Number(a[index]):BigInt(a[index]),y=floating?Number(b[index]):BigInt(b[index]);
-    if(floating&&(Number.isNaN(x)||Number.isNaN(y)))return {sign:null,componentIndex:index,status:'unordered'};
-    if(x!==y)return {sign:(x<y?-1:1)*direction,componentIndex:index};}
+    const x=keyPayload(a[index]),y=keyPayload(b[index]);
+    const compared=comparePayload(x,y);
+    if(compared.sign===null)return {...compared,componentIndex:index};
+    if(compared.sign!==0)return {sign:compared.sign*direction,componentIndex:index};}
   return {sign:0,componentIndex:null};
 }

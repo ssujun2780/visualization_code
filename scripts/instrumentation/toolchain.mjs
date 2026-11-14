@@ -55,7 +55,10 @@ export async function execute(module, args, fs, traceImport, stdin = "") {
   };
   const wasi = new WASI({ args, fs, stdout: append("stdout"), stderr: append("stderr") });
   const imports = wasi.getImportObject();
-  const input = new TextEncoder().encode(stdin);
+  // A live execution may supply a synchronous reader from its worker. Blocking
+  // that worker retains the same WASM instance, stack and libc input buffer.
+  const inputReader = typeof stdin?.read === 'function' ? stdin : null;
+  const input = inputReader ? null : new TextEncoder().encode(stdin);
   let inputOffset = 0;
   for (const namespace of Object.values(imports)) {
     if(namespace.fd_write&&traceImport?.outputBytes){
@@ -81,19 +84,26 @@ export async function execute(module, args, fs, traceImport, stdin = "") {
     namespace.fd_read = (fd, iovs, count, resultPointer) => {
       if (fd !== 0) return originalRead(fd, iovs, count, resultPointer);
       const view = new DataView(wasi.memory.buffer);
+      let capacity = 0;
+      for (let i = 0; i < count; i++) capacity += view.getUint32(iovs + i * 8 + 4, true);
+      if (!capacity) { view.setUint32(resultPointer, 0, true); return 0; }
+      const supplied = inputReader ? inputReader.read(capacity) : input.subarray(inputOffset);
+      if (!(supplied instanceof Uint8Array) || supplied.length > capacity && inputReader) throw new Error('입력 공급자의 바이트 범위가 잘못되었습니다.');
+      let suppliedOffset = 0;
       let total = 0;const startOffset=inputOffset,regions=[];
       for (let i = 0; i < count; i++) {
         const pointer = view.getUint32(iovs + i * 8, true);
         const capacity = view.getUint32(iovs + i * 8 + 4, true);
-        const amount = Math.min(capacity, input.length - inputOffset);
-        new Uint8Array(wasi.memory.buffer, pointer, amount).set(input.subarray(inputOffset, inputOffset + amount));
+        const amount = Math.min(capacity, supplied.length - suppliedOffset);
+        new Uint8Array(wasi.memory.buffer, pointer, amount).set(supplied.subarray(suppliedOffset, suppliedOffset + amount));
         if(amount)traceImport?.nativeMemory?.(2,pointer,amount);
         if(amount)regions.push({address:pointer,size:amount,streamOffset:inputOffset});
         inputOffset += amount;
+        suppliedOffset += amount;
         total += amount;
       }
       view.setUint32(resultPointer, total, true);
-      if(total)traceImport?.input?.(input.subarray(startOffset,inputOffset),startOffset,regions);
+      if(total)traceImport?.input?.(supplied.subarray(0,total),startOffset,regions);
       return 0;
     };
   }

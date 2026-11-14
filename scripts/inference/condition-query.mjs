@@ -5,6 +5,7 @@ import {evaluateStructureConditions,STRUCTURE_CONDITIONS} from './structure-cond
 import {observeScalarBytes} from './observed-scalar-bytes.mjs';
 import {queryManagementRoles} from './management-roles.mjs';
 import {stateHistoryGapAt} from './state-history.mjs';
+import {defineStructureConditionRules,observeUserConditions} from './user-conditions.mjs';
 const sameRoles=(a,b)=>a.length===b.length&&a.every(id=>b.includes(id));
 const overlap=(a,b)=>a?.objectId===b?.objectId&&a.offset<b.offset+b.size&&b.offset<a.offset+a.size;
 export function validateConditionBindings(bindings){
@@ -42,11 +43,12 @@ function propertiesAt(trace,relation,bindings,ctx){
   }
   const byObject=new Map();for(const s of slots)if(s.range){if(!byObject.has(s.range.objectId))byObject.set(s.range.objectId,[]);byObject.get(s.range.objectId).push(s);}
   for(let i=0;i<=ctx.at;i++){
-    const e=trace.events[i];if(!['SPACE','READ','WRITE'].includes(e.kind))continue;
+    const e=trace.events[i];if(!['SPACE','READ','WRITE'].includes(e.kind)||e.phase&&e.phase!=='complete')continue;
     const target=e.target??(e.objectId&&e.memoryState?{objectId:e.objectId,offset:0,size:e.memoryState.byteLength}:null);
     for(const s of byObject.get(target?.objectId)??[]){if(!overlap(s.range,target))continue;
       const exact=target.offset===s.range.offset&&target.size===s.range.size;
-      let next;if(e.memoryState)next=observeScalarBytes(s.bytes,{size:s.range.size,snapshot:e.memoryState,start:target.offset,offset:s.range.offset});
+      let next;if(e.initializationEvidence==='unobserved')next=observeScalarBytes(s.bytes,{size:s.range.size,snapshot:{byteLength:target.size,ranges:[]},start:target.offset,offset:s.range.offset});
+      else if(e.memoryState)next=observeScalarBytes(s.bytes,{size:s.range.size,snapshot:e.memoryState,start:target.offset,offset:s.range.offset});
       else if(exact&&e.value?.bits!==undefined)next=observeScalarBytes(s.bytes,{size:s.range.size,value:e.value.bits});
       else if(e.kind!=='READ')next=observeScalarBytes(s.bytes,{size:s.range.size,snapshot:{byteLength:target.size,ranges:[]},start:target.offset,offset:s.range.offset});
       if(next){s.bytes=next;s.evidence.push(e.eventId);}
@@ -60,34 +62,38 @@ function propertiesAt(trace,relation,bindings,ctx){
     properties[s.name].values.push({nodeId:s.nodeId,range:s.range,value,evidenceExecutionIds:s.evidence});}
   return properties;
 }
-export function queryStructureConditions(trace,{target,candidateId,roleIds=null,afterExecutionId,expected,bindings=null}={}){
+export function queryStructureConditions(trace,{target,candidateId,roleIds=null,afterExecutionId,expected,bindings=null,relationBinding=null,relationLimits={},conditionRules=null}={}){
   bindings=validateConditionBindings(bindings);
-  const ctx=relationContext(trace,afterExecutionId),{relations}=queryStructureRelations(trace,{target,candidateId,roleIds,afterExecutionId}),candidates=[];
+  conditionRules=defineStructureConditionRules(trace,conditionRules);
+  const ctx=relationContext(trace,afterExecutionId),{relations,historyGap:relationHistoryGap}=queryStructureRelations(trace,{target,candidateId,roleIds,afterExecutionId,relationBinding,relationLimits}),candidates=[];
   for(const relation of relations){
     const roleSuggestions=queryManagementRoles(trace,{afterExecutionId}).filter(r=>relation.nodes.some(n=>n.recordTypeId===r.binding.recordTypeId)),
       heights=roleSuggestions.filter(r=>r.role==='height'),autoHeight=!bindings?.height&&heights.length===1?heights[0]:null,
-      effectiveBindings={...bindings,...(autoHeight?{height:{...autoHeight.binding,leafHeight:autoHeight.leafHeight}}:{})};
+      colors=roleSuggestions.filter(r=>r.role==='color'&&r.suggestedMapping),autoColor=!bindings?.color&&colors.length===1?colors[0]:null,
+      effectiveBindings={...bindings,...(autoHeight?{height:{...autoHeight.binding,leafHeight:autoHeight.leafHeight}}:{}),...(autoColor?{color:{...autoColor.binding,redValue:autoColor.suggestedMapping.redValue,blackValue:autoColor.suggestedMapping.blackValue}}:{})};
     const selectedOrderId=trace.structures.find(s=>s.id===(candidateId??target?.structureId)&&s.kind==='ordered-tree-candidate')?.id,
       orders=trace.structures.filter(s=>s.kind==='ordered-tree-candidate'&&s.sourceStructureId===relation.sourceStructureId&&
       (!selectedOrderId||s.id===selectedOrderId))
       .map(s=>({s,state:ctx.state(s)})).filter(({state})=>state&&sameRoles(state.contracts.map(c=>c.roleId),relation.roleIds)),
-      properties=propertiesAt(trace,relation,effectiveBindings,ctx);
+      properties=propertiesAt(trace,relation,effectiveBindings,ctx),user=observeUserConditions(trace,relation,conditionRules,ctx.at);
     if(autoHeight&&properties.height){properties.height.origin='inferred';properties.height.roleEvidenceExecutionIds=autoHeight.evidenceExecutionIds;}
-    for(const item of orders.length?orders:[null]){
+    if(autoColor&&properties.color){properties.color.origin='inferred-hypothesis';properties.color.roleEvidenceExecutionIds=autoColor.evidenceExecutionIds;properties.color.encodingEvidence=autoColor.suggestedMapping;}
+    for(const item of user.order?[null]:orders.length?orders:[null]){
       const state=item?.state,historyGap=!!state?.historyGap,
         snapshot=historyGap?{...relation,complete:false,historyGap:true}:relation,
-        order=state?{nodes:state.nodes,contracts:state.contracts,keyOrder:state.keyOrder??[{index:0,direction:1}],composite:!!item.s.key.components,
+        order=user.order??(state?{nodes:state.nodes,contracts:state.contracts,keyOrder:state.keyOrder??[{index:0,direction:1}],composite:!!item.s.key.components,
           complete:state.contracts.length===2&&state.contracts.some(c=>c.direction==='less')&&state.contracts.some(c=>c.direction==='greater'),
-          unsupported:state.status==='not-checkable',conflict:state.contracts.some(c=>c.direction==='conflicting')}:null,
-        checks=evaluateStructureConditions(snapshot,{expected,order,properties});
-      candidates.push({candidateId:item?.s.id??relation.selectedCandidateId,relation:snapshot,properties,roleSuggestions,...checks});
+          unsupported:state.status==='not-checkable',conflict:state.contracts.some(c=>c.direction==='conflicting')}:null),
+        checks=evaluateStructureConditions(snapshot,{expected,order,properties,customConditions:user.customConditions});
+      candidates.push({candidateId:item?.s.id??relation.selectedCandidateId,relation:snapshot,properties,roleSuggestions,
+        ...(conditionRules?{userProperties:user.properties,orderOrigin:user.order?'user':order?'inferred':null}:{}),...checks});
     }
   }
-  const needsOrder=id=>id==='bst-order'||STRUCTURE_CONDITIONS[id]?.requires.some(needsOrder),
+  const needsOrder=id=>id==='bst-order'||Object.hasOwn(STRUCTURE_CONDITIONS,id)&&STRUCTURE_CONDITIONS[id].requires.some(needsOrder),
     orderedIds=new Set(trace.structures.filter(s=>s.kind==='ordered-tree-candidate').map(s=>s.id)),
     // Child projections without an ordering role are not rival BST contracts.
     scoped=needsOrder(expected)&&candidates.some(c=>orderedIds.has(c.candidateId))?candidates.filter(c=>orderedIds.has(c.candidateId)):candidates,
-    missingHistory=trace.structures.some(s=>s.id===(candidateId??target?.structureId)&&stateHistoryGapAt(s,ctx.positions,ctx.at)),
+    missingHistory=relationHistoryGap||trace.structures.some(s=>s.id===(candidateId??target?.structureId)&&stateHistoryGapAt(s,ctx.positions,ctx.at)),
     assessment=!scoped.length?(missingHistory?'incomplete':'not-checkable'):scoped.every(c=>c.assessment===scoped[0].assessment)?scoped[0].assessment:'ambiguous';
   return {expected,assessment,candidates:scoped,reason:!scoped.length?'no observed relation for the selected scope':assessment==='ambiguous'?'alternative relations have different assessments':null,
     warnings:scoped.flatMap(c=>c.warnings.map(w=>({...w,candidateId:c.candidateId,relationId:c.relation.id}))),

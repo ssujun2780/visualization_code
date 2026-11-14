@@ -12,15 +12,22 @@ export function coindexedRecordStructures(_plan,{events,objects=[],structures=[]
   if(!dependencies?.coindexed?.length||!work)return [];
   const arrays=new Map(structures.filter(s=>s.kind==='array').map(a=>[a.id,a])),
     accesses=new Map(work.accesses.map(a=>[a.executionId,a])),byEvent=new Map(events.map(e=>[e.eventId,e])),
-    positions=new Map(events.map((e,i)=>[e.eventId,i])),groups=new Map();
+    positions=new Map(events.map((e,i)=>[e.eventId,i])),byObject=new Map(objects.map(o=>[o.id,o])),groups=new Map();
+  const alive=(id,at)=>{const o=byObject.get(arrays.get(id)?.objectId);return !o||
+    (positions.get(o.createdBy)??-1)<=at&&at<(positions.get(o.endedBy)??Infinity);};
   for(const proof of dependencies.coindexed){
     const used=proof.accessExecutionIds.map(id=>accesses.get(id)).filter(a=>a&&positions.has(a.executionId)&&arrays.has(a.target.arrayId)&&
       validIndex(arrays.get(a.target.arrayId),a.target.index)&&a.target.elementOffset===0&&a.target.size===arrays.get(a.target.arrayId).elementBytes)
-      .sort((a,b)=>positions.get(a.executionId)-positions.get(b.executionId)),first=new Map(),emitted=new Set();
-    let firstRead=null;
+      .sort((a,b)=>positions.get(a.executionId)-positions.get(b.executionId)),first=new Map(),reads=new Map(),emitted=new Set();
     for(const a of used){
+      const at=positions.get(a.executionId);
+      // The same index origin can be reused across calls and storage lifetimes.
+      // Expired columns must not contaminate every later group on that origin.
+      for(const id of first.keys())if(!alive(id,at)){first.delete(id);reads.delete(id);}
+      if(!alive(a.target.arrayId,at))continue;
       if(!first.has(a.target.arrayId))first.set(a.target.arrayId,a.executionId);
-      if(!firstRead&&byEvent.get(a.executionId)?.kind==='READ')firstRead=a.executionId;
+      if(!reads.has(a.target.arrayId)&&byEvent.get(a.executionId)?.kind==='READ')reads.set(a.target.arrayId,a.executionId);
+      const firstRead=[...reads.values()].sort((a,b)=>positions.get(a)-positions.get(b))[0];
       // Only an observed prefix may establish fields. Repeated reads do not
       // postpone discovery, and a later third field cannot appear in the pair.
       if(first.size<2||!firstRead)continue;

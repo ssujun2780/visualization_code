@@ -5,6 +5,8 @@ import {createValueFlow} from './observed-value-flow.mjs';
 import {topology} from '../shared/topology.mjs';
 import {observeGraphStorage} from './graph-storage-observations.mjs';
 import {neighborhoodProofs} from './neighborhood-proofs.mjs';
+import {graphEdgeIdentity,mergeGraphEvidence} from './graph-proof-identity.mjs';
+import {indexedNeighborhoodProofs} from './indexed-neighborhood-proofs.mjs';
 const overlap=(a,b)=>a?.objectId===b?.objectId&&a.offset<b.offset+b.size&&b.offset<a.offset+a.size;
 const num=v=>Number(v?.decimal??v?.signed??v?.unsigned);
 const unique=a=>[...new Set(a)];
@@ -25,8 +27,8 @@ export function traversalGraphStructures(plan,trace,{maxEvidence=8192,maxStates=
     const ids=unique(proof.evidenceExecutionIds),at=pos.get(proof.executionId);
     if(ids.some(id=>!pos.has(id)||pos.get(id)>at))return;
     let g=groups.get(a.id);if(!g)groups.set(a.id,g={array:a,evidence:[],omitted:0});
-    const key=`${proof.kind}:${proof.fromIndex}:${proof.toIndex}:${proof.sourceSlots.map(r=>`${r.objectId}:${r.offset}:${r.size}`).join('|')}`;
-    if(g.evidence.some(p=>p.executionId===proof.executionId&&p.edgeIdentity===key))return;
+    const key=graphEdgeIdentity(proof);
+    if(g.evidence.some(p=>p.kind===proof.kind&&p.executionId===proof.executionId&&p.edgeIdentity===key))return;
     if(g.evidence.length>=maxEvidence){g.omitted++;return;}
     g.evidence.push({...proof,edgeIdentity:key,evidenceExecutionIds:ids});
   }
@@ -119,6 +121,7 @@ export function traversalGraphStructures(plan,trace,{maxEvidence=8192,maxStates=
     }
   }
   for(const {array,proof} of neighborhoodProofs(plan,trace,flow))add(array,proof);
+  for(const {array,proof} of indexedNeighborhoodProofs(plan,trace,flow))add(array,proof);
   const result=[];
   for(const {array:a,evidence,omitted}of groups.values()){
     const at=new Map(),edges=new Map(),nodes=new Map(),states=[],ended=new Set();let omittedEdges=0,history=stateHistoryCoverage(maxStates);
@@ -134,7 +137,7 @@ export function traversalGraphStructures(plan,trace,{maxEvidence=8192,maxStates=
         const node=i=>`${a.id}:vertex:${i}`;
         for(const i of [p.fromIndex,p.toIndex])nodes.set(node(i),{id:node(i),index:i,range:{objectId:a.objectId,offset:a.range.offset+i*a.elementBytes,size:a.elementBytes}});
         if(!edges.has(p.edgeIdentity)&&edges.size>=maxEdges){omittedEdges++;continue;}
-        edges.set(p.edgeIdentity,{...p,id:p.edgeIdentity,from:node(p.fromIndex),to:node(p.toIndex),status:'observed'});changed=true;
+        edges.set(p.edgeIdentity,mergeGraphEvidence(edges.get(p.edgeIdentity),{...p,id:p.edgeIdentity,from:node(p.fromIndex),to:node(p.toIndex),status:'observed'}));changed=true;
       }
       if(!changed||!nodes.size)continue;
       const ns=[...nodes.values()],es=[...edges.values()].map(p=>({...p,status:ended.has(a.objectId)||p.sourceSlots.some(r=>ended.has(r.objectId))?'ended':p.status,

@@ -1,0 +1,1334 @@
+{
+  "createdAt": "2026-11-09T08:43:05.873Z",
+  "phase": "predicted before compilation/API",
+  "cases": [
+    {
+      "id": "tree_extras_00",
+      "family": "tree with optional roles",
+      "style": "novice or ad-hoc composition",
+      "stdout": "30\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "prediction": {
+        "note": "Five real tree nodes; parent/owner/cache/mark are optional roles. Arbitrary keys do not establish BST; stale size 99 does not enlarge the tree.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "9d3439852cd86072aeebdeedbccf25d5988b621500ef1903b01052d203ebd59d"
+    },
+    {
+      "id": "tree_extras_01",
+      "family": "tree with optional roles",
+      "style": "novice or ad-hoc composition",
+      "stdout": "30 7 99\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "prediction": {
+        "note": "Five real tree nodes; parent/owner/cache/mark are optional roles. Arbitrary keys do not establish BST; stale size 99 does not enlarge the tree.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "f59f42d19ba7b356298fdeb1c2e9b86d46e9b2654b0070042c1885eb1ec473c0"
+    },
+    {
+      "id": "tree_extras_10",
+      "family": "tree with optional roles",
+      "style": "novice or ad-hoc composition",
+      "stdout": "30 2\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "prediction": {
+        "note": "Five real tree nodes; parent/owner/cache/mark are optional roles. Arbitrary keys do not establish BST; stale size 99 does not enlarge the tree.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "056f6f2b6adf808210c8f032fc422600f2af4167d2c83ba50d5661b3f278a6bd"
+    },
+    {
+      "id": "tree_extras_11",
+      "family": "tree with optional roles",
+      "style": "novice or ad-hoc composition",
+      "stdout": "30 2 7 99\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "prediction": {
+        "note": "Five real tree nodes; parent/owner/cache/mark are optional roles. Arbitrary keys do not establish BST; stale size 99 does not enlarge the tree.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "c16f2da483cb532d3b412cb5998390680019415ec848c2218389668641cb71a9"
+    },
+    {
+      "id": "tree_list_hybrid_false",
+      "family": "tree plus list",
+      "style": "novice or ad-hoc composition",
+      "stdout": "15 15\n",
+      "targets": [
+        "root",
+        "head",
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree",
+        "linked-list",
+        "graph"
+      ],
+      "prediction": {
+        "note": "Shared five records contain independent child roles and next role. Union has cycles; preserve tree and list projections, including later circular next links.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "1b1f4ed7b631f2213a6eee05663461f1efee4964ed7ddbfd5f26bd5c8e29d0b6"
+    },
+    {
+      "id": "tree_list_hybrid_true",
+      "family": "tree plus list",
+      "style": "novice or ad-hoc composition",
+      "stdout": "15 15\n5\n",
+      "targets": [
+        "root",
+        "head",
+        "pool"
+      ],
+      "views": [
+        "tree",
+        "binary-tree",
+        "linked-list",
+        "graph"
+      ],
+      "prediction": {
+        "note": "Shared five records contain independent child roles and next role. Union has cycles; preserve tree and list projections, including later circular next links.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "456c86751842420aea492bb78a26cd4ab4c89478099e717521b31a4ad2cfa91b"
+    },
+    {
+      "id": "list_cache_false",
+      "family": "list with nonessential pointers",
+      "style": "novice or ad-hoc composition",
+      "stdout": "5 48\n",
+      "targets": [
+        "head",
+        "box"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "prediction": {
+        "note": "Five physical nodes, four logically selected entries. Unused jump and owner pointers must not erase the next chain; optional reverse traversal supplies reciprocal evidence.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "e70ba6c6fbc3b25e9451715f643c4cade1407687cab09e2ab67780874079d001"
+    },
+    {
+      "id": "list_cache_true",
+      "family": "list with nonessential pointers",
+      "style": "novice or ad-hoc composition",
+      "stdout": "5 48 60\n",
+      "targets": [
+        "head",
+        "box"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "prediction": {
+        "note": "Five physical nodes, four logically selected entries. Unused jump and owner pointers must not erase the next chain; optional reverse traversal supplies reciprocal evidence.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "ca47d87e904daa3517668ff8931cd9d5618ab81f8b6a16204e366126dc0326f0"
+    },
+    {
+      "id": "list_lazy_unlink",
+      "family": "linked list with tombstones",
+      "style": "novice or ad-hoc composition",
+      "stdout": "9\n9\n",
+      "targets": [
+        "head",
+        "a"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "prediction": {
+        "note": "Before unlink: five live C records with two logical tombstones. Afterwards three reachable records, two detached live records; never manufacture free/object.end.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "a834351ecc58e475ef16226085356ad0e8f4521806c1e2f9d339b66242ecba46"
+    },
+    {
+      "id": "list_holey_index_table",
+      "family": "list encoded in a mixed integer table",
+      "style": "novice or ad-hoc composition",
+      "stdout": "4 46\n",
+      "targets": [
+        "table"
+      ],
+      "views": [
+        "linked-list",
+        "graph",
+        "grid"
+      ],
+      "prediction": {
+        "note": "A noncontiguous linked list uses column 2 as successor, column 0 payload, column 1 occupancy, column 3 irrelevant cached number. Physical grid is valid fallback; four logical nodes.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "886cdd5690d7a7e1af9367e09c6a15bcafb6679b8e49916799e1b530aae487c7"
+    },
+    {
+      "id": "list_text_addresses",
+      "family": "string-key links without pointers",
+      "style": "novice or ad-hoc composition",
+      "stdout": "3 14\n",
+      "targets": [
+        "a",
+        "at"
+      ],
+      "views": [
+        "linked-list",
+        "graph",
+        "array"
+      ],
+      "prediction": {
+        "note": "Semantic string lookup links red->blue->green; a spare incoming link is not reachable. Infer only if lookup relation is justified; unsupported is preferable to invented pointers.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "3a4a806e9e3d6d96cc7621b7e3cd6f4420575f0d5dd875985bf6addaceda0bca"
+    },
+    {
+      "id": "queue_hybrid_stash_false",
+      "family": "queue plus scratch storage",
+      "style": "novice or ad-hoc composition",
+      "stdout": "12345 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue",
+        "array"
+      ],
+      "prediction": {
+        "note": "Quadratic FIFO uses a separate temporary array; count shrinks but storage remains. Pointer may point to stale scratch contents; scratch is not an extra queue.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "5e1ce03e8c95be22d812007485b5e74ef5c1272ccdafd2e068eca2d48eb5ffb5"
+    },
+    {
+      "id": "queue_hybrid_stash_true",
+      "family": "queue plus scratch storage",
+      "style": "novice or ad-hoc composition",
+      "stdout": "12345 0 5\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue",
+        "array"
+      ],
+      "prediction": {
+        "note": "Quadratic FIFO uses a separate temporary array; count shrinks but storage remains. Pointer may point to stale scratch contents; scratch is not an extra queue.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "356cb043dd14909e053ae78eef61f565a7e1cfc6d51de212db96597e48f31598"
+    },
+    {
+      "id": "stack_from_two_arrays",
+      "family": "beginner stack with separate occupancy",
+      "style": "novice or ad-hoc composition",
+      "stdout": "4321\n",
+      "targets": [
+        "data",
+        "used"
+      ],
+      "views": [
+        "stack",
+        "array"
+      ],
+      "prediction": {
+        "note": "LIFO behavior is implemented by scanning occupancy, with no top counter. Physical contents are not erased when flags clear.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "47fc231b02311f99b3a8c4b421c2d02c40527249871b796716a0b63d52e2f98b"
+    },
+    {
+      "id": "queue_from_two_stacks",
+      "family": "amateur composition of two stacks",
+      "style": "novice or ad-hoc composition",
+      "stdout": "1234\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue",
+        "stack",
+        "array"
+      ],
+      "prediction": {
+        "note": "Two physical stacks compose a FIFO. Distinguish constituent storage from abstract queue; do not merge b and a allocations or erase transfer writes.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "d1e9b3d3f67fc5370ca8496ce5bc3ac3fd6019f01f91b0f65c93bb94f1435eb7"
+    },
+    {
+      "id": "heap_append_false",
+      "family": "imperfect heap implementation",
+      "style": "novice or ad-hoc composition",
+      "stdout": "5 1 0\n",
+      "targets": [
+        "h"
+      ],
+      "views": [
+        "min-heap",
+        "tree",
+        "binary-tree"
+      ],
+      "prediction": {
+        "note": "One-based heap storage, unused capacity and unrelated priority cache. In append-only variant min-heap intent is violated; retain actual array/tree and contradictions instead of claiming a valid heap.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "87c94778cb3effc1ac0ca1d6204ff5e3cff8466d745ebf09fc755ab4e0a32be6"
+    },
+    {
+      "id": "heap_append_true",
+      "family": "imperfect heap implementation",
+      "style": "novice or ad-hoc composition",
+      "stdout": "5 8 3\n",
+      "targets": [
+        "h"
+      ],
+      "views": [
+        "array",
+        "tree",
+        "binary-tree"
+      ],
+      "prediction": {
+        "note": "One-based heap storage, unused capacity and unrelated priority cache. In append-only variant min-heap intent is violated; retain actual array/tree and contradictions instead of claiming a valid heap.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "7749ca4fc35e5257073813b9deb4ee4e216a9d0491ae564c077f7cef43abde97"
+    },
+    {
+      "id": "dsu_lazy_labels",
+      "family": "union-find by relabeling every element",
+      "style": "novice or ad-hoc composition",
+      "stdout": "0 5 1\n",
+      "targets": [
+        "label",
+        "size"
+      ],
+      "views": [
+        "array",
+        "graph",
+        "forest"
+      ],
+      "prediction": {
+        "note": "Equivalence labels are not parent pointers. DSU intent should not automatically create a fabricated parent forest; current labels describe three groups.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "225ed5325bdd93765dbc57af3a9e9e6a1de6fe79001230f2591ab00d513fe062"
+    },
+    {
+      "id": "dsu_recursive_size_noise",
+      "family": "parent forest with stale rank",
+      "style": "novice or ad-hoc composition",
+      "stdout": "3 2 2\n0\n",
+      "targets": [
+        "par",
+        "rank"
+      ],
+      "views": [
+        "forest",
+        "tree",
+        "graph"
+      ],
+      "prediction": {
+        "note": "Three parent trees then two; self-index is a root marker. Rank cache is irrelevant and intentionally stale, not node count.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "818769ef0db55f1a121855506b41c7b64c7e7a93bfc342dddd619a8fa0d7b5a1"
+    },
+    {
+      "id": "hash_linear_tombstone",
+      "family": "linear-probe map with tombstones",
+      "style": "novice or ad-hoc composition",
+      "stdout": "10 -1 30 40\n",
+      "targets": [
+        "table"
+      ],
+      "views": [
+        "array"
+      ],
+      "prediction": {
+        "note": "Hash map with collisions, retained dead bytes and slot reuse. No pointer graph can be claimed simply because keys/flags look like indices.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "5f2902a9bf66b0b094d791f5162cad0123b536021694f6940ab35003bc919b97"
+    },
+    {
+      "id": "hash_list_order_hybrid",
+      "family": "buckets plus insertion list",
+      "style": "novice or ad-hoc composition",
+      "stdout": "54321 12345\n",
+      "targets": [
+        "heads",
+        "first",
+        "a"
+      ],
+      "views": [
+        "linked-list",
+        "graph"
+      ],
+      "prediction": {
+        "note": "Five shared records participate in reverse bucket chain and forward insertion-order list. Both roles are valid; their union is cyclic.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "44ff543ce2e1c81c45c04de696274a7234b48ae027cdf2a78ec618c152c998cc"
+    },
+    {
+      "id": "forward_star_false",
+      "family": "parallel graph arrays with optional flags",
+      "style": "novice or ad-hoc composition",
+      "stdout": "6 15\n",
+      "targets": [
+        "head",
+        "to",
+        "next",
+        "weight"
+      ],
+      "views": [
+        "graph",
+        "linked-list",
+        "array"
+      ],
+      "prediction": {
+        "note": "Integer head/next edge lists form a directed multirole graph, including a self-loop. Optional tombstone suppresses one algorithmic edge without freeing storage.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "76adda48d96648fe8684e890e8ca4644bef32edfbd35102994fcdb8039e2b489"
+    },
+    {
+      "id": "forward_star_true",
+      "family": "parallel graph arrays with optional flags",
+      "style": "novice or ad-hoc composition",
+      "stdout": "5 14\n",
+      "targets": [
+        "head",
+        "to",
+        "next",
+        "weight"
+      ],
+      "views": [
+        "graph",
+        "linked-list",
+        "array"
+      ],
+      "prediction": {
+        "note": "Integer head/next edge lists form a directed multirole graph, including a self-loop. Optional tombstone suppresses one algorithmic edge without freeing storage.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "844cc146085ec58bdb3566f64efa047ffb543e6340eaa4e465fc9c202ff28ac4"
+    },
+    {
+      "id": "matrix_rows_and_bfs_parent",
+      "family": "graph plus traversal tree and flags",
+      "style": "novice or ad-hoc composition",
+      "stdout": "4 2\n",
+      "targets": [
+        "raw",
+        "rows",
+        "parent",
+        "queue"
+      ],
+      "views": [
+        "graph",
+        "grid",
+        "tree",
+        "queue"
+      ],
+      "prediction": {
+        "note": "Original graph has a shared child and cycle; parent array is a separate BFS tree; queue is traversal work storage, not vertex edges.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "65724d28956039d58a07b72f29325305c9931c08b678156fbaf82e8757cd6d22"
+    },
+    {
+      "id": "children_list_parent_cache",
+      "family": "tree whose child sets are lists",
+      "style": "novice or ad-hoc composition",
+      "stdout": "21 3\n",
+      "targets": [
+        "root",
+        "a"
+      ],
+      "views": [
+        "tree",
+        "graph"
+      ],
+      "prediction": {
+        "note": "Child/sibling physical edges form a binary representation of a three-child tree. Parent links and cached degree are auxiliary; logical children are not identical to raw outdegree.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "4b2e0d8999d7be04c712cd99372bbc18f4d34a5a62bec16c9394ffb49bcea665"
+    },
+    {
+      "id": "grid_cells_neighbour_chimera",
+      "family": "grid with explicit links and row list",
+      "style": "novice or ad-hoc composition",
+      "stdout": "21 6\n",
+      "targets": [
+        "a",
+        "head"
+      ],
+      "views": [
+        "grid",
+        "linked-list",
+        "graph"
+      ],
+      "prediction": {
+        "note": "Same six cells have grid coordinates, horizontal/vertical adjacency and one linear traversal. Optional next edges must not destroy physical grid view.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "7dc79ae5a228f15e9327970262330bf5b5e88b9e987266fcffcfedde13d60e0f"
+    },
+    {
+      "id": "lookup_payload_decoy",
+      "family": "unrelated arrays and integer metadata",
+      "style": "novice or ad-hoc composition",
+      "stdout": "28\n",
+      "targets": [
+        "x",
+        "values"
+      ],
+      "views": [
+        "array"
+      ],
+      "prediction": {
+        "note": "Names left/right/parent and index-looking payloads do not establish a tree: only independent lookup computations, no recursive/repeated edge traversal.",
+        "process": "source allocation and initialization precede traversals; optional storage and real writes remain visible; output is a checkpoint before local cleanup"
+      },
+      "sha256": "470cb2ad33a00120cef5590ba7deb9b49a61be0a8b85187edb70b40dd477d98b"
+    },
+    {
+      "id": "priority_scan_false",
+      "family": "priority queue without heap",
+      "style": "novice or ad-hoc composition",
+      "stdout": "98731\n",
+      "targets": [
+        "b"
+      ],
+      "views": [
+        "array"
+      ],
+      "prediction": {
+        "note": "Priority behavior comes from full scans or insertion sorting, not a parent/child heap. Do not infer a heap just from extremum comparisons.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "070830e3ce1d3f3553635ef667c90db437ae1776035189d92765a0fcf04f4581",
+      "predictedAt": "2026-11-09T08:48:33.564Z"
+    },
+    {
+      "id": "priority_scan_true",
+      "family": "priority queue without heap",
+      "style": "novice or ad-hoc composition",
+      "stdout": "13789\n",
+      "targets": [
+        "b"
+      ],
+      "views": [
+        "array"
+      ],
+      "prediction": {
+        "note": "Priority behavior comes from full scans or insertion sorting, not a parent/child heap. Do not infer a heap just from extremum comparisons.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "b00620ce69338ad5cbbe7b25142e2df77d0d197ea15f132c9265075161a1f50a",
+      "predictedAt": "2026-11-09T08:48:33.567Z"
+    },
+    {
+      "id": "double_list_stale_previous",
+      "family": "incomplete optional reverse links",
+      "style": "novice or ad-hoc composition",
+      "stdout": "15 11\n",
+      "targets": [
+        "head",
+        "tail",
+        "a"
+      ],
+      "views": [
+        "linked-list",
+        "graph"
+      ],
+      "prediction": {
+        "note": "No invalid memory access. Forward list has five nodes; reverse chain skips one because the programmer left an inconsistent prev pointer. Retain the contradiction rather than repair links.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "ee613c7f44d65dc80b6171270647fa244983cb5a52c616cab948c85c736328db",
+      "predictedAt": "2026-11-09T08:48:33.568Z"
+    },
+    {
+      "id": "tree_accidental_shared_child",
+      "family": "valid memory but non-tree topology",
+      "style": "novice or ad-hoc composition",
+      "stdout": "14\n",
+      "targets": [
+        "root",
+        "a"
+      ],
+      "views": [
+        "graph"
+      ],
+      "prediction": {
+        "note": "Intended tree actually shares a child between two parents. Four distinct records, diamond DAG in child roles; optional parent cache cannot override real child links.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "5ed7be5a254a88522985a0beea57d4a461d09719c2b876b3846a507bfcc07151",
+      "predictedAt": "2026-11-09T08:48:33.569Z"
+    },
+    {
+      "id": "tree_detach_without_free",
+      "family": "detached live records and stale auxiliary parent",
+      "style": "novice or ad-hoc composition",
+      "stdout": "10\n4 6\n",
+      "targets": [
+        "root",
+        "saved",
+        "a"
+      ],
+      "views": [
+        "tree",
+        "binary-tree",
+        "forest"
+      ],
+      "prediction": {
+        "note": "After detach, root reaches two nodes and saved reaches two; all four records stay alive. Stale parent cache must not restore removed child reachability.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "14cdf43782b194f82e3f0455bddac941ae92945c099aa6a41c411597d20d1349",
+      "predictedAt": "2026-11-09T08:48:33.573Z"
+    },
+    {
+      "id": "unrolled_list_partial_chunks",
+      "family": "linked chunks with uneven active counts",
+      "style": "novice or ad-hoc composition",
+      "stdout": "7 58\n6\n",
+      "targets": [
+        "head",
+        "chunks"
+      ],
+      "views": [
+        "linked-list",
+        "array"
+      ],
+      "prediction": {
+        "note": "Three linked storage nodes contain seven then six logical values. Node count, element count and capacity 12 are different; removed array bytes remain.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "503cc27c48108b962ed0366e347e3f6ef05e262a810d8230c6554bb0d8cbd277",
+      "predictedAt": "2026-11-09T08:48:33.575Z"
+    },
+    {
+      "id": "rope_manual_flags",
+      "family": "string tree with leaf marker and stale lengths",
+      "style": "novice or ad-hoc composition",
+      "stdout": "HELLO 99\n",
+      "targets": [
+        "root",
+        "a",
+        "out"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "prediction": {
+        "note": "Five tree nodes, three string leaves. Cached lengths are stale but harmless to this traversal; leaf flag controls actual recursion. Output is built in a distinct buffer.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "1dcb6197a1a8213e8c9ae3b5336dc811a8dcf98d6bba1ee65f529736b8ed8b16",
+      "predictedAt": "2026-11-09T08:48:33.577Z"
+    },
+    {
+      "id": "bst_optional_color_false",
+      "family": "unbalanced search tree with color metadata",
+      "style": "novice or ad-hoc composition",
+      "stdout": "15\n",
+      "targets": [
+        "root",
+        "a"
+      ],
+      "views": [
+        "tree",
+        "binary-tree",
+        "linked-list"
+      ],
+      "prediction": {
+        "note": "Ascending insertions produce a valid skewed BST. Merely attaching red fields does not establish a red-black tree or balancing; no rotations occur.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "3101d99cf3edb107e308832a245139f27f5e73079a07c730097f6fdb3965ebfb",
+      "predictedAt": "2026-11-09T08:48:33.580Z"
+    },
+    {
+      "id": "bst_optional_color_true",
+      "family": "unbalanced search tree with color metadata",
+      "style": "novice or ad-hoc composition",
+      "stdout": "15 1\n",
+      "targets": [
+        "root",
+        "a"
+      ],
+      "views": [
+        "tree",
+        "binary-tree",
+        "linked-list"
+      ],
+      "prediction": {
+        "note": "Ascending insertions produce a valid skewed BST. Merely attaching red fields does not establish a red-black tree or balancing; no rotations occur.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "5ae9adc6707485d0a1cf69d816399f066c639967c6fd93d7d682e9af3bb1f20c",
+      "predictedAt": "2026-11-09T08:48:33.581Z"
+    },
+    {
+      "id": "multiway_node_count_holes",
+      "family": "multiway tree with partial key arrays",
+      "style": "novice or ad-hoc composition",
+      "stdout": "200\n",
+      "targets": [
+        "root",
+        "pool"
+      ],
+      "views": [
+        "tree"
+      ],
+      "prediction": {
+        "note": "Five live members in capacity eight, root four children, seven active keys. This is a multiway tree representation; no B-tree balancing intent should be inferred from array capacity alone.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "dd1b23d7510b178acdb2a471ec0e6635da2be64ff680c1cab3889f5a767087aa",
+      "predictedAt": "2026-11-09T08:48:33.583Z"
+    },
+    {
+      "id": "segment_tree_naive_ranges",
+      "family": "range tree with endpoint fields",
+      "style": "novice or ad-hoc composition",
+      "stdout": "28 15\n",
+      "targets": [
+        "a",
+        "values"
+      ],
+      "views": [
+        "tree",
+        "binary-tree",
+        "array"
+      ],
+      "prediction": {
+        "note": "Child indices are arithmetic; fields named left/right are interval bounds, not links. Capacity 20 includes unused records.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "1a3fd86f6c3fa9d733bce4452b9feac88630ecc2e5439b655dae42ec83f5636e",
+      "predictedAt": "2026-11-09T08:48:33.585Z"
+    },
+    {
+      "id": "fenwick_redundant_prefix",
+      "family": "implicit low-bit tree with extra cache",
+      "style": "novice or ad-hoc composition",
+      "stdout": "28 28\n",
+      "targets": [
+        "bit",
+        "cache",
+        "plain"
+      ],
+      "views": [
+        "array",
+        "tree"
+      ],
+      "prediction": {
+        "note": "Implicit Fenwick relationships and a redundant ordinary prefix cache; identical numerical output does not make these the same structure.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "28c4aa839c4fbb1ae2fc033abf593f3b98d1c9bc7a6458a047ce284b9b960f1a",
+      "predictedAt": "2026-11-09T08:48:33.586Z"
+    },
+    {
+      "id": "sparse_matrix_triplets",
+      "family": "coordinate list with no pointer edges",
+      "style": "novice or ad-hoc composition",
+      "stdout": "3 17\n",
+      "targets": [
+        "e",
+        "dense"
+      ],
+      "views": [
+        "grid",
+        "array"
+      ],
+      "prediction": {
+        "note": "Four records encode three nonzero matrix cells, including duplicate coordinates. Row and column domains are distinct; duplicate entries are not extra vertices.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "98ee32e5dc60e88170507319adc8f6194aa43c551b134f7bb5dd72161190a017",
+      "predictedAt": "2026-11-09T08:48:33.588Z"
+    },
+    {
+      "id": "sparse_table_grid",
+      "family": "precomputed range table",
+      "style": "novice or ad-hoc composition",
+      "stdout": "3 1\n",
+      "targets": [
+        "table"
+      ],
+      "views": [
+        "grid"
+      ],
+      "prediction": {
+        "note": "Sparse-table DAG is a computation dependency, not stored links. A physical grid should remain available; unfilled entries stay distinct from active table cells.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "e42e82d9a8503f739736b427f07dc7f3491af7ecd5642757ecb3572a14994057",
+      "predictedAt": "2026-11-09T08:48:33.592Z"
+    },
+    {
+      "id": "pool_free_list_recycle",
+      "family": "array pool with active and free chains",
+      "style": "novice or ad-hoc composition",
+      "stdout": "3 13 3 2\n",
+      "targets": [
+        "pool"
+      ],
+      "views": [
+        "linked-list",
+        "graph",
+        "array"
+      ],
+      "prediction": {
+        "note": "One allocation holds two disjoint index chains; removed slot is reused without malloc/free. Old payload is legitimate stale storage, not uninitialized garbage.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "f6616e0c03a5138ac009a6377975fad598d77e45eb07f17ca1595cd1938c5948",
+      "predictedAt": "2026-11-09T08:48:33.593Z"
+    },
+    {
+      "id": "duplicate_payload_false",
+      "family": "identity versus equal payload",
+      "style": "novice or ad-hoc composition",
+      "stdout": "15\n",
+      "targets": [
+        "root",
+        "a"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "prediction": {
+        "note": "Same sum and leaf payloads; separate leaves form a three-node tree, while two pointers to one leaf form a shared-child relation. Never merge objects by value.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "5b63b006f3d69f7fdb2e25f2097be74c3078b037129d03d42fa9caa97ec8ed19",
+      "predictedAt": "2026-11-09T08:48:33.594Z"
+    },
+    {
+      "id": "duplicate_payload_true",
+      "family": "identity versus equal payload",
+      "style": "novice or ad-hoc composition",
+      "stdout": "15\n",
+      "targets": [
+        "root",
+        "a"
+      ],
+      "views": [
+        "graph"
+      ],
+      "prediction": {
+        "note": "Same sum and leaf payloads; separate leaves form a three-node tree, while two pointers to one leaf form a shared-child relation. Never merge objects by value.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "1e09de007819f3e76c602c86e25c7a4a3648130f66191b5e308a6e6b32922835",
+      "predictedAt": "2026-11-09T08:48:33.596Z"
+    },
+    {
+      "id": "heterogeneous_vertex_edge",
+      "family": "vertices and edge records separately allocated",
+      "style": "novice or ad-hoc composition",
+      "stdout": "4 51\n",
+      "targets": [
+        "nodes",
+        "edges"
+      ],
+      "views": [
+        "graph",
+        "linked-list"
+      ],
+      "prediction": {
+        "note": "Three vertices and four separate edge records; parent pointers are auxiliary, not replacements for graph connectivity. Self/cross-record types must remain distinct.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "166a91769816de1cd8eaaeb1c84a1716d62c59d251b6af141ed67440b9de8f7c",
+      "predictedAt": "2026-11-09T08:48:33.598Z"
+    },
+    {
+      "id": "pointer_payload_list",
+      "family": "one allocation per node and payload",
+      "style": "novice or ad-hoc composition",
+      "stdout": "10\n",
+      "targets": [
+        "head"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "prediction": {
+        "note": "Four node allocations and four scalar payload allocations. The payload edges are not list successors; frees occur separately and must keep their true order.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "7eb880057686d7fbe7aed939ff439c3ced82f4b88664b8458e520806573a3f85",
+      "predictedAt": "2026-11-09T08:48:33.600Z"
+    },
+    {
+      "id": "graph_string_vertex_labels",
+      "family": "edge table whose endpoints are names",
+      "style": "novice or ad-hoc composition",
+      "stdout": "2 3 4\n",
+      "targets": [
+        "e",
+        "names",
+        "matrix"
+      ],
+      "views": [
+        "graph",
+        "grid",
+        "array"
+      ],
+      "prediction": {
+        "note": "Name lookup creates a three-vertex cycle; string byte arrays remain distinct from vertex-index identities.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "8ae0ccb06137950ba5433dca117e8eac966361775d130c7666eee0e9f1aef784",
+      "predictedAt": "2026-11-09T08:48:33.611Z"
+    },
+    {
+      "id": "ragged_rows_in_linked_list",
+      "family": "ragged arrays attached to list records",
+      "style": "novice or ad-hoc composition",
+      "stdout": "3 28\n",
+      "targets": [
+        "head",
+        "rows"
+      ],
+      "views": [
+        "linked-list",
+        "array"
+      ],
+      "prediction": {
+        "note": "Three list records refer to three arrays with different lengths; no rectangular matrix or common allocation should be invented.",
+        "process": "preserve physical storage and every source-level write; distinguish declared intent from the actually traversed relationships"
+      },
+      "sha256": "5205ef1fed68daa896e410d59150774df371068e74a6993364ca01ce09621a0b",
+      "predictedAt": "2026-11-09T08:48:33.612Z"
+    },
+    {
+      "id": "probe_simple_single_chain",
+      "family": "one-link minimal control",
+      "style": "independent novice implementation or discriminating probe",
+      "stdout": "10\n",
+      "targets": [
+        "head",
+        "a"
+      ],
+      "views": [
+        "linked-list"
+      ],
+      "prediction": {
+        "note": "Exactly one forward link per node, no cache or parent. A chain is mathematically a degenerate tree but a list is the useful primary view."
+      },
+      "sha256": "214987276ec7e2447f316821308b0a5ad4d778c67568dd634e3341bc577fd01a",
+      "predictedAt": "2026-11-09T08:53:26.904Z"
+    },
+    {
+      "id": "probe_chain_then_branch",
+      "family": "shape transition",
+      "style": "independent novice implementation or discriminating probe",
+      "stdout": "6\n10\n",
+      "targets": [
+        "root",
+        "a"
+      ],
+      "views": [
+        "tree",
+        "binary-tree",
+        "linked-list"
+      ],
+      "prediction": {
+        "note": "Three-node chain then four-node branching tree. Alternative views can coexist; later branching must not be used as evidence at the first output."
+      },
+      "sha256": "05449284e5d107f7a5e4c272e2ccf990e9e473d7627810ac9d9ec073af1ccbfb",
+      "predictedAt": "2026-11-09T08:53:26.908Z"
+    },
+    {
+      "id": "probe_queue_two_stacks_phases",
+      "family": "composed FIFO lifecycle",
+      "style": "independent novice implementation or discriminating probe",
+      "stdout": "3 0\n1 1 2\n234 0 0\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue",
+        "stack",
+        "array"
+      ],
+      "prediction": {
+        "note": "One FIFO is composed of two stack arrays. Query nonempty, mixed and empty phases; no single array is a complete FIFO snapshot."
+      },
+      "sha256": "c8e7ec2d7948004e32be755d0ef9110792b0f0bd4eae33fa9bb37fb6b7c24c63",
+      "predictedAt": "2026-11-09T08:53:26.922Z"
+    },
+    {
+      "id": "probe_priority_scan_phases",
+      "family": "scan priority lifecycle",
+      "style": "independent novice implementation or discriminating probe",
+      "stdout": "4\n86 2\n8632 0\n",
+      "targets": [
+        "b"
+      ],
+      "views": [
+        "array"
+      ],
+      "prediction": {
+        "note": "Priority behavior via unsorted scan, no heap. Empty state still owns a six-element array; distinguish storage fallback from abstract priority queue recognition."
+      },
+      "sha256": "f37e2a4c7e9d8d217c722c28a7dd60c2ba64104d578ed222220ea829ddf2b093",
+      "predictedAt": "2026-11-09T08:53:26.923Z"
+    },
+    {
+      "id": "probe_parent_only_tree",
+      "family": "parent-only tree with extra properties",
+      "style": "independent novice implementation or discriminating probe",
+      "stdout": "14\n",
+      "targets": [
+        "a"
+      ],
+      "views": [
+        "tree",
+        "forest"
+      ],
+      "prediction": {
+        "note": "Parent-only rooted tree, shuffled record order; up is a real traversed index and cache is not a cardinality. Six nodes, depth counts 1,3,2,2,3,3."
+      },
+      "sha256": "cefd5b3fdfb2c3e8f12dc3c27988fe4f57ff6b8469aabf65ab61fd8d853075bd",
+      "predictedAt": "2026-11-09T08:53:26.924Z"
+    },
+    {
+      "id": "probe_circular_deque_stale_cache",
+      "family": "circular deque with unused size cache",
+      "style": "independent novice implementation or discriminating probe",
+      "stdout": "34567 99\n26\n",
+      "targets": [
+        "q"
+      ],
+      "views": [
+        "queue",
+        "array"
+      ],
+      "prediction": {
+        "note": "Modulo storage is full with logical order 3,4,5,6,7. Cache 99 is unrelated. Second state modifies beginning and overwrites one live slot, still memory-safe."
+      },
+      "sha256": "1ce0c2c7afbef92beb8a79efe1e826848e16b98c28f3b8fc757e6e2e91e55347",
+      "predictedAt": "2026-11-09T08:53:26.925Z"
+    },
+    {
+      "id": "probe_trie_false",
+      "family": "table trie optional terminal field",
+      "style": "independent novice implementation or discriminating probe",
+      "stdout": "5 3\n",
+      "targets": [
+        "edge"
+      ],
+      "views": [
+        "tree",
+        "grid",
+        "array"
+      ],
+      "prediction": {
+        "note": "An index-table trie with five nodes; optional terminal marks distinguish word acceptance, not connectivity. All 8x3 cells initialized to -1."
+      },
+      "sha256": "f6bd599df68214b5eb64a56edc8fc8311ab50cb6486659d4154fbe9d7c53b04c",
+      "predictedAt": "2026-11-09T08:53:26.929Z"
+    },
+    {
+      "id": "probe_trie_true",
+      "family": "table trie optional terminal field",
+      "style": "independent novice implementation or discriminating probe",
+      "stdout": "5 3 1\n",
+      "targets": [
+        "edge",
+        "terminal"
+      ],
+      "views": [
+        "tree",
+        "grid",
+        "array"
+      ],
+      "prediction": {
+        "note": "An index-table trie with five nodes; optional terminal marks distinguish word acceptance, not connectivity. All 8x3 cells initialized to -1."
+      },
+      "sha256": "3710ce8ef1ef62086b37f7bc2fa058c489030b11fee1e2fed53950321b5d8b1d",
+      "predictedAt": "2026-11-09T08:53:26.930Z"
+    },
+    {
+      "id": "probe_skip_levels_manual",
+      "family": "hand-built skip links",
+      "style": "independent novice implementation or discriminating probe",
+      "stdout": "7 25\n",
+      "targets": [
+        "head",
+        "a"
+      ],
+      "views": [
+        "linked-list",
+        "graph"
+      ],
+      "prediction": {
+        "note": "Base list plus shortcut level, structurally a DAG in union; no balancing or probabilistic insertion. Each pointer-array slot has a separate role."
+      },
+      "sha256": "5394469f7c1b931544ee299c7540f7639bb183b2efb6d9ee6161837ba26bdd96",
+      "predictedAt": "2026-11-09T08:53:26.931Z"
+    },
+    {
+      "id": "probe_graph_adjacency_counts",
+      "family": "ragged adjacency vectors",
+      "style": "independent novice implementation or discriminating probe",
+      "stdout": "4 15\n",
+      "targets": [
+        "a",
+        "q"
+      ],
+      "views": [
+        "graph",
+        "queue",
+        "array"
+      ],
+      "prediction": {
+        "note": "Four-vertex diamond graph with per-record adjacency arrays, counts and separate weight arrays; capacity slots are not graph edges."
+      },
+      "sha256": "6c09246490ac08904565dcae70982be0469072c45ebea56953bd6f44dc9ce3c1",
+      "predictedAt": "2026-11-09T08:53:26.936Z"
+    },
+    {
+      "id": "siblings_renamed_false",
+      "family": "child-sibling optional parent control",
+      "style": "novice composition with optional metadata",
+      "stdout": "20\n",
+      "targets": [
+        "root",
+        "a"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "prediction": {
+        "note": "Same logical tree has root children indices 3,1,4 and child 2 of node3. Optional parent role cannot require sibling to reverse directly to its previous sibling. Fields renamed, slots reordered."
+      },
+      "sha256": "23389d87f69f222f6533a86e317fbb2774d56e88f02ad9b7f16cdce6db29671b",
+      "predictedAt": "2026-11-09T08:56:21.848Z"
+    },
+    {
+      "id": "siblings_renamed_true",
+      "family": "child-sibling optional parent control",
+      "style": "novice composition with optional metadata",
+      "stdout": "20\n",
+      "targets": [
+        "root",
+        "a"
+      ],
+      "views": [
+        "tree",
+        "binary-tree"
+      ],
+      "prediction": {
+        "note": "Same logical tree has root children indices 3,1,4 and child 2 of node3. Optional parent role cannot require sibling to reverse directly to its previous sibling. Fields renamed, slots reordered."
+      },
+      "sha256": "a14af49504321ce98257c25d1417319bfab69cd7cd23b426fec06b5498dc9f1e",
+      "predictedAt": "2026-11-09T08:56:21.861Z"
+    },
+    {
+      "id": "parent_array_terminal_false",
+      "family": "parent-array terminal representation",
+      "style": "novice composition with optional metadata",
+      "stdout": "14\n",
+      "targets": [
+        "a"
+      ],
+      "views": [
+        "tree",
+        "forest"
+      ],
+      "prediction": {
+        "note": "Same six-node rooted tree as record parent probe, represented by scalar array. Root self-reference or -1 terminates traversal; do not count self sentinel as a graph cycle."
+      },
+      "sha256": "b66d2e23fe772edb78744a1d33c9b380c0b432502c36f3f8cd47a03d2b4fe878",
+      "predictedAt": "2026-11-09T08:56:21.862Z"
+    },
+    {
+      "id": "parent_array_terminal_true",
+      "family": "parent-array terminal representation",
+      "style": "novice composition with optional metadata",
+      "stdout": "14\n",
+      "targets": [
+        "a"
+      ],
+      "views": [
+        "tree",
+        "forest"
+      ],
+      "prediction": {
+        "note": "Same six-node rooted tree as record parent probe, represented by scalar array. Root self-reference or -1 terminates traversal; do not count self sentinel as a graph cycle."
+      },
+      "sha256": "8da986833f161db8a68708cb5293be88b98c5d5946c36f722d5c936d961346ce",
+      "predictedAt": "2026-11-09T08:56:21.863Z"
+    },
+    {
+      "id": "nested_lists_owner_cache",
+      "family": "list of lists with owner cache",
+      "style": "novice composition with optional metadata",
+      "stdout": "2 15\n",
+      "targets": [
+        "root",
+        "b",
+        "a"
+      ],
+      "views": [
+        "linked-list",
+        "graph",
+        "array"
+      ],
+      "prediction": {
+        "note": "Outer two-node list owns inner lists of lengths3 and2. Backreference owner creates cycles in physical graph but is not next/previous. Two relation domains, not one homogeneous tree."
+      },
+      "sha256": "821928b6fc6af38228223da6d8992dd2b859e803442d4bd538ca2480575d0d5c",
+      "predictedAt": "2026-11-09T08:56:21.864Z"
+    },
+    {
+      "id": "sentinel_ring_optional_metadata",
+      "family": "sentinel ring with duplicate values",
+      "style": "novice composition with optional metadata",
+      "stdout": "3\n2\n",
+      "targets": [
+        "head",
+        "a"
+      ],
+      "views": [
+        "linked-list",
+        "graph"
+      ],
+      "prediction": {
+        "note": "Ring has four then three reachable storage nodes including sentinel, payloadcount3 then2. Every payload equals0 so sentinel recognition must use traversal guard, never values/tag names. Detached node remains allocated."
+      },
+      "sha256": "3e79e5626054dc6bd215d748c1b09a9de66118d42cc3d5fbf4a8d47a2b146fc8",
+      "predictedAt": "2026-11-09T08:56:21.868Z"
+    },
+    {
+      "id": "spaghetti_scheduler_parallel",
+      "family": "ad hoc scheduler with overlapping views",
+      "stdout": "19 13254 0\n37\n",
+      "targets": [
+        "stuff",
+        "hop",
+        "parent",
+        "line",
+        "buckets"
+      ],
+      "views": [
+        "array",
+        "grid",
+        "graph",
+        "tree",
+        "forest",
+        "linked-list"
+      ],
+      "prediction": {
+        "note": "Five records in 5x3 table, two hop chains, parent tree, sorted index worklist and result log share task identities. Sorted priority order3,1,4,0,2; successive scans execute0,2,1,4,3. Output19 13254 0, then weighted ancestor sum37. Do not conflate the two link roles or treat done/log as links based on coinciding integers."
+      },
+      "style": "novice ad-hoc implementation",
+      "sha256": "b6971d3fa213318bc56175d898f5ffa8adb857346dda170975c39fd07efc2907",
+      "predictedAt": "2026-11-09T08:59:31.605Z"
+    },
+    {
+      "id": "parent_storage_repurposed",
+      "family": "storage changes semantic purpose",
+      "stdout": "7\n60\n",
+      "targets": [
+        "a"
+      ],
+      "views": [
+        "tree",
+        "array",
+        "graph"
+      ],
+      "prediction": {
+        "note": "Parent array rooted at0 is traversed first, depths1+2+2+2=7. Then same live array overwritten with ordinary scores10,20,10,20 and only summed. Preserve storage identity; former traversal relation is historical, not proof that scores are current valid links."
+      },
+      "style": "novice ad-hoc implementation",
+      "sha256": "c40b258b10970be43dd4c4835b1bdbc4d0f90de3101982eba08e01150018ef56",
+      "predictedAt": "2026-11-09T08:59:31.609Z"
+    },
+    {
+      "id": "truth_member_source_false",
+      "family": "member truth source range control",
+      "style": "targeted metadata probe",
+      "stdout": "7\n",
+      "targets": [
+        "a",
+        "p"
+      ],
+      "views": [
+        "array"
+      ],
+      "prediction": {
+        "note": "READ p->flag =1, CALC truth or !=0 =true, branch enters, sum becomes7. CALC source should cover p->flag for implicit truth, or p->flag !=0 for explicit comparison; highlighting just p misidentifies tested value."
+      },
+      "sha256": "d8c5fa0f62c54b9305df4cd181020668f68f6c980db5e97ea1e66b3610d4b6a6",
+      "predictedAt": "2026-11-09T09:00:54.570Z"
+    },
+    {
+      "id": "truth_member_source_true",
+      "family": "member truth source range control",
+      "style": "targeted metadata probe",
+      "stdout": "7\n",
+      "targets": [
+        "a",
+        "p"
+      ],
+      "views": [
+        "array"
+      ],
+      "prediction": {
+        "note": "READ p->flag =1, CALC truth or !=0 =true, branch enters, sum becomes7. CALC source should cover p->flag for implicit truth, or p->flag !=0 for explicit comparison; highlighting just p misidentifies tested value."
+      },
+      "sha256": "b3021413ad5e26b577718742658a32714c60ad278de7a485269ed3e77536ce49",
+      "predictedAt": "2026-11-09T09:00:54.574Z"
+    }
+  ]
+}

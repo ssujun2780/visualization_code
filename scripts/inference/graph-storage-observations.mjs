@@ -2,7 +2,7 @@ import {stateHistoryCoverage,appendStateSnapshot} from './state-history.mjs';
 // Extend a learned graph role with subsequent storage observations. Comparisons
 // establish roles, but are not required to execute for every later edge.
 import {topology} from '../shared/topology.mjs';
-import {graphProofId} from './graph-proof-identity.mjs';
+import {graphProofId,graphEdgeIdentity,mergeGraphEvidence} from './graph-proof-identity.mjs';
 const unique=a=>[...new Set(a)];
 const slot=r=>r&&`${r.objectId}:${r.offset}:${r.size}`;
 const overlap=(a,b)=>a?.objectId===b?.objectId&&a.offset<b.offset+b.size&&b.offset<a.offset+a.size;
@@ -92,7 +92,7 @@ export function observeGraphStorage(plan,trace,s,{maxStates=512,maxEvidence=8192
       const old=edges.get(edge.id),gone=absences.get(edge.id),proof=s.evidence.find(p=>p.executionId===edge.executionId&&p.edgeIdentity===edge.edgeIdentity);
       if(gone&&pos.get(edge.executionId)<=pos.get(gone.executionId))continue;
       if(old?.basis==='learned-storage-role'&&pos.get(old.executionId)>pos.get(edge.executionId))continue;
-      edges.set(edge.id,{...edge,storageRoleId:schemaForProof.get(proof)});
+      edges.set(edge.id,mergeGraphEvidence(old,{...edge,storageRoleId:schemaForProof.get(proof)}));
     }}
     for(const schema of schemas.values()){
       const rowKey=`${schema.id}|${e.activationId}`;
@@ -124,7 +124,7 @@ export function observeGraphStorage(plan,trace,s,{maxStates=512,maxEvidence=8192
         if(!fresh(reads,at))continue;
         const sourceReads=schema.matrix?(schema.gate?.readSites??[]).map(site=>readAt(site,e)).filter(Boolean):[source,...other];
         if(schema.matrix&&schema.gate&&sourceReads.length!==schema.gate.readSites.length)continue;
-        const slots=sourceReads.map(r=>r.target),identity=schema.matrix?`matrix-operand-pair:${from}:${to}:${slots.map(slot).join('|')}`:
+        const slots=sourceReads.map(r=>r.target),identity=schema.matrix?graphEdgeIdentity({fromIndex:from,toIndex:to,sourceSlots:slots,properties:props.map(r=>({source:r.target}))},{matrix:true}):
           `${slots.map(slot).sort().join('|')}:${from}:${to}`;
         const row=rows.get(rowKey);if(row?.from===from){row.seen.add(identity);row.pending=false;row.watched.push(...slots,...props.map(r=>r.target));}
         if(storageEvidence.length>=maxEvidence||!edges.has(identity)&&edges.size>=maxEdges){omittedEvidence++;continue;}
@@ -134,8 +134,8 @@ export function observeGraphStorage(plan,trace,s,{maxStates=512,maxEvidence=8192
           fromReadExecutionId:schema.matrix?null:cursor.eventId,evidenceExecutionIds:unique([...reads,...sourceReads].map(r=>r.eventId)),
           sourceSlots:slots,sourceReads:sourceReads.map(r=>({source:r.target,executionId:r.eventId})),
           rootBindings:previous?.rootBindings??[],rangeInputs:row?[{source:byId.get(row.start).target,sourceReadExecutionId:row.start}]:[],properties:props.map((r,i)=>({source:r.target,value:r.value,readExecutionId:r.eventId,role:schema.properties[i].role,status:'observed'}))};
-        storageEvidence.push(proof);edges.set(identity,{...proof,id:identity,from:nodeId(from),to:nodeId(to),status:'observed',
-          storageRoleId:schema.id,basis:'learned-storage-role',afterExecutionId:e.eventId});changed=true;
+        storageEvidence.push(proof);edges.set(identity,mergeGraphEvidence(previous,{...proof,id:identity,from:nodeId(from),to:nodeId(to),status:'observed',
+          storageRoleId:schema.id,basis:'learned-storage-role',afterExecutionId:e.eventId}));changed=true;
       }
       if(e.action==='branch'&&e.instructionId===schema.loopSite){
         const row=rows.get(rowKey);if(row){

@@ -1,0 +1,1031 @@
+{
+  "createdAt": "2026-11-09T02:15:03.667Z",
+  "cases": [
+    {
+      "id": "01_backlink_remove",
+      "intent": "intrusive singly linked list with pointer-to-pointer backlink",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N {int value; struct N*next; struct N**back;} N;\nvoid add(N**head,N*x){x->next=*head;x->back=head;if(*head)(*head)->back=&x->next;*head=x;}\nvoid erase(N*x){*x->back=x->next;if(x->next)x->next->back=x->back;x->next=0;x->back=0;}\nint main(void){N nodes[5]={{1,0,0},{2,0,0},{3,0,0},{4,0,0},{5,0,0}};N*head=0;\nfor(int i=4;i>=0;i--)add(&head,&nodes[i]);erase(&nodes[2]);int sum=0;for(N*p=head;p;p=p->next)sum+=p->value;\nprintf(\"%d %d\\n\",sum,nodes[2].value);return 0;}\n",
+      "stdout": "12 3\n",
+      "process": [
+        "5 add calls and 1 erase; pointer-to-pointer READ/WRITE targets resolve to head or predecessor.next",
+        "erase unlinks but does not free automatic nodes",
+        "final traversal reads values 1,2,4,5"
+      ],
+      "structures": [
+        "one live chain of 4 nodes; detached node remains alive; backlink points to a slot rather than a duplicate node"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:09:37.935Z",
+      "sha256": "466d6acf5fb381857f95da6d433c1f25d47a429fa58ddeefca1b984b8a4a939f",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/01_backlink_remove.c"
+    },
+    {
+      "id": "02_parent_thread_rotation",
+      "intent": "tree with parent and independent inorder thread",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N{struct N*parent,*low,*high,*thread;int value;}N;\nN*rotate(N*x){N*y=x->high;x->high=y->low;if(y->low)y->low->parent=x;y->parent=x->parent;y->low=x;x->parent=y;return y;}\nint sum(N*p){if(!p)return 0;return sum(p->low)+p->value+sum(p->high);}\nint main(void){N a[7]={0};for(int i=0;i<7;i++){a[i].value=i+1;a[i].thread=i<6?&a[i+1]:0;}\nN*root=&a[3];root->low=&a[1];root->high=&a[5];a[1].parent=root;a[5].parent=root;\na[1].low=&a[0];a[1].high=&a[2];a[0].parent=&a[1];a[2].parent=&a[1];\na[5].low=&a[4];a[5].high=&a[6];a[4].parent=&a[5];a[6].parent=&a[5];\nroot=rotate(root);int threaded=0;for(N*p=a;p;p=p->thread)threaded+=p->value;\nprintf(\"%d %d %d\\n\",sum(root),threaded,root->value);return 0;}\n",
+      "stdout": "28 28 6\n",
+      "process": [
+        "rotation mutates actual links in source order; intermediates are preserved",
+        "return of rotate is delivered to existing root box",
+        "sum has 15 recursive activations including null leaves"
+      ],
+      "structures": [
+        "7-node child tree plus parent links and independent thread; original objects survive rotation"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:09:37.939Z",
+      "sha256": "b74d28277cd65e59edc3d7af225844e5b571c5276ff2c8e60aad6cdb1187cb35",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/02_parent_thread_rotation.c"
+    },
+    {
+      "id": "03_counted_sentinel",
+      "intent": "circular list whose dummy header stores a count",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N{int data;struct N*next;}N;\nint main(void){N a[3]={{10,0},{20,0},{30,0}},header={3,a};a[0].next=&a[1];a[1].next=&a[2];a[2].next=&header;\nint count=header.data,total=0;for(N*p=header.next;p!=&header;p=p->next)total+=p->data;\nprintf(\"%d %d\\n\",count,total);return 0;}\n",
+      "stdout": "3 60\n",
+      "process": [
+        "header.data READ is metadata; traversal payload reads only 10,20,30",
+        "compare against header ends traversal before header payload"
+      ],
+      "structures": [
+        "dummy header plus 3 data nodes; scalar header read alone cannot prove header is an ordinary list item"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:09:37.940Z",
+      "sha256": "897be194b496d2a3bae5481d5450901d1460ab59e1536023361c8fd3bbacd956",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/03_counted_sentinel.c"
+    },
+    {
+      "id": "04_fenwick_and_payload",
+      "intent": "Fenwick index relations over separate source and aggregate arrays",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nvoid put(int*t,int n,int i,int x){for(;i<=n;i+=i&-i)t[i]+=x;}\nint get(const int*t,int i){int s=0;for(;i>0;i-=i&-i)s+=t[i];return s;}\nint main(void){int tree[9]={0},payload[8]={1,2,3,4,5,6,7,8};for(int i=0;i<8;i++)put(tree,8,i+1,payload[i]);\nprintf(\"%d %d %d\\n\",get(tree,8),get(tree,5),get(tree,8)-get(tree,3));return 0;}\n",
+      "stdout": "36 15 30\n",
+      "process": [
+        "t[i]+=x preserves one old-value READ, one addition and one WRITE",
+        "i&-i belongs in each enclosing index-update CALC",
+        "4 get calls remain real call boundaries"
+      ],
+      "structures": [
+        "aggregate index tree is not a binary heap; two arrays carry related but distinct values"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:09:37.941Z",
+      "sha256": "35d1af7b29645ec12f351e7d191eeb86d8788021606aa35bc37222ab7c714798",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/04_fenwick_and_payload.c"
+    },
+    {
+      "id": "05_global_deque",
+      "intent": "ring deque with separately stored globals",
+      "style": "beginner",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nint boxes[7],head,used;\nvoid front(int x){head=(head+6)%7;boxes[head]=x;used++;}\nvoid back(int x){boxes[(head+used)%7]=x;used++;}\nint first(void){int x=boxes[head];head=(head+1)%7;used--;return x;}\nint last(void){used--;return boxes[(head+used)%7];}\nint main(void){front(2);back(3);front(1);int a=last(),b=first();back(4);int c=first(),d=first();printf(\"%d %d %d %d\\n\",a,b,c,d);return 0;}\n",
+      "stdout": "3 1 2 4\n",
+      "process": [
+        "global integers and array are zero-initialized before main",
+        "decrement before last READ and first READ before decrement preserve order",
+        "four return destinations initialized at their declarations"
+      ],
+      "structures": [
+        "one deque across separate storage; not just FIFO because both ends are used"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:09:37.942Z",
+      "sha256": "eb491aaea8e276cc81f73ce76f8bfa0909be9122ddad187358479167996f2044",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/05_global_deque.c"
+    },
+    {
+      "id": "06_csr_dijkstra",
+      "intent": "weighted directed graph in CSR arrays",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nint edge(const int*a,int i){return a[i];}\nint main(void){int offsets[6]={0,2,4,5,6,6},to[6]={1,2,2,3,3,4},cost[6]={2,9,1,4,1,1};int distance[5]={0,999,999,999,999},done[5]={0};\nfor(int step=0;step<5;step++){int u=-1;for(int v=0;v<5;v++)if(!done[v]&&(u<0||distance[v]<distance[u]))u=v;\ndone[u]=1;for(int e=offsets[u];e<offsets[u+1];e++){int v=edge(to,e);int alt=distance[u]+edge(cost,e);if(alt<distance[v])distance[v]=alt;}}\nfor(int i=0;i<5;i++)printf(\"%d%c\",distance[i],i==4?'\\n':' ');return 0;}\n",
+      "stdout": "0 2 3 4 5\n",
+      "process": [
+        "u<0 short circuits distance[u] read; no access at -1",
+        "helper call returns to same outer addition CALC",
+        "distance changes are distinct READ/CALC/WRITE even if final vertex values match"
+      ],
+      "structures": [
+        "CSR outgoing ranges + destinations + weights; done and distance are per-vertex metadata, not extra edge arrays"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:09:37.943Z",
+      "sha256": "9763f86f2dcfc6c1e5cddcaf3b824da7344518fda500f54d93fc7760af7706fc",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/06_csr_dijkstra.c"
+    },
+    {
+      "id": "07_bitset_reachability",
+      "intent": "graph encoded by bitset rows",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nint main(void){unsigned rows[6]={6,8,8,16,32,0},seen=1;int queue[6]={0},front=0,back=1,sum=0;\nwhile(front<back){int u=queue[front++];sum+=u;for(int v=0;v<6;v++)if((rows[u]&(1u<<v))&&!(seen&(1u<<v))){seen|=1u<<v;queue[back++]=v;}}\nprintf(\"%u %d\\n\",seen,sum);return 0;}\n",
+      "stdout": "63 15\n",
+      "process": [
+        "bitmask compound conditions remain one source logical CALC, with actual short circuits",
+        "queue postfix cursors return old indices while updating counters"
+      ],
+      "structures": [
+        "bitset rows encode edges; integer bit patterns must not be treated as pointer addresses or simple indices"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:09:37.944Z",
+      "sha256": "dc6e0a7d4cce4dc803eb076e7fe4cb08f0ee727ad9927c2c125561f3e6b07e38",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/07_bitset_reachability.c"
+    },
+    {
+      "id": "08_ragged_rows",
+      "intent": "nonrectangular separately allocated grid with shared alias",
+      "style": "beginner",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nint main(void){int lengths[3]={2,4,1};int**rows=calloc(3,sizeof *rows);if(!rows)return 1;\nfor(int i=0;i<3;i++){rows[i]=malloc(lengths[i]*sizeof **rows);if(!rows[i])return 1;for(int j=0;j<lengths[i];j++)rows[i][j]=10*i+j;}\nint*alias=rows[1];int sum=0;for(int i=0;i<3;i++)for(int j=0;j<lengths[i];j++)sum+=rows[i][j];alias[2]+=5;\nprintf(\"%d %d\\n\",sum,rows[1][2]);for(int i=0;i<3;i++)free(rows[i]);free(rows);return 0;}\n",
+      "stdout": "67 17\n",
+      "process": [
+        "outer pointer array plus 3 separate row allocations; alias has no own allocation",
+        "sum before alias mutation is 67; alias[2] and rows[1][2] reference same slot",
+        "four frees follow accesses"
+      ],
+      "structures": [
+        "ragged rows, not contiguous rectangular array; alias does not duplicate row"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:09:37.946Z",
+      "sha256": "bfca127445c234f0c3cdfc0b9820b9fa2e8d1d3dde6ae303c5a239019b68e6a1",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/08_ragged_rows.c"
+    },
+    {
+      "id": "09_union_expression",
+      "intent": "tagged expression tree with overwritten union member",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N N;struct N{int tag;union{int number;struct{N*a,*b;}pair;}u;};\nint eval(N*p){return p->tag?eval(p->u.pair.a)+eval(p->u.pair.b):p->u.number;}\nint main(void){N a={.tag=0,.u.number=4},b={.tag=0,.u.number=5},root={.tag=1,.u.pair={&a,&b}};\nint first=eval(&root);root.tag=0;root.u.number=12;printf(\"%d %d\\n\",first,eval(&root));return 0;}\n",
+      "stdout": "9 12\n",
+      "process": [
+        "only selected conditional arm executes; first eval 3 calls, second eval 1",
+        "union overwrite writes actual overlapping bytes without freeing children",
+        "return evaluation crosses calls then one arithmetic sum"
+      ],
+      "structures": [
+        "tree before overwrite; afterward union pointer interpretation is no longer valid merely because old bytes survive"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:09:37.949Z",
+      "sha256": "6560adce07e872a5434c5a38ab3d43cf2166620c200f2f6365a9d12a62bf6fae",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/09_union_expression.c"
+    },
+    {
+      "id": "10_pool_freelist",
+      "intent": "array arena with generation tags and active/free link roles",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct{int value,next,live,generation;}Slot;\nint main(void){Slot a[5];for(int i=0;i<5;i++)a[i]=(Slot){0,i+1<5?i+1:-1,0,0};int freehead=0,head=-1;\nfor(int v=1;v<=3;v++){int k=freehead;freehead=a[k].next;a[k].value=v;a[k].live=1;a[k].generation++;a[k].next=head;head=k;}\nint old=head;head=a[old].next;a[old].live=0;a[old].next=freehead;freehead=old;\nint k=freehead;freehead=a[k].next;a[k].value=9;a[k].live=1;a[k].generation++;a[k].next=head;head=k;\nint sum=0;for(int p=head;p!=-1;p=a[p].next)sum+=a[p].value;printf(\"%d %d\\n\",sum,a[k].generation);return 0;}\n",
+      "stdout": "12 2\n",
+      "process": [
+        "slot reuse is writes within existing array, not free/malloc",
+        "struct assignment initializes each full slot before reading fields",
+        "last reused slot generation increments twice"
+      ],
+      "structures": [
+        "same next field serves disjoint active list and free list; active prefix length is not the pool membership"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:09:37.950Z",
+      "sha256": "311e3b90f4027086fa9ea9211b89307c4cd12d4e25b49fb86e50c0dcf5b91c8f",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/10_pool_freelist.c"
+    },
+    {
+      "id": "11_dual_order_indexes",
+      "intent": "two independent index-linked orders on shared elements",
+      "style": "inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nint main(void){int value[4]={4,1,3,2},forward[4]={1,2,3,-1},sorted[4]={-1,3,0,2};int a=0,b=1,total=0;\nwhile(a!=-1){int redundant=0;for(int j=0;j<4;j++)redundant+=0*value[j];total=total*10+value[a]+redundant;a=forward[a];}\nint ordered=0;while(b!=-1){ordered=ordered*10+value[b];b=sorted[b];}printf(\"%d %d\\n\",total,ordered);return 0;}\n",
+      "stdout": "4132 1234\n",
+      "process": [
+        "redundant reads and zero multiplications remain visible; no optimization of source operations",
+        "each index READ feeds next access with its own provenance"
+      ],
+      "structures": [
+        "two list orders share values; must not combine into a single cyclic order"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:09:37.952Z",
+      "sha256": "ee67d923a83d9138d414e92ccb2d5fc75cd4af3d4a08fdcc9ff74d4253620485",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/11_dual_order_indexes.c"
+    },
+    {
+      "id": "12_rebuild_string_table",
+      "intent": "reallocated vector of owning string pointers",
+      "style": "beginner",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nchar*copy(const char*s){size_t n=strlen(s)+1;char*p=malloc(n);if(p)memcpy(p,s,n);return p;}\nint main(void){char**items=0;size_t used=0;const char*words[3]={\"alpha\",\"b\",\"cc\"};\nfor(size_t i=0;i<3;i++){char**next=malloc((used+1)*sizeof *next);if(!next)return 1;for(size_t j=0;j<used;j++)next[j]=items[j];next[used]=copy(words[i]);if(!next[used])return 1;free(items);items=next;used++;}\nsize_t sum=0;for(size_t i=0;i<used;i++)sum+=strlen(items[i]);printf(\"%zu %s\\n\",sum,items[2]);for(size_t i=0;i<used;i++)free(items[i]);free(items);return 0;}\n",
+      "stdout": "8 cc\n",
+      "process": [
+        "three new pointer buffers, shallow copy of pointers, three independent deep string copies",
+        "free old pointer vector must not free pointed-to strings",
+        "strlen results sum to 8; realloc not used"
+      ],
+      "structures": [
+        "logical vector backing moves across malloc/copy/free; string objects remain distinct from pointer slots"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:09:37.954Z",
+      "sha256": "b251aea4943428e130b994c37dece7bfeed8702c17eba88fb65ee333e38c6905",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/12_rebuild_string_table.c"
+    },
+    {
+      "id": "13_skip_levels",
+      "intent": "skip list with an array of links in each node",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N{int key;struct N*next[3];}N;\nN*find(N*h,int k){for(int level=2;level>=0;level--)while(h->next[level]&&h->next[level]->key<k)h=h->next[level];return h->next[0];}\nint main(void){N a[6]={0};for(int i=0;i<6;i++)a[i].key=i*10;\nfor(int i=0;i<5;i++)a[i].next[0]=&a[i+1];a[0].next[1]=&a[2];a[2].next[1]=&a[4];a[0].next[2]=&a[4];\nN*p=find(a,35);int sum=0;for(N*q=a[0].next[0];q;q=q->next[0])sum+=q->key;printf(\"%d %d\\n\",p->key,sum);return 0;}\n",
+      "stdout": "40 150\n",
+      "process": [
+        "short circuit avoids reading null target key",
+        "each next[level] resolves its array field and selected pointer slot",
+        "return delivers pointer to a[4] without copying node"
+      ],
+      "structures": [
+        "three link levels share five data nodes and one sentinel; levels are distinct relation roles"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:15:03.647Z",
+      "sha256": "5b6729d0350ef90bcf8b7dc7d1ea4af6e50ef54db13bb39c90e055c32b14d5c5",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/13_skip_levels.c"
+    },
+    {
+      "id": "14_hash_tombstones",
+      "intent": "linear probing hash table with tombstones",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct{int key,value;unsigned char state;}Slot;\nvoid put(Slot*a,int key,int value){int i=key%7,first=-1;while(a[i].state){if(a[i].state==2&&first<0)first=i;if(a[i].state==1&&a[i].key==key){a[i].value=value;return;}i=(i+1)%7;}if(first>=0)i=first;a[i]=(Slot){key,value,1};}\nint get(Slot*a,int key){int i=key%7;while(a[i].state){if(a[i].state==1&&a[i].key==key)return a[i].value;i=(i+1)%7;}return -1;}\nint main(void){Slot a[7]={0};put(a,1,10);put(a,8,20);put(a,15,30);a[2].state=2;put(a,22,40);printf(\"%d %d %d %d\\n\",get(a,1),get(a,8),get(a,15),get(a,22));return 0;}\n",
+      "stdout": "10 -1 30 40\n",
+      "process": [
+        "aggregate assignment writes key/value/state",
+        "deleted slot remains allocated and is reused; state 2 is not object death",
+        "lookup short circuit reads key only for occupied slots"
+      ],
+      "structures": [
+        "hash probing relationships and occupancy; array prefix is not membership"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:15:03.649Z",
+      "sha256": "c442124be87e5760325e982893b3972b25ed1f7ddf52cd457d7ce51428de546f",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/14_hash_tombstones.c"
+    },
+    {
+      "id": "15_generic_vector_sort",
+      "intent": "generic byte vector with comparator callback",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct{void*data;size_t size,width;}Vec;\nvoid push(Vec*v,const void*x){void*p=realloc(v->data,(v->size+1)*v->width);if(!p)exit(1);v->data=p;memcpy((char*)v->data+v->size*v->width,x,v->width);v->size++;}\nint compare(const void*a,const void*b){int x=*(const int*)a,y=*(const int*)b;return (x>y)-(x<y);}\nint main(void){Vec v={0,0,sizeof(int)};int input[5]={7,2,9,2,1};for(int i=0;i<5;i++)push(&v,&input[i]);qsort(v.data,v.size,v.width,compare);int*s=v.data;printf(\"%d %d %d %d %d\\n\",s[0],s[1],s[2],s[3],s[4]);free(v.data);return 0;}\n",
+      "stdout": "1 2 2 7 9\n",
+      "process": [
+        "five realloc calls preserve prior bytes",
+        "memcpy writes one element using byte offset without scalarizing the public call",
+        "qsort library operation mutates existing buffer; callback observations may differ by native implementation"
+      ],
+      "structures": [
+        "generic vector with element width 4 on this ABI; do not treat byte view as independent char allocation"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:15:03.650Z",
+      "sha256": "b122c07ba9411b0ab3cf4cc4810edfbe719e5d6114b35b3c9d58bb262df20339",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/15_generic_vector_sort.c"
+    },
+    {
+      "id": "16_vla_grid_view",
+      "intent": "VLA row stride and borrowed submatrix pointer",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nint total(int r,int c,int a[r][c]){int sum=0;for(int i=0;i<r;i++)for(int j=0;j<c;j++)sum+=a[i][j];return sum;}\nint main(void){int rows=3,cols=4;int (*a)[cols]=malloc((size_t)rows*sizeof *a);if(!a)return 1;for(int i=0;i<rows;i++)for(int j=0;j<cols;j++)a[i][j]=10*i+j;int (*view)[cols]=a+1;view[1][2]+=5;printf(\"%d %d\\n\",total(rows,cols,a),total(2,cols,view));free(a);return 0;}\n",
+      "stdout": "143 137\n",
+      "process": [
+        "dynamic row stride is 4 ints; view points 16 bytes inside allocation",
+        "view[1][2] modifies a[2][2] from22 to27",
+        "callee VLA dimensions are evaluated from parameters; no duplicate heap"
+      ],
+      "structures": [
+        "3 by 4 grid and borrowed 2 by 4 slice over same bytes"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:15:03.651Z",
+      "sha256": "ffa66a77daafca0aebfdda17dd902eca4d239e32c1abc13dc5fc20543334c015",
+      "excludedFromValidation": true,
+      "exclusionReason": "sizeof has a VLA operand containing an uninitialized pointer. C evaluation semantics need separate review; do not count the resulting fault as a model defect. Use27/45.",
+      "sourceArtifact": "test-results/codex_code-results/structure-followup-2026-11-09-1106/16_vla_grid_view/excluded-source.c"
+    },
+    {
+      "id": "17_bplus_leaf_links",
+      "intent": "small multiway search tree and independent leaf chain",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N{int leaf,n,key[3];struct N*child[4],*next;}N;\nN*locate(N*p,int x){while(!p->leaf){int k=0;while(k<p->n&&x>=p->key[k])k++;p=p->child[k];}return p;}\nint main(void){N a={.leaf=1,.n=2,.key={1,3}},b={.leaf=1,.n=2,.key={5,7}},c={.leaf=1,.n=2,.key={9,11}};N root={.n=2,.key={5,9},.child={&a,&b,&c}};a.next=&b;b.next=&c;N*p=locate(&root,7);int sum=0;for(N*q=&a;q;q=q->next)for(int i=0;i<q->n;i++)sum+=q->key[i];printf(\"%d %d\\n\",p->key[1],sum);return 0;}\n",
+      "stdout": "7 36\n",
+      "process": [
+        "designated initializers include zero-filled omitted fields",
+        "array child selection and next traversal use separate roles",
+        "no scalar key leaf value is confused with pointer index"
+      ],
+      "structures": [
+        "three children of one root plus leaf chain; must not merge child and next into a single invalid tree"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:15:03.652Z",
+      "sha256": "eee6af51a50efc7ef00a5c1ed53d7cb63cfd29809098d83352908b72b80d7a06",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/17_bplus_leaf_links.c"
+    },
+    {
+      "id": "18_spaghetti_queue_copy",
+      "intent": "inefficient queue with copying after every pop and goto control",
+      "style": "beginner-spaghetti",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nint main(void){int a[6]={2,4,6,8},n=4,sum=0;again:if(!n)goto done;int temporary[6]={0};int front=a[0];for(int i=1;i<n;i++)temporary[i-1]=a[i];for(int i=0;i<n-1;i++)a[i]=temporary[i];n--;sum+=front;goto again;done:printf(\"%d %d\\n\",sum,n);return 0;}\n",
+      "stdout": "20 0\n",
+      "process": [
+        "four temporary array lifetimes on reentering declaration; source inefficiency preserved",
+        "two copy loops remain explicit reads/writes; not replaced by pop",
+        "goto and conditional control remains recorded"
+      ],
+      "structures": [
+        "shift queue over prefix; temporary copy array is workspace not second queue"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:15:03.663Z",
+      "sha256": "24f6505c14716b6af76f3f8835163dab8a441d8a0d7091bbe7d9f3e156cd0df3",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/18_spaghetti_queue_copy.c"
+    },
+    {
+      "id": "19_tagged_bitfield_nodes",
+      "intent": "bitfields and normal child links in tagged nodes",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N{unsigned color:1;unsigned weight:5;unsigned used:1;struct N*l,*r;}N;\nunsigned visit(N*p){return p?(p->used?p->weight:0)+visit(p->l)+visit(p->r):0;}\nint main(void){N a={.weight=3,.used=1},b={.weight=5,.used=1},r={.color=1,.weight=7,.used=1,.l=&a,.r=&b};r.weight+=2;b.used=0;printf(\"%u %u %u\\n\",visit(&r),r.color,r.weight);return 0;}\n",
+      "stdout": "12 1 9\n",
+      "process": [
+        "weight update must preserve adjacent color/used bits",
+        "unused node is alive and its links are still traversed",
+        "bitfield compiler masks should not appear as unrelated C operations"
+      ],
+      "structures": [
+        "binary child tree; used bit is application flag, not memory lifetime"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:15:03.663Z",
+      "sha256": "efad0c9f2408889ca9bdb053b07fcbf1db6bb1a463dca43cb4c363d4555d76e3",
+      "excludedFromValidation": true,
+      "exclusionReason": "Use29 with explicit unsigned variadic arguments as the strict validity control; this original remains diagnostic evidence only.",
+      "sourceArtifact": "test-results/codex_code-results/structure-followup-2026-11-09-1106/19_tagged_bitfield_nodes/excluded-source.c"
+    },
+    {
+      "id": "20_recursive_record_return",
+      "intent": "tree aggregate returned by value",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N{int value;struct N*l,*r;}N;typedef struct{int count;long long sum;}Stats;\nStats scan(const N*p){if(!p)return(Stats){0,0};Stats a=scan(p->l),b=scan(p->r);return(Stats){a.count+b.count+1,a.sum+b.sum+p->value};}\nint main(void){N a={2,0,0},b={8,0,0},root={5,&a,&b};Stats result=scan(&root);printf(\"%d %lld\\n\",result.count,result.sum);return 0;}\n",
+      "stdout": "3 15\n",
+      "process": [
+        "seven scan calls including null leaves",
+        "aggregate return delivers values to destination box; no surviving callee automatic objects",
+        "count and sum arithmetic retain distinct source initializer expressions"
+      ],
+      "structures": [
+        "binary tree with borrowed const pointers; Stats is an aggregate result not tree node"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:15:03.664Z",
+      "sha256": "8a5800c27baa96db79d20d5187ae7a8df511af6af2f84be3aecde5f842adcdd6",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/20_recursive_record_return.c"
+    },
+    {
+      "id": "21_arena_offsets",
+      "intent": "tree stored in byte arena with explicit relative offsets",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct{int value;size_t left,right;}N;typedef union{max_align_t align;unsigned char bytes[4*sizeof(N)];}Arena;\nN*at(Arena*a,size_t offset){return offset?(N*)(void*)(a->bytes+offset):0;}\nint sum(Arena*a,size_t p){N*n=at(a,p);return n?n->value+sum(a,n->left)+sum(a,n->right):0;}\nint main(void){Arena *a=calloc(1,sizeof *a);if(!a)return 1;size_t x=sizeof(N),y=2*sizeof(N),z=3*sizeof(N);*at(a,x)=(N){4,y,z};*at(a,y)=(N){2,0,0};*at(a,z)=(N){6,0,0};printf(\"%d\\n\",sum(a,x));free(a);return 0;}\n",
+      "stdout": "12\n",
+      "process": [
+        "offset zero is sentinel, not pointer to first bytes",
+        "size_t additions and pointer casts preserve effective target offsets",
+        "one allocation contains three logical node regions; no synthetic malloc per node"
+      ],
+      "structures": [
+        "relative offset child tree; zero sentinel and stride sizeof(N) are access-derived"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:15:03.665Z",
+      "sha256": "33f4b2ac0d4b6e97c20ddcd25a0bfe3555c9ba4cb7aae22e238071566658fbc9",
+      "excludedFromValidation": true,
+      "exclusionReason": "Use42 with raw allocated storage to avoid making the union-backed arena effective-type interpretation a validation assumption.",
+      "sourceArtifact": "test-results/codex_code-results/structure-followup-2026-11-09-1106/21_arena_offsets/excluded-source.c"
+    },
+    {
+      "id": "22_stable_parallel_sort",
+      "intent": "stable insertion sort over parallel payload and key arrays",
+      "style": "inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nint main(void){int key[5]={3,1,2,1,3};char label[5]={'a','b','c','d','e'};for(int i=1;i<5;i++){int k=key[i];char v=label[i];int j=i;while(j>0&&key[j-1]>k){key[j]=key[j-1];label[j]=label[j-1];j--;}key[j]=k;label[j]=v;}for(int i=0;i<5;i++)putchar(label[i]);putchar('\n');return 0;}\n",
+      "stdout": "bdcae\n",
+      "process": [
+        "short circuit does not read key[-1]",
+        "compound while condition uses READ operands and one expression CALC per activation",
+        "paired key/label shifts preserve order; putchar emits at call site"
+      ],
+      "structures": [
+        "two arrays form records by shared index; sorted output retains stable duplicate order"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:15:03.666Z",
+      "sha256": "c50f78761f7564033858000f5d4b14437374646c99bc8d9354373fd4b572ef30",
+      "excludedFromValidation": true,
+      "exclusionReason": "Generator escaped a character literal incorrectly; compilation failed before API. Correct fixture22b was separately predicted and executed.",
+      "sourceArtifact": "test-results/codex_code-results/structure-followup-2026-11-09-1106/22_stable_parallel_sort/excluded-source.c"
+    },
+    {
+      "id": "22b_stable_parallel_sort",
+      "intent": "stable insertion sort over parallel payload and key arrays",
+      "style": "inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nint main(void){int key[5]={3,1,2,1,3};char label[5]={'a','b','c','d','e'};for(int i=1;i<5;i++){int k=key[i];char v=label[i];int j=i;while(j>0&&key[j-1]>k){key[j]=key[j-1];label[j]=label[j-1];j--;}key[j]=k;label[j]=v;}for(int i=0;i<5;i++)putchar(label[i]);putchar('\\n');return 0;}\n",
+      "stdout": "bdcae\n",
+      "process": [
+        "short circuit does not read key[-1]",
+        "compound while condition uses READ operands and one expression CALC per activation",
+        "paired key/label shifts preserve order; putchar emits at call site"
+      ],
+      "structures": [
+        "two arrays form records by shared index; sorted output retains stable duplicate order"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:16:47.820Z",
+      "sha256": "2bc7e3bd64dca02e49ec495d8ef71d916385fcf2b9bfa0c621f87888a6590c29",
+      "variantOf": "22_stable_parallel_sort",
+      "transformation": "Fix generator escaping error before API execution; initial invalid fixture excluded",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/22b_stable_parallel_sort.c"
+    },
+    {
+      "id": "23_renamed_reordered_tree",
+      "intent": "tree with parent and independent inorder thread",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N{int x69;struct N*x58,*x41,*x17,*x33;}N;\nN*rotate(N*x){N*y=x->x41;x->x41=y->x33;if(y->x33)y->x33->x17=x;y->x17=x->x17;y->x33=x;x->x17=y;return y;}\nint sum(N*p){if(!p)return 0;return sum(p->x33)+p->x69+sum(p->x41);}\nint main(void){N a[7]={0};for(int i=0;i<7;i++){a[i].x69=i+1;a[i].x58=i<6?&a[i+1]:0;}\nN*root=&a[3];root->x33=&a[1];root->x41=&a[5];a[1].x17=root;a[5].x17=root;\na[1].x33=&a[0];a[1].x41=&a[2];a[0].x17=&a[1];a[2].x17=&a[1];\na[5].x33=&a[4];a[5].x41=&a[6];a[4].x17=&a[5];a[6].x17=&a[5];\nroot=rotate(root);int threaded=0;for(N*p=a;p;p=p->x58)threaded+=p->x69;\nprintf(\"%d %d %d\\n\",sum(root),threaded,root->x69);return 0;}\n",
+      "stdout": "28 28 6\n",
+      "process": [
+        "rotation mutates actual links in source order; intermediates are preserved",
+        "return of rotate is delivered to existing root box",
+        "sum has 15 recursive activations including null leaves"
+      ],
+      "structures": [
+        "7-node child tree plus parent links and independent thread; original objects survive rotation"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:16:47.822Z",
+      "sha256": "63b41b4a79bed066321f46acc1464a8a98018755837bf4c3b3cea7f6ebf8105b",
+      "variantOf": "02_parent_thread_rotation",
+      "transformation": "Reorder record members and replace semantic field names with opaque names; same tree and accesses",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/23_renamed_reordered_tree.c"
+    },
+    {
+      "id": "24_record_owned_deque",
+      "intent": "ring deque with separately stored globals",
+      "style": "beginner",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nstruct{int boxes[7],head,used;} state;\nvoid front(int x){state.head=(state.head+6)%7;state.boxes[state.head]=x;state.used++;}\nvoid back(int x){state.boxes[(state.head+state.used)%7]=x;state.used++;}\nint first(void){int x=state.boxes[state.head];state.head=(state.head+1)%7;state.used--;return x;}\nint last(void){state.used--;return state.boxes[(state.head+state.used)%7];}\nint main(void){front(2);back(3);front(1);int a=last(),b=first();back(4);int c=first(),d=first();printf(\"%d %d %d %d\\n\",a,b,c,d);return 0;}\n",
+      "stdout": "3 1 2 4\n",
+      "process": [
+        "global integers and array are zero-initialized before main",
+        "decrement before last READ and first READ before decrement preserve order",
+        "four return destinations initialized at their declarations"
+      ],
+      "structures": [
+        "one deque across separate storage; not just FIFO because both ends are used"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:16:47.822Z",
+      "sha256": "9d801d150383f8de53aacdef7f79518394c1e6615f1e9c8bf080ed874faa663a",
+      "variantOf": "05_global_deque",
+      "transformation": "Move identical ring buffer and counters under one record owner; semantics unchanged",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/24_record_owned_deque.c"
+    },
+    {
+      "id": "25_sentinel_without_count_read",
+      "intent": "circular list whose dummy header stores a count",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N{int data;struct N*next;}N;\nint main(void){N a[3]={{10,0},{20,0},{30,0}},header={3,a};a[0].next=&a[1];a[1].next=&a[2];a[2].next=&header;\nint count=3,total=0;for(N*p=header.next;p!=&header;p=p->next)total+=p->data;\nprintf(\"%d %d\\n\",count,total);return 0;}\n",
+      "stdout": "3 60\n",
+      "process": [
+        "header.data READ is metadata; traversal payload reads only 10,20,30",
+        "compare against header ends traversal before header payload"
+      ],
+      "structures": [
+        "dummy header plus 3 data nodes; scalar header read alone cannot prove header is an ordinary list item"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:16:47.822Z",
+      "sha256": "a2d0d7a89c630bd48e0924dce6ef1d8c2d60599e0acf9937cefb9d93fb12ae35",
+      "variantOf": "03_counted_sentinel",
+      "transformation": "Keep identical sentinel/list links, replace metadata read with literal3 to isolate sentinel classification",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/25_sentinel_without_count_read.c"
+    },
+    {
+      "id": "26_sentinel_explicit_root",
+      "intent": "circular list whose dummy header stores a count",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N{int data;struct N*next;}N;\nint main(void){N a[3]={{10,0},{20,0},{30,0}},header={3,a};a[0].next=&a[1];a[1].next=&a[2];a[2].next=&header;\nint count=header.data,total=0;N*head=header.next;for(N*p=head;p!=&header;p=p->next)total+=p->data;\nprintf(\"%d %d\\n\",count,total);return 0;}\n",
+      "stdout": "3 60\n",
+      "process": [
+        "header.data READ is metadata; traversal payload reads only 10,20,30",
+        "compare against header ends traversal before header payload"
+      ],
+      "structures": [
+        "dummy header plus 3 data nodes; scalar header read alone cannot prove header is an ordinary list item"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:16:47.822Z",
+      "sha256": "6330492a685fe9dcfbfa31dd5403a5858f4e6d40876b769857eb3d6275e38c1a",
+      "variantOf": "03_counted_sentinel",
+      "transformation": "Add independent root pointer before traversal; allocation and topology unchanged",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/26_sentinel_explicit_root.c"
+    },
+    {
+      "id": "27_vla_explicit_size",
+      "intent": "VLA row stride and borrowed submatrix pointer",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nint total(int r,int c,int a[r][c]){int sum=0;for(int i=0;i<r;i++)for(int j=0;j<c;j++)sum+=a[i][j];return sum;}\nint main(void){int rows=3,cols=4;int (*a)[cols]=malloc((size_t)rows*cols*sizeof(int));if(!a)return 1;for(int i=0;i<rows;i++)for(int j=0;j<cols;j++)a[i][j]=10*i+j;int (*view)[cols]=a+1;view[1][2]+=5;printf(\"%d %d\\n\",total(rows,cols,a),total(2,cols,view));free(a);return 0;}\n",
+      "stdout": "143 137\n",
+      "process": [
+        "dynamic row stride is 4 ints; view points 16 bytes inside allocation",
+        "view[1][2] modifies a[2][2] from22 to27",
+        "callee VLA dimensions are evaluated from parameters; no duplicate heap"
+      ],
+      "structures": [
+        "3 by 4 grid and borrowed 2 by 4 slice over same bytes"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:16:47.822Z",
+      "sha256": "adfe33b2760624eef29377dd3fea9bf3bb3e6022cf66cf8aae871129c6eeb898",
+      "variantOf": "16_vla_grid_view",
+      "transformation": "Use explicit allocation size; preserve pointer-to-VLA indexing and borrowed slice",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/27_vla_explicit_size.c"
+    },
+    {
+      "id": "28_bitfields_zero_then_assign",
+      "intent": "bitfields and normal child links in tagged nodes",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N{unsigned color:1;unsigned weight:5;unsigned used:1;struct N*l,*r;}N;\nunsigned visit(N*p){return p?(p->used?p->weight:0)+visit(p->l)+visit(p->r):0;}\nint main(void){N a={.weight=3,.used=1},b={.weight=5,.used=1},r={0};r.color=1;r.weight=7;r.used=1;r.l=&a;r.r=&b;r.weight+=2;b.used=0;printf(\"%u %u %u\\n\",visit(&r),(unsigned)r.color,(unsigned)r.weight);return 0;}\n",
+      "stdout": "12 1 9\n",
+      "process": [
+        "weight update must preserve adjacent color/used bits",
+        "unused node is alive and its links are still traversed",
+        "bitfield compiler masks should not appear as unrelated C operations"
+      ],
+      "structures": [
+        "binary child tree; used bit is application flag, not memory lifetime"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:16:47.822Z",
+      "sha256": "fbe96de725819afd9f9db9b7af97fec956b59092f912529ccfdc3e4f94190516",
+      "variantOf": "19_tagged_bitfield_nodes",
+      "transformation": "Zero-initialize root then assign individual fields; explicit printf promotions; same final tree",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/28_bitfields_zero_then_assign.c"
+    },
+    {
+      "id": "29_bitfields_explicit_promotions",
+      "intent": "bitfields and normal child links in tagged nodes",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N{unsigned color:1;unsigned weight:5;unsigned used:1;struct N*l,*r;}N;\nunsigned visit(N*p){return p?(p->used?p->weight:0)+visit(p->l)+visit(p->r):0;}\nint main(void){N a={.weight=3,.used=1},b={.weight=5,.used=1},r={.color=1,.weight=7,.used=1,.l=&a,.r=&b};r.weight+=2;b.used=0;printf(\"%u %u %u\\n\",visit(&r),(unsigned)r.color,(unsigned)r.weight);return 0;}\n",
+      "stdout": "12 1 9\n",
+      "process": [
+        "weight update must preserve adjacent color/used bits",
+        "unused node is alive and its links are still traversed",
+        "bitfield compiler masks should not appear as unrelated C operations"
+      ],
+      "structures": [
+        "binary child tree; used bit is application flag, not memory lifetime"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:16:47.822Z",
+      "sha256": "a53e57f603431420a7e2709481e097ad2f5a2071d93499ce0ef45a46abd9778e",
+      "variantOf": "19_tagged_bitfield_nodes",
+      "transformation": "Make variadic unsigned formatting types explicit; retain aggregate root initializer",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/29_bitfields_explicit_promotions.c"
+    },
+    {
+      "id": "30_vla_initialized_sizeof",
+      "intent": "VLA row stride and borrowed submatrix pointer",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nint total(int r,int c,int a[r][c]){int sum=0;for(int i=0;i<r;i++)for(int j=0;j<c;j++)sum+=a[i][j];return sum;}\nint main(void){int rows=3,cols=4;int (*a)[cols]=0; a=malloc((size_t)rows*sizeof *a);if(!a)return 1;for(int i=0;i<rows;i++)for(int j=0;j<cols;j++)a[i][j]=10*i+j;int (*view)[cols]=a+1;view[1][2]+=5;printf(\"%d %d\\n\",total(rows,cols,a),total(2,cols,view));free(a);return 0;}\n",
+      "stdout": "143 137\n",
+      "process": [
+        "dynamic row stride is 4 ints; view points 16 bytes inside allocation",
+        "view[1][2] modifies a[2][2] from22 to27",
+        "callee VLA dimensions are evaluated from parameters; no duplicate heap"
+      ],
+      "structures": [
+        "3 by 4 grid and borrowed 2 by 4 slice over same bytes"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:16:47.822Z",
+      "sha256": "957268d6d80e7af48936f2e8effeef96d7e62eda226c9858a53a12e63b7873cc",
+      "variantOf": "16_vla_grid_view",
+      "transformation": "Initialize pointer to null before sizeof-VLA expression; isolate actual pointer-value dependence",
+      "excludedFromValidation": true,
+      "exclusionReason": "Null pointer occurs in an evaluated VLA sizeof operand; excluded from the error-free validation set. Use27/45.",
+      "sourceArtifact": "test-results/codex_code-results/structure-followup-2026-11-09-1106/30_vla_initialized_sizeof/excluded-source.c"
+    },
+    {
+      "id": "31_fixed_row_type",
+      "intent": "VLA row stride and borrowed submatrix pointer",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nint total(int r,int c,int a[][4]){int sum=0;for(int i=0;i<r;i++)for(int j=0;j<c;j++)sum+=a[i][j];return sum;}\nint main(void){int rows=3,cols=4;int (*a)[4]=malloc((size_t)rows*sizeof *a);if(!a)return 1;for(int i=0;i<rows;i++)for(int j=0;j<cols;j++)a[i][j]=10*i+j;int (*view)[4]=a+1;view[1][2]+=5;printf(\"%d %d\\n\",total(rows,cols,a),total(2,cols,view));free(a);return 0;}\n",
+      "stdout": "143 137\n",
+      "process": [
+        "dynamic row stride is 4 ints; view points 16 bytes inside allocation",
+        "view[1][2] modifies a[2][2] from22 to27",
+        "callee VLA dimensions are evaluated from parameters; no duplicate heap"
+      ],
+      "structures": [
+        "3 by 4 grid and borrowed 2 by 4 slice over same bytes"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:16:47.822Z",
+      "sha256": "ad98c407c5f6b48de71ef4c72979ed01ac96dbb7351be98b9ee6b360c9d1a4d3",
+      "variantOf": "16_vla_grid_view",
+      "transformation": "Use fixed row type with identical shape, values, allocation and borrowed slice",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/31_fixed_row_type.c"
+    },
+    {
+      "id": "32_avl_rotations",
+      "intent": "AVL tree with single and double rotations",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct N{int key,height;struct N*l,*r;}N;\nint h(N*p){return p?p->height:0;}int max(int a,int b){return a>b?a:b;}\nvoid update(N*p){p->height=1+max(h(p->l),h(p->r));}\nN*right(N*x){N*y=x->l;x->l=y->r;y->r=x;update(x);update(y);return y;}\nN*left(N*x){N*y=x->r;x->r=y->l;y->l=x;update(x);update(y);return y;}\nN*insert(N*p,int k){if(!p){N*n=malloc(sizeof *n);if(!n)exit(1);*n=(N){k,1,0,0};return n;}if(k<p->key)p->l=insert(p->l,k);else p->r=insert(p->r,k);update(p);int b=h(p->l)-h(p->r);if(b>1){if(k>p->l->key)p->l=left(p->l);return right(p);}if(b< -1){if(k<p->r->key)p->r=right(p->r);return left(p);}return p;}\nint sum(N*p){return p?p->key+sum(p->l)+sum(p->r):0;}\nvoid clear(N*p){if(p){clear(p->l);clear(p->r);free(p);}}\nint main(void){int keys[6]={30,20,10,25,28,27};N*root=0;for(int i=0;i<6;i++)root=insert(root,keys[i]);printf(\"%d %d %d\\n\",root->key,root->height,sum(root));clear(root);return 0;}\n",
+      "stdout": "25 3 140\n",
+      "process": [
+        "six heap nodes; recursive frames distinct from heap nodes",
+        "intermediate rotations preserve all actual writes; direct returned pointers feed parent child slots",
+        "clear frees children before parent"
+      ],
+      "structures": [
+        "six-node binary search tree; balancing/key ordering needs evidence beyond topology"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:19:34.855Z",
+      "sha256": "b7c28c31ff8458edca29bcb0fa6523c5e4a3b3cdb66c9b5ecf291d8262d7b848",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/32_avl_rotations.c"
+    },
+    {
+      "id": "33_index_trie",
+      "intent": "trie stored in index pool with two child slots",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct{int child[2],terminal,pass;}Node;Node pool[16];int used=1;\nvoid add(const char*s){int p=0;pool[p].pass++;for(;*s;s++){int k=*s-'a';if(pool[p].child[k]==0)pool[p].child[k]=used++;p=pool[p].child[k];pool[p].pass++;}pool[p].terminal++;}\nint main(void){add(\"a\");add(\"ab\");add(\"b\");add(\"ba\");int a=pool[0].child[0],b=pool[0].child[1];printf(\"%d %d %d %d\\n\",used,pool[0].pass,pool[a].pass,pool[b].pass);return 0;}\n",
+      "stdout": "5 4 2 2\n",
+      "process": [
+        "postincrement used delivers old allocation index",
+        "index zero means no child but is valid root index",
+        "static pool zero initialization before main; no heap allocations"
+      ],
+      "structures": [
+        "index-based trie, two character roles; binary shape alone is not BST"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:19:34.858Z",
+      "sha256": "e424bc933bf3f42c674fc7d81e7176e7cefc16dbc9d494c0f1fee21dda9f8a02",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/33_index_trie.c"
+    },
+    {
+      "id": "34_lazy_segment_tree",
+      "intent": "recursive segment tree with deferred interval updates",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint sums[32],lazy[32];\nvoid build(int p,int l,int r){if(r-l==1){sums[p]=l+1;return;}int m=(l+r)/2;build(p*2,l,m);build(p*2+1,m,r);sums[p]=sums[p*2]+sums[p*2+1];}\nvoid apply(int p,int l,int r,int x){sums[p]+=(r-l)*x;lazy[p]+=x;}\nvoid push(int p,int l,int r){if(lazy[p]&&r-l>1){int m=(l+r)/2;apply(p*2,l,m,lazy[p]);apply(p*2+1,m,r,lazy[p]);lazy[p]=0;}}\nvoid add(int p,int l,int r,int a,int b,int x){if(b<=l||r<=a)return;if(a<=l&&r<=b){apply(p,l,r,x);return;}push(p,l,r);int m=(l+r)/2;add(p*2,l,m,a,b,x);add(p*2+1,m,r,a,b,x);sums[p]=sums[p*2]+sums[p*2+1];}\nint query(int p,int l,int r,int a,int b){if(b<=l||r<=a)return 0;if(a<=l&&r<=b)return sums[p];push(p,l,r);int m=(l+r)/2;return query(p*2,l,m,a,b)+query(p*2+1,m,r,a,b);}\nint main(void){build(1,0,8);add(1,0,8,2,6,3);printf(\"%d %d\\n\",query(1,0,8,0,8),query(1,0,8,3,5));return 0;}\n",
+      "stdout": "48 15\n",
+      "process": [
+        "compound logical guards remain short-circuited",
+        "two recursive child calls keep independent argument evaluation and return delivery",
+        "sums update merges two child READs in one CALC; lazy value reset is real WRITE"
+      ],
+      "structures": [
+        "one implicit index tree with sums and lazy payload arrays, not min/max heap"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:19:34.858Z",
+      "sha256": "02452fc9058f685bfd358adf3af69bee520409d79bb8deea7566daa8f543fdfc",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/34_lazy_segment_tree.c"
+    },
+    {
+      "id": "35_negative_size_dsu",
+      "intent": "disjoint sets with negative root sizes in parent array",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint parent[8];\nint root(int x){if(parent[x]<0)return x;return parent[x]=root(parent[x]);}\nvoid join(int a,int b){a=root(a);b=root(b);if(a==b)return;if(parent[a]>parent[b]){int t=a;a=b;b=t;}parent[a]+=parent[b];parent[b]=a;}\nint main(void){for(int i=0;i<8;i++)parent[i]=-1;join(0,1);join(2,3);join(1,2);join(5,6);int count=0;for(int i=0;i<8;i++)if(parent[i]<0)count++;printf(\"%d %d %d\\n\",count,root(3),-parent[root(0)]);return 0;}\n",
+      "stdout": "4 0 4\n",
+      "process": [
+        "negative parent is size sentinel and never dereferenced",
+        "path compression assignment returns assigned root value",
+        "find calls distinct activations; no cycles introduced"
+      ],
+      "structures": [
+        "four parent trees; negative roots encode size, not invalid index errors"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:19:34.869Z",
+      "sha256": "8d13e11227c72e9280982223abb07c61d1cf7ef5937cdb30aff9b1181ed8f6c6",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/35_negative_size_dsu.c"
+    },
+    {
+      "id": "36_binary_heap",
+      "intent": "min heap using separate global array and length",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint a[16],n;\nvoid put(int x){int i=n++;while(i&&a[(i-1)/2]>x){a[i]=a[(i-1)/2];i=(i-1)/2;}a[i]=x;}\nint take(void){int answer=a[0],x=a[--n],i=0;while(i*2+1<n){int j=i*2+1;if(j+1<n&&a[j+1]<a[j])j++;if(a[j]>=x)break;a[i]=a[j];i=j;}if(n)a[i]=x;return answer;}\nint main(void){put(9);put(3);put(7);put(1);put(4);int order=0;while(n)order=order*10+take();printf(\"%d\\n\",order);return 0;}\n",
+      "stdout": "13479\n",
+      "process": [
+        "postincrement insert index and predecrement removal index preserve value delivery",
+        "take call interrupts outer order*10+take calculation at real call boundary",
+        "array storage survives length zero"
+      ],
+      "structures": [
+        "implicit min heap with active prefix; order checker should use comparison evidence"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:19:34.870Z",
+      "sha256": "8727fdf58f787bcd575e9447b2d175a9a243fae070d6a703f8ccedca93499640",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/36_binary_heap.c"
+    },
+    {
+      "id": "37_hash_chain_pool",
+      "intent": "hash table with index-linked bucket chains",
+      "style": "beginner",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint head[3]={-1,-1,-1},key[8],value[8],next[8],used;\nvoid put(int k,int v){int i=used++;key[i]=k;value[i]=v;int b=k%3;next[i]=head[b];head[b]=i;}\nint get(int k){for(int i=head[k%3];i!=-1;i=next[i])if(key[i]==k)return value[i];return -1;}\nint main(void){put(1,10);put(4,40);put(7,70);put(2,20);printf(\"%d %d %d %d\\n\",get(1),get(4),get(7),get(2));return 0;}\n",
+      "stdout": "10 40 70 20\n",
+      "process": [
+        "four inserts use distinct indices; next/head store indices not pointers",
+        "lookup traverses same backing from distinct bucket roots",
+        "negative sentinel stops before array access"
+      ],
+      "structures": [
+        "multiple bucket lists sharing key/value/next parallel arrays; not one big list"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:19:34.871Z",
+      "sha256": "1e0554d756492606ea290b42352e2aff0e3743e83e46b5c717f988b502d4833e",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/37_hash_chain_pool.c"
+    },
+    {
+      "id": "38_matrix_floyd",
+      "intent": "adjacency cost matrix updated by Floyd Warshall",
+      "style": "beginner-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int a[4][4];for(int i=0;i<4;i++)for(int j=0;j<4;j++)a[i][j]=i==j?0:999;a[0][1]=2;a[1][2]=3;a[0][2]=9;a[2][3]=1;\nfor(int k=0;k<4;k++)for(int i=0;i<4;i++)for(int j=0;j<4;j++){int candidate=a[i][k]+a[k][j];if(candidate<a[i][j])a[i][j]=candidate;else a[i][j]=a[i][j];}\nprintf(\"%d %d %d\\n\",a[0][3],a[3][0],a[1][3]);return 0;}\n",
+      "stdout": "6 999 4\n",
+      "process": [
+        "64 candidate additions, redundant self-assignment READ/WRITE remains",
+        "conditional initializer selects0 or999",
+        "three array READs feed final printf"
+      ],
+      "structures": [
+        "4 by4 grid and weighted directed graph candidate; 999 is source-specific sentinel, not intrinsic infinity"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:19:34.875Z",
+      "sha256": "df91ed1ae60fbdb98d0da35227909efb0b13c0390cef851603b8ba9d7ea8a884",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/38_matrix_floyd.c"
+    },
+    {
+      "id": "39_stack_frames_dfs",
+      "intent": "iterative DFS with explicit record stack",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct{int v,edge;}Frame;\nint main(void){int off[5]={0,2,3,4,4},to[4]={1,2,3,3},seen[4]={0};Frame stack[8];int size=1,order=0;stack[0]=(Frame){0,0};seen[0]=1;\nwhile(size){Frame*f=&stack[size-1];if(f->edge==off[f->v+1]-off[f->v]){order=order*10+f->v;size--;continue;}int v=to[off[f->v]+f->edge++];if(!seen[v]){seen[v]=1;stack[size++]=(Frame){v,0};}}\nprintf(\"%d\\n\",order);return 0;}\n",
+      "stdout": "3120\n",
+      "process": [
+        "Frame.edge++ produces old edge index then stored increment",
+        "borrowed f points current explicit stack record; function call stack remains onlymain",
+        "size decrement does not destroy underlying automatic array"
+      ],
+      "structures": [
+        "CSR DAG plus explicit LIFO work stack; shared destination3 is not a tree child with singleparent"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:19:34.876Z",
+      "sha256": "7e7abdaef364b108647066581ae4d89d6fd167e358df930e039c93980a71f938",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/39_stack_frames_dfs.c"
+    },
+    {
+      "id": "40_named_record_deque",
+      "intent": "ring deque with separately stored globals",
+      "style": "beginner",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nstruct Ring{int boxes[7],head,used;} state;\nvoid front(int x){state.head=(state.head+6)%7;state.boxes[state.head]=x;state.used++;}\nvoid back(int x){state.boxes[(state.head+state.used)%7]=x;state.used++;}\nint first(void){int x=state.boxes[state.head];state.head=(state.head+1)%7;state.used--;return x;}\nint last(void){state.used--;return state.boxes[(state.head+state.used)%7];}\nint main(void){front(2);back(3);front(1);int a=last(),b=first();back(4);int c=first(),d=first();printf(\"%d %d %d %d\\n\",a,b,c,d);return 0;}\n",
+      "stdout": "3 1 2 4\n",
+      "process": [
+        "global integers and array are zero-initialized before main",
+        "decrement before last READ and first READ before decrement preserve order",
+        "four return destinations initialized at their declarations"
+      ],
+      "structures": [
+        "one deque across separate storage; not just FIFO because both ends are used"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:21:30.285Z",
+      "sha256": "3387b74223fdd86b18a6d1fb1f8409328afdeb4ecc48b22f36f7e98d2e4d79f8",
+      "variantOf": "24_record_owned_deque",
+      "transformation": "Give the otherwise identical anonymous global record a tag; storage/operations unchanged",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/40_named_record_deque.c"
+    },
+    {
+      "id": "41_named_record_trie",
+      "intent": "trie stored in index pool with two child slots",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct Entry{int child[2],terminal,pass;}Node;Node pool[16];int used=1;\nvoid add(const char*s){int p=0;pool[p].pass++;for(;*s;s++){int k=*s-'a';if(pool[p].child[k]==0)pool[p].child[k]=used++;p=pool[p].child[k];pool[p].pass++;}pool[p].terminal++;}\nint main(void){add(\"a\");add(\"ab\");add(\"b\");add(\"ba\");int a=pool[0].child[0],b=pool[0].child[1];printf(\"%d %d %d %d\\n\",used,pool[0].pass,pool[a].pass,pool[b].pass);return 0;}\n",
+      "stdout": "5 4 2 2\n",
+      "process": [
+        "postincrement used delivers old allocation index",
+        "index zero means no child but is valid root index",
+        "static pool zero initialization before main; no heap allocations"
+      ],
+      "structures": [
+        "index-based trie, two character roles; binary shape alone is not BST"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:21:30.287Z",
+      "sha256": "beceb6e0b5ab203869dc5d6917886de6ab9c63158e26e8097be6bed8f4fe0957",
+      "variantOf": "33_index_trie",
+      "transformation": "Add record tag only; identical global pool and index operations",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/41_named_record_trie.c"
+    },
+    {
+      "id": "42_raw_arena_offsets",
+      "intent": "tree stored in byte arena with explicit relative offsets",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct{int value;size_t left,right;}N;typedef unsigned char Arena;\nN*at(Arena*a,size_t offset){return offset?(N*)(void*)(a+offset):0;}\nint sum(Arena*a,size_t p){N*n=at(a,p);return n?n->value+sum(a,n->left)+sum(a,n->right):0;}\nint main(void){Arena *a=calloc(4,sizeof(N));if(!a)return 1;size_t x=sizeof(N),y=2*sizeof(N),z=3*sizeof(N);*at(a,x)=(N){4,y,z};*at(a,y)=(N){2,0,0};*at(a,z)=(N){6,0,0};printf(\"%d\\n\",sum(a,x));free(a);return 0;}\n",
+      "stdout": "12\n",
+      "process": [
+        "offset zero is sentinel, not pointer to first bytes",
+        "size_t additions and pointer casts preserve effective target offsets",
+        "one allocation contains three logical node regions; no synthetic malloc per node"
+      ],
+      "structures": [
+        "relative offset child tree; zero sentinel and stride sizeof(N) are access-derived"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:21:30.287Z",
+      "sha256": "d35b0d616d86ecf0ab0d812a0d9799e7b9dd3dfcfff59903e87e7294ff08c1a4",
+      "variantOf": "21_arena_offsets",
+      "transformation": "Use directly allocated untyped storage and N-aligned offsets; removes union representation ambiguity",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/42_raw_arena_offsets.c"
+    },
+    {
+      "id": "43_explicit_zero_children",
+      "intent": "small multiway search tree and independent leaf chain",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N{int leaf,n,key[3];struct N*child[4],*next;}N;\nN*locate(N*p,int x){while(!p->leaf){int k=0;while(k<p->n&&x>=p->key[k])k++;p=p->child[k];}return p;}\nint main(void){N a={.leaf=1,.n=2,.key={1,3}},b={.leaf=1,.n=2,.key={5,7}},c={.leaf=1,.n=2,.key={9,11}};N root={.n=2,.key={5,9,0},.child={&a,&b,&c,0}};a.next=&b;b.next=&c;N*p=locate(&root,7);int sum=0;for(N*q=&a;q;q=q->next)for(int i=0;i<q->n;i++)sum+=q->key[i];printf(\"%d %d\\n\",p->key[1],sum);return 0;}\n",
+      "stdout": "7 36\n",
+      "process": [
+        "designated initializers include zero-filled omitted fields",
+        "array child selection and next traversal use separate roles",
+        "no scalar key leaf value is confused with pointer index"
+      ],
+      "structures": [
+        "three children of one root plus leaf chain; must not merge child and next into a single invalid tree"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:21:30.287Z",
+      "sha256": "d7442555b6cfadeb5dd2a4f5a39cbc0b686ddbb9e9ce9774f6903a0bdd7585e4",
+      "variantOf": "17_bplus_leaf_links",
+      "transformation": "Explicitly spell trailing zero initializers; same physical bytes and graph, isolate implicit initializer path mapping",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/43_explicit_zero_children.c"
+    },
+    {
+      "id": "44_separate_union_assignment",
+      "intent": "tagged expression tree with overwritten union member",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N N;struct N{int tag;union{int number;struct{N*a,*b;}pair;}u;};\nint eval(N*p){return p->tag?eval(p->u.pair.a)+eval(p->u.pair.b):p->u.number;}\nint main(void){N a={.tag=0,.u.number=4},b={.tag=0,.u.number=5},root={0};root.tag=1;root.u.pair.a=&a;root.u.pair.b=&b;\nint first=eval(&root);root.tag=0;root.u.number=12;printf(\"%d %d\\n\",first,eval(&root));return 0;}\n",
+      "stdout": "9 12\n",
+      "process": [
+        "only selected conditional arm executes; first eval 3 calls, second eval 1",
+        "union overwrite writes actual overlapping bytes without freeing children",
+        "return evaluation crosses calls then one arithmetic sum"
+      ],
+      "structures": [
+        "tree before overwrite; afterward union pointer interpretation is no longer valid merely because old bytes survive"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:21:30.287Z",
+      "sha256": "b6c09055400ed9482afb6647c92df8127532787e99cfaf7c25008069e368068a",
+      "variantOf": "09_union_expression",
+      "transformation": "Replace nested aggregate union initializer with explicit field writes; same values and active member",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/44_separate_union_assignment.c"
+    },
+    {
+      "id": "45_vla_type_sizeof",
+      "intent": "VLA row stride and borrowed submatrix pointer",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\nint total(int r,int c,int a[r][c]){int sum=0;for(int i=0;i<r;i++)for(int j=0;j<c;j++)sum+=a[i][j];return sum;}\nint main(void){int rows=3,cols=4;int (*a)[cols]=malloc((size_t)rows*sizeof(int[cols]));if(!a)return 1;for(int i=0;i<rows;i++)for(int j=0;j<cols;j++)a[i][j]=10*i+j;int (*view)[cols]=a+1;view[1][2]+=5;printf(\"%d %d\\n\",total(rows,cols,a),total(2,cols,view));free(a);return 0;}\n",
+      "stdout": "143 137\n",
+      "process": [
+        "dynamic row stride is 4 ints; view points 16 bytes inside allocation",
+        "view[1][2] modifies a[2][2] from22 to27",
+        "callee VLA dimensions are evaluated from parameters; no duplicate heap"
+      ],
+      "structures": [
+        "3 by 4 grid and borrowed 2 by 4 slice over same bytes"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:21:30.287Z",
+      "sha256": "8ecc99d42258a7859ac7fe8ecb5d2c8346721c407c5f80c997885e3ada16a09d",
+      "variantOf": "27_vla_explicit_size",
+      "transformation": "Use sizeof VLA type name with initialized cols; no pointer-value operand; expected correct dynamic stride",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/45_vla_type_sizeof.c"
+    },
+    {
+      "id": "46_helper_sentinel_traversal",
+      "intent": "circular list whose dummy header stores a count",
+      "style": "ordinary",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdint.h>\n\ntypedef struct N{int data;struct N*next;}N;\nint sum(N*head,N*stop){int total=0;for(N*p=head;p!=stop;p=p->next)total+=p->data;return total;}\nint main(void){N a[3]={{10,0},{20,0},{30,0}},header={3,a};a[0].next=&a[1];a[1].next=&a[2];a[2].next=&header;\nint count=header.data,total=sum(header.next,&header);\nprintf(\"%d %d\\n\",count,total);return 0;}\n",
+      "stdout": "3 60\n",
+      "process": [
+        "header.data READ is metadata; traversal payload reads only 10,20,30",
+        "compare against header ends traversal before header payload"
+      ],
+      "structures": [
+        "dummy header plus 3 data nodes; scalar header read alone cannot prove header is an ordinary list item"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:21:30.287Z",
+      "sha256": "c186b0e550df1b07b0b5ad45380f02701a36be4a79f538120a154efbcea1bd23",
+      "variantOf": "03_counted_sentinel",
+      "transformation": "Move traversal into helper with explicit begin and sentinel arguments; identical topology",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/46_helper_sentinel_traversal.c"
+    },
+    {
+      "id": "47_intrusive_embedded_link",
+      "intent": "intrusive circular list whose links are embedded after other fields",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <stddef.h>\n\ntypedef struct Hook{struct Hook*next,*prev;}Hook;\ntypedef struct Item{long long metadata;Hook link;int value;}Item;\nItem*owner(Hook*h){return(Item*)((char*)h - offsetof(Item,link));}\nvoid append(Hook*head,Hook*n){n->prev=head->prev;n->next=head;head->prev->next=n;head->prev=n;}\nint main(void){Hook head={&head,&head};Item a[3]={{.value=2},{.value=4},{.value=8}};for(int i=0;i<3;i++)append(&head,&a[i].link);int sum=0;for(Hook*h=head.next;h!=&head;h=h->next)sum+=owner(h)->value;printf(\"%d\\n\",sum);return 0;}\n",
+      "stdout": "14\n",
+      "process": [
+        "embedded Hook pointers point inside Item objects",
+        "offsetof subtraction belongs in one source expression CALC",
+        "owner returns alias to containing Item, does not allocate or copy"
+      ],
+      "structures": [
+        "circular doubly linked list through embedded subobjects; payload belongs to outer record"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:25:40.866Z",
+      "sha256": "adf19cb789ea117d349d4f38c59bd0834782e08214a2cea04aec365c4ed52d94",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/47_intrusive_embedded_link.c"
+    },
+    {
+      "id": "48_flexible_children",
+      "intent": "multiway tree with flexible-array child storage",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <stddef.h>\n\ntypedef struct N{int value,count;struct N*child[];}N;\nN*make(int v,int count){N*p=calloc(1,sizeof *p+(size_t)count*sizeof p->child[0]);if(!p)exit(1);p->value=v;p->count=count;return p;}\nint sum(N*p){int s=p->value;for(int i=0;i<p->count;i++)s+=sum(p->child[i]);return s;}\nvoid clear(N*p){for(int i=0;i<p->count;i++)clear(p->child[i]);free(p);}\nint main(void){N*root=make(1,2);root->child[0]=make(2,0);root->child[1]=make(3,0);printf(\"%d\\n\",sum(root));clear(root);return 0;}\n",
+      "stdout": "6\n",
+      "process": [
+        "three allocations with different extents despite same nominal sizeof(N)",
+        "flexible child bounds derive from allocation and count, no independent array allocation",
+        "children freed before parent; pointer value delivery follows make returns"
+      ],
+      "structures": [
+        "multiway tree using variable child array roles; count is extent, not child index"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:25:40.870Z",
+      "sha256": "fc6ac6ef09976fdc72c1fc12748821333a69b5b195f5e3870cc029fa54ed7c10",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/48_flexible_children.c"
+    },
+    {
+      "id": "49_shared_expression_dag",
+      "intent": "expression DAG with deliberately shared subexpression",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <stddef.h>\n\ntypedef struct N{int kind,value;struct N*a,*b;}N;\nint eval(N*p){if(p->kind==0)return p->value;int x=eval(p->a),y=eval(p->b);return p->kind==1?x+y:x*y;}\nint main(void){N a={0,2,0,0},b={0,3,0,0},sum={1,0,&a,&b},root={2,0,&sum,&sum};printf(\"%d\\n\",eval(&root));return 0;}\n",
+      "stdout": "25\n",
+      "process": [
+        "sum evaluated twice: seven eval activations total, no memoization invented",
+        "two root pointers reference same sum object",
+        "conditional return executes selected arithmetic only"
+      ],
+      "structures": [
+        "DAG with shared subexpression, never duplicate shared node to force a tree"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:25:40.871Z",
+      "sha256": "9e14b787d7e0f7dc040906bf6cfb6bf979f3878b2c4a7c7d996b19f5562b134c",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/49_shared_expression_dag.c"
+    },
+    {
+      "id": "50_vertex_edge_types",
+      "intent": "directed graph with distinct vertex and edge records",
+      "style": "professional",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <stddef.h>\n\ntypedef struct Vertex Vertex;typedef struct Edge{Vertex*to;struct Edge*next;int cost;}Edge;struct Vertex{int value,seen;Edge*first;};\nint main(void){Vertex v[3]={{0},{1},{2}};Edge e[4]={{&v[1],&e[1],2},{&v[2],0,7},{&v[2],0,3},{&v[0],0,1}};v[0].first=&e[0];v[1].first=&e[2];v[2].first=&e[3];Vertex*q[3];int head=0,tail=1,total=0;q[0]=&v[0];v[0].seen=1;while(head<tail){Vertex*p=q[head++];total+=p->value;for(Edge*a=p->first;a;a=a->next)if(!a->to->seen){a->to->seen=1;q[tail++]=a->to;}}printf(\"%d %d\\n\",total,tail);return 0;}\n",
+      "stdout": "3 3\n",
+      "process": [
+        "queue contains borrowed vertex pointers; edge list traverses two record types",
+        "visited bit avoids repeated enqueue through cyclic edge",
+        "next and to are different relationship roles; costs remain edge payload"
+      ],
+      "structures": [
+        "three-vertex directed cyclic graph plus per-vertex edge chains and BFS queue"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:25:40.872Z",
+      "sha256": "660b2fe4347a767798b95f12f5a067cbd331f24bc661216a689ce49acfa794cb",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/50_vertex_edge_types.c"
+    },
+    {
+      "id": "51_unsigned_member_postincrement",
+      "source": "#include <stdio.h>\n#include <limits.h>\ntypedef struct Counters{unsigned int count;}Counters;\nCounters state={UINT_MAX-1U};\nint main(void){unsigned int first=state.count++;unsigned int second=state.count++;printf(\"%u %u %u\\n\",first,second,state.count);return 0;}\n",
+      "intent": "unsigned record counter postfix delivery across wraparound",
+      "style": "ordinary",
+      "stdout": "4294967294 4294967295 0\n",
+      "process": [
+        "postincrement delivers UINT_MAX-1 then UINT_MAX, final stored count zero",
+        "READ, CALC and WRITE retain unsigned int type and unsigned badge metadata",
+        "overflow is defined unsigned wraparound, not a runtime error"
+      ],
+      "structures": [
+        "one static record counter; no algorithm inference expected"
+      ],
+      "anchors": [],
+      "predictedAt": "2026-11-09T02:29:21.455Z",
+      "sha256": "a8695f3c7fedbed460b7d55cbad3e13553dca95ec1856473f0ab4410b79fe7f6",
+      "sourceArtifact": "example/c/codex_code/structure_followup_20261109/51_unsigned_member_postincrement.c"
+    }
+  ]
+}

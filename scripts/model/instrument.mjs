@@ -118,6 +118,7 @@ export function instrumentLLVM(ir,source,{filename="main.c",ast="",parsedNodes,m
     if(opcode!=="phi")flushPhi();
     if(opcode==="alloca") {
       const parts=splitTop(clean.slice(7)),p=typed(parts[0]),layout=abi.layout(p.type),count=parts[1]&&!parts[1].startsWith("align")?operand(parts[1]):{type:"i32",value:"1"};
+      if(p.value)throw new UnsupportedC(`LLVM 할당 자료형을 끝까지 해석하지 못했습니다: ${parts[0]}`,common.source);
       operation=op("SPACE",{action:"object.begin",type:p.type,size:layout.size,local:fn.locals.get(result),count});
       operation.lifetimeManaged=fn.lifetimeRoots.has(result);
       fn.allocations.set(result,operation);

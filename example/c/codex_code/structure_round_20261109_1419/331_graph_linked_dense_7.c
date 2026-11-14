@@ -1,0 +1,3 @@
+#include <stdio.h>
+typedef struct E{int to,w;struct E*next;}E;int main(void){int source[25]={0,0,0,0,1,1,1,2,2,2,2,3,3,3,4,4,4,4,4,5,5,5,5,6,6};E pool[25]={{1,5,0},{3,3,0},{4,8,0},{6,7,0},{2,3,0},{5,2,0},{6,2,0},{1,4,0},{3,8,0},{4,1,0},{5,7,0},{2,2,0},{4,2,0},{6,8,0},{1,2,0},{2,8,0},{3,6,0},{5,0,0},{6,7,0},{0,3,0},{2,8,0},{4,4,0},{6,3,0},{0,8,0},{5,3,0}},*heads[7]={0};for(int k=0;k<25;k++){int u=source[k];pool[k].next=heads[u];heads[u]=pool+k;}int d[7];for(int i=0;i<7;i++)d[i]=i?10000:0;
+for(int pass=0;pass<7;pass++)for(int u=0;u<7;u++)for(E*p=heads[u];p;p=p->next)if(d[u]<10000&&d[p->to]>d[u]+p->w)d[p->to]=d[u]+p->w;for(int i=0;i<7;i++)printf("%d ",d[i]);printf("\n");return 0;}

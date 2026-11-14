@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import {boundaryCases} from './fixtures/structure-boundaries.mjs';
-import {traceModel} from '../scripts/model/index.mjs';
+import {testExecution} from './helpers/test-execution.mjs';
 import {inferStructures,createInferenceView,queryStructureRelations,queryStorageReferences,queryInferredSemantics,validateStructureTrace,recommendStructureViews,setStructurePresentation,resolveStructurePresentation} from '../scripts/inference/index.mjs';
 const dir='test-results/structure-boundaries-2026-11-12',cache=new Map(),hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 const predictions=JSON.parse(await fs.readFile(new URL('./fixtures/structure-boundaries-expected.json',import.meta.url)));
@@ -13,7 +13,8 @@ async function load(id,source,stdout){
  if(cache.has(id))return cache.get(id);const fixture=boundaryCases.find(c=>c.id===id);source??=fixture.source;stdout??=fixture.stdout;let raw;
  const expected=fixture?predictions.find(c=>c.id===id):{sourceHash:hash(source),stdout};assert.equal(expected.sourceHash,hash(source));
  if(!fixture){try{assert.deepEqual(JSON.parse(await fs.readFile(`${dir}/${id}.expected.json`)),expected);}catch(e){if(e.code!=='ENOENT')throw e;await fs.writeFile(`${dir}/${id}.expected.json`,JSON.stringify(expected),{flag:'wx'});}}
- try{raw=JSON.parse(await fs.readFile(`${dir}/${id}.execution.json`));}catch(e){if(e.code!=='ENOENT')throw e;raw=await traceModel(source,{filename:`${id}.c`,includeObservations:true});await fs.writeFile(`${dir}/${id}.execution.json`,JSON.stringify(raw));await fs.writeFile(`example/c/codex_code/structure_boundaries_20261112/${id}.c`,source);}
+ raw=await testExecution({source,options:{filename:`${id}.c`,includeObservations:true},expected,file:`${dir}/${id}.cache.json`});
+ await fs.writeFile(`${dir}/${id}.execution.json`,JSON.stringify(raw));await fs.writeFile(`example/c/codex_code/structure_boundaries_20261112/${id}.c`,source);
  assert.equal(raw.trace.status,'completed',id);assert.equal(raw.stdout,stdout,id);const before=hash(JSON.stringify(raw)),inference=inferStructures(raw.plan,raw.trace,{observationPlan:raw.observations?.plan,observedTrace:raw.observations?.trace});
  assert.equal(inference.status,'completed',JSON.stringify(inference.diagnostics));assert.equal(hash(JSON.stringify(raw)),before,'read-only IR');await fs.writeFile(`${dir}/${id}.inference.json`,JSON.stringify(inference));const r={...createInferenceView(raw,inference),inference};validateStructureTrace(r.plan,r.trace);cache.set(id,r);return r;
 }
@@ -69,8 +70,8 @@ test('terminal rules survive field reordering, renamed storage and an inverted b
  const r=await load('sentinel-reordered',code,'0 0 0 3 '),[s]=candidates(r,'pointer-partition-candidate');assert.equal(s.fieldOffset,4);assert.deepEqual(grouped(s),[[0,1,2],[3]]);assert.ok(s.terminals.every(p=>p.mode==='sentinel'));assert.ok(last(s).nodes.every(n=>n.range.objectId!==object(r,'boundary').id));
 });
 
-test('pointer comparator policy is identified separately from an unproven heap shape',async()=>{
- const r=await load('pointer-comparator'),[s]=candidates(r,'composite-priority-candidate');assert.ok(s);assert.deepEqual(last(s).keyOrder.map(f=>[f.offset,f.direction]),[[0,1],[4,-1]]);assert.equal(last(s).min,'unknown');assert.equal(last(s).activeRange,null);assert.deepEqual(last(s).nodes,[]);
+test('pointer comparator policy connects to the observed heap shape and active prefix',async()=>{
+ const r=await load('pointer-comparator'),[s]=candidates(r,'composite-priority-candidate');assert.ok(s);assert.deepEqual(last(s).keyOrder.map(f=>[f.offset,f.direction]),[[0,1],[4,-1]]);assert.ok(s.states.some(st=>st.nodes.length===4&&st.min==='satisfied'));assert.equal(last(s).activeRange.count,0);assert.deepEqual(last(s).nodes,[]);
  const t=await load('pointer-comparator-reversed',source('pointer-comparator').replace('x->k<y->k','x->k>y->k').replace('x->t>y->t','x->t<y->t'),'4:1 3:7 2:5 2:9 ');assert.deepEqual(last(candidates(t,'composite-priority-candidate')[0]).keyOrder.map(f=>[f.offset,f.direction]),[[0,-1],[4,1]]);
 });
 

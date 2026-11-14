@@ -51,7 +51,17 @@ return c+d+e+z+n+x;} int main(){return f(0,1)+f(1,0)+f(1,1);}`;
   const {plan,trace}=await traceModel(source);assert.equal(trace.exitCode,92);assert.equal(trace.status,'completed');
   const defs=new Map(plan.instructions.map(i=>[i.id,i]));
   const logical=trace.events.filter(e=>e.evaluation?.kind==='logical');
-  assert.equal(logical.length,11);assert.equal(new Set(logical.map(e=>e.activationId)).size,3);
+  // Three source logical expressions per call. The inner b||++x belongs to
+  // a&&(b||++x), including when ++x is an independent mutation boundary.
+  assert.equal(logical.length,9);assert.equal(new Set(logical.map(e=>e.activationId)).size,3);
+  for(const frame of trace.frames.filter(f=>f.functionName==='f')){
+    const groups=logical.filter(e=>e.activationId===frame.id);
+    assert.deepEqual(groups.map(e=>defs.get(e.instructionId).source.expression),['a&&++x','a||++x','a&&(b||++x)']);
+  }
+  const nested=logical.filter(e=>defs.get(e.instructionId).source.expression==='a&&(b||++x)');
+  assert.deepEqual(nested.map(e=>e.value.decimal),['0','1','1']);
+  assert.deepEqual(nested.map(e=>e.evaluation.right),['skipped','evaluated','evaluated']);
+  assert.deepEqual(nested.slice(1).map(e=>e.nestedEvaluations.find(n=>n.kind==='logical').right),['evaluated','skipped']);
   assert.ok(logical.every(e=>e.value.cType.name==='int'&&['0','1'].includes(e.value.decimal)&&e.evaluation.right!=='unknown'));
   assert.equal(logical.filter(e=>e.helpMarker).length,5);
   assert.ok(!trace.events.some(e=>['icmp','zext','phi','select'].includes(e.operator)));

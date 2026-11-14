@@ -1,4 +1,5 @@
 import {complete,storage,port,unique,intersects,overlapBounds} from './common.mjs';
+import {addressOriginOf,addressOriginKeys} from '../../shared/address-origin.mjs';
 
 export function bitPreservingCast(step){const a=step?.conversion?.fromType,b=step?.conversion?.toType;
   const integer=t=>t&&['signed','unsigned'].includes(t.signedness)&&t.encoding!=='DW_ATE_boolean'&&t.kind!=='boolean'&&t.sizeBits>0;
@@ -47,7 +48,18 @@ export function buildProvenance(c,events,access,calls,emit,result){
       const input=rows[i],producer=c.resolveRef(input,e.eventId),id=producer?.eventId;
       const role=['address','control','callee'].includes(input.role)?input.role:
         id&&!e.dataInputs?.includes(id)&&e.addressInputs?.includes(id)?'address':id&&!e.dataInputs?.includes(id)&&e.controlInputs?.includes(id)?'control':defaultRole;
-      if(input.executionId||input.observationId){const source=find(input,e);
+      const address=addressOriginOf(input);
+      if(address){
+        const source=addNode({id:`a:${target.id}:${i}`,executionId:e.eventId,order:-1,transform:'address',unresolved:[],
+          addressOriginRef:{executionId:e.eventId,instructionId:e.instructionId,stepOrder:target===node?null:target.order,inputIndex:i}});
+        for(const key of addressOriginKeys)for(const id of address[key]){
+          const producer=c.resolveRef(id,e.eventId),from=producer&&byId.get(`v:${producer.eventId}`),sourceRole=key==='dataInputs'?'value':key==='addressInputs'?'address':key==='controlInputs'?'control':'callee';
+          if(from)edge(from,source,sourceRole,{path:'address-origin'});else source.unresolved.push(`unresolved-${sourceRole}-operand`);
+        }
+        if(!addressOriginKeys.some(key=>address[key].length))source.unresolved.push('unobserved-address-origin');
+        source.unresolved=unique(source.unresolved);if(source.unresolved.length)target.unresolved.push('unresolved-address-origin');
+        edge(source,target,role,{path:'operand'});
+      }else if(input.executionId||input.observationId){const source=find(input,e);
         if(source)edge(source,target,role,{path:'operand'});else target.unresolved.push(`unresolved-${role}-operand`);
       }else if(input.kind==='memory-range'){
             const range=storage(c,input,e);if(range)for(const prior of spans(range))edge(byId.get(prior.producer),target,role,{path:'memory',range:{objectId:range.objectId,offset:Math.max(prior.offset,range.offset),size:Math.min(prior.offset+prior.size,range.offset+range.size)-Math.max(prior.offset,range.offset)}});
@@ -55,7 +67,9 @@ export function buildProvenance(c,events,access,calls,emit,result){
         const source=addNode({id:`literal:${target.id}:${i}`,executionId:e.eventId,order:-1,transform:literal?'literal':'captured-input',inputRef:{instructionId:e.instructionId,executionId:e.eventId,stepOrder:target===node?null:target.order,inputIndex:i},unresolved:literal?[]:['unbound-input-observation']});edge(source,target,role,{path:'operand'});}
     }}
     for(const step of e.steps??[])inputs(steps.get(step),step.inputs??[]);
-    inputs(node,e.inputs??[],['resume','write.range','copy','fill'].includes(e.action)?'callee':e.kind==='READ'?e.action==='input'?'control':'address':'value');
+    // resume.inputs retain the original call arguments for inspection. They
+    // are not return-value operands; actual return/read/effect links follow.
+    if(e.action!=='resume')inputs(node,e.inputs??[],['write.range','copy','fill'].includes(e.action)?'callee':e.kind==='READ'?e.action==='input'?'control':'address':'value');
     for(const [key,role]of [['dataInputs','value'],['addressInputs','address'],['controlInputs','control'],['calleeInputs','callee']]){
       if(e.kind==='READ'&&key==='dataInputs')continue;
       for(const ref of e[key]??[]){const producer=c.resolveRef(ref,e.eventId),source=producer&&byId.get(`v:${producer.eventId}`);
@@ -86,7 +100,7 @@ export function buildProvenance(c,events,access,calls,emit,result){
     if(e.kind==='WRITE'&&target){
       setProducer(target,node.id);
     }
-    if(e.kind==='SPACE'&&e.action==='object.begin')for(const range of e.memoryState?.ranges??[]){const initialized=storage(c,{objectId:e.objectId,offset:range.offset,size:range.length},e);if(initialized)setProducer(initialized,node.id,range.initialization);}
+    if(e.kind==='SPACE'&&e.action==='object.begin'&&!c.object(e.objectId)?.storageAlias)for(const range of e.memoryState?.ranges??[]){const initialized=storage(c,{objectId:e.objectId,offset:range.offset,size:range.length},e);if(initialized)setProducer(initialized,node.id,range.initialization);}
     if(['WRITE','CALC'].includes(e.kind)&&e.value!==undefined&&!['fill','range-copy'].includes(node.transform)&&!(incoming.get(node.id)?.length))node.unresolved.push('unrecorded-value-input');
     node.unresolved=unique(node.unresolved);
     if(node.unresolved.length)emit.issue('unresolved-provenance',{executionId:e.eventId,reasons:node.unresolved});

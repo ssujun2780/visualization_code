@@ -16,12 +16,20 @@ function runWorker(source,{timeoutMs=25000,...options}={},mode) {
   if(options.maxObservationBytes!==undefined&&(!Number.isInteger(options.maxObservationBytes)||options.maxObservationBytes<65536||options.maxObservationBytes>67108864))throw new Error('관찰 기록 바이트 제한은 65536~67108864여야 합니다.');
   return new Promise((resolve,reject)=>{
     const worker=new Worker(new URL("./worker.mjs",import.meta.url),{workerData:{source,options,mode},execArgv:[]});
-    let prepared={},events=[],state={},replayCheckpoint=null,done=false,interrupted=false;
+    let prepared={},events=[],state={},replayCheckpoint=null,completedExecution=null,done=false,interrupted=false;
     const finish=(result,interrupt=false)=>{if(done)return;done=true;clearTimeout(timer);if(interrupt)void worker.terminate();resolve(result);};
     const fail=error=>{if(done)return;done=true;clearTimeout(timer);void worker.terminate();reject(error);};
+    const finishExecution=message=>{
+      const {type,...execution}=completedExecution,{type:preparedType,observationPlan,...inputs}=prepared;
+      finish({...inputs,...execution,recordingNotice:{stage:'result-delivery',message}},true);
+    };
     const timer=setTimeout(()=>{
       try {
       interrupted=true;void worker.terminate();
+      if(completedExecution){
+        finishExecution('최종 결과 전달 시간 제한에 도달했습니다. 확정된 실행 기록은 보존됩니다.');
+        return;
+      }
       const diagnostic={code:"time-limit",message:"컴파일·실행·중간언어 변환 시간 제한에 도달했습니다. 기록은 마지막 전달된 사건까지 보존됩니다."};
       const event={schemaVersion:2,eventId:`e${events.length+1}`,kind:"ERROR",phase:"fault",diagnostic,evidence:"observer"};
       const observedTrace={schemaVersion:2,objects:[],frames:[],...state,status:"limited",exitCode:null,events:[...events,event],
@@ -48,10 +56,13 @@ function runWorker(source,{timeoutMs=25000,...options}={},mode) {
       events.push(...message.events);state=message.state??state;
       if(events.length<=8192&&(state.coverage?.observationBytes??0)<=4194304)replayCheckpoint={count:events.length,state};
     }
+      if(message.type==='execution')completedExecution=message;
       if(message.type==="result")finish(message.result);if(message.type==="failure"){
-        const {type,...details}=message;fail(Object.assign(new Error(message.message),details));
+        if(completedExecution)finishExecution(message.message);
+        else{const {type,...details}=message;fail(Object.assign(new Error(message.message),details));}
       }});
-    worker.on("error",error=>{if(!interrupted)fail(error);});
-    worker.on("exit",code=>{if(!done&&!interrupted)fail(new Error(`계측 작업이 예기치 않게 종료됐습니다 (${code}).`));});
+    worker.on("error",error=>{if(!interrupted){if(completedExecution)finishExecution(error.message);else fail(error);}});
+    worker.on("exit",code=>{if(!done&&!interrupted){const message=`계측 작업이 예기치 않게 종료됐습니다 (${code}).`;
+      if(completedExecution)finishExecution(message);else fail(new Error(message));}});
   });
 }

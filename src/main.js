@@ -3,6 +3,7 @@ import { createCodeEditor, setCompilerDiagnostics } from "./code-editor.js";
 import {parseCompilerDiagnostics} from './compiler-diagnostics.js';
 import {createLiveDiagnostics} from './live-diagnostics.js';
 import {localizeDiagnostic,diagnosticTooltip,localizeCompilerOutput} from './diagnostic-messages.ko.js';
+import {storeAnimationSource} from './animation/source-input.js';
 
 const defaultCode = '#include <stdio.h>\n\nint main(){\n\tprintf("Hello World!\\n");\n\treturn 0;\n}\n';
 const previousDefault = '#include <stdio.h>\n\nint main() {\n    return 0;\n}\n';
@@ -30,6 +31,10 @@ try {
   elements.stdin.value = saved?.stdin ?? "";
 } catch { /* Keep the default when storage is unavailable. */ }
 const codeEditor = createCodeEditor(elements.code, initialCode, run);
+document.getElementById('visualize-code').addEventListener('click',event=>{
+  try {storeAnimationSource(sessionStorage,codeEditor.getValue());save();}
+  catch {event.preventDefault();elements.status.textContent='코드를 시각화 화면으로 전달하지 못했습니다. 브라우저의 사이트 저장소 사용 여부를 확인해 주세요.';}
+});
 const problemList=document.getElementById('code-problems-list');
 const problemPanel=document.getElementById('code-problems');
 const analysisStatus=document.getElementById('analysis-status');

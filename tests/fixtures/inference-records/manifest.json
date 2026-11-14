@@ -117,5 +117,66 @@
       },
       "sourceHash": "56d3e6446e584ac4e81ff98ab10f0089ba01c1339b5169476b1e0c0e328bffea"
     }
+  },
+  "range-lazy": {
+    "origin": "test-results/structure-extensions-2026-11-12",
+    "executionSha256": "4719de78dc26d137ac97fc111215887ac1536e881319815863362b94a6d3e5ee",
+    "expected": {
+      "id": "range-lazy",
+      "sourceHash": "d5b4d199454aae7bfbbcfc858d25568b1936fb2b42e5c2867ae75235de91b309",
+      "stdout": "30 5 9 ",
+      "expected": {
+        "sum": 30,
+        "tag": 5,
+        "leaf": 9
+      }
+    }
+  },
+  "selected-edges": {
+    "origin": "test-results/structure-extensions-2026-11-12",
+    "executionSha256": "98e32eaf63cfd6f1ad0b7affd6c48ba423e1d5ccea44a91d13cdc0ab85c0992e",
+    "expected": {
+      "id": "selected-edges",
+      "sourceHash": "077e40cd1696afc34bc1e52191c9b89a4032862048d3c214c3e6e877a6b6c08f",
+      "stdout": "6 3 ",
+      "expected": {
+        "chosen": [
+          0,
+          1,
+          2
+        ],
+        "weight": 6,
+        "components": [
+          [
+            0,
+            1,
+            2,
+            3
+          ]
+        ]
+      }
+    }
+  },
+  "pointer-comparator": {
+    "origin": "test-results/structure-boundaries-2026-11-12",
+    "executionSha256": "b07a4d6aadc9e2c63bb296ab9aaa584386716dd0b213f113d85fb5420c9b101e",
+    "expected": {
+      "id": "pointer-comparator",
+      "sourceHash": "e348b6f53135ad16f8dcd9dc967f585082aeb66482f7a4ca072f763a52080215",
+      "stdout": "2:9 2:5 3:7 4:1 ",
+      "expected": {
+        "keyOrder": [
+          [
+            0,
+            1
+          ],
+          [
+            4,
+            -1
+          ]
+        ],
+        "pointerArguments": true
+      }
+    }
   }
 }

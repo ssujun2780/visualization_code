@@ -1,0 +1,1485 @@
+{
+  "createdAt": "2026-11-06T04:00:10.211Z",
+  "cases": [
+    {
+      "id": "01_bubble_copy",
+      "title": "Every pass copies the full array twice",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int a[5]={5,1,4,2,3},comparisons=0,swaps=0;\n for(int pass=0;pass<4;pass++){int copy[5];for(int k=0;k<5;k++)copy[k]=a[k];for(int k=0;k<5;k++)a[k]=copy[k];\n  for(int j=0;j<4;j++){comparisons++;if(a[j]>a[j+1]){int temporary=a[j];a[j]=a[j+1];a[j+1]=temporary;swaps++;}}}\n for(int i=0;i<5;i++)printf(\"%d \",a[i]);printf(\"| %d %d\\n\",comparisons,swaps);return 0;}\n",
+      "stdout": "1 2 3 4 5 | 16 6\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Six real swaps retain temporary/read/write order; 16 comparisons are not optimized away.",
+        "Four source lifetimes for copy; local temporary exists only in six executed swaps."
+      ],
+      "checks": {
+        "calcCounts": [
+          {
+            "expression": "a[j]>a[j+1]",
+            "count": 16
+          }
+        ],
+        "objectCounts": {
+          "copy": 4,
+          "temporary": 6
+        }
+      },
+      "createdAt": "2026-11-06T04:00:10.181Z",
+      "sha256": "b45bf07c3497c40b7f4c4d56669a57923c3bd7909ab200e9c0b185a44da0e4a8"
+    },
+    {
+      "id": "02_naive_fibonacci",
+      "title": "Exponential recursion without memoization",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint visits=0;int fib(int n){visits++;if(n<2)return n;int left=fib(n-1);int right=fib(n-2);int answer=left+right;return answer;}\nint main(void){int answer=fib(7);printf(\"%d %d\\n\",answer,visits);return 0;}\n",
+      "stdout": "13 41\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "41 distinct fib frames; left call completes before right call.",
+        "Repeated subproblems remain repeated source work."
+      ],
+      "checks": {
+        "calls": {
+          "fib": 41
+        }
+      },
+      "createdAt": "2026-11-06T04:00:10.182Z",
+      "sha256": "66bbf2959f3e61719b8d793b591f8ea9fd8927e8c1bafdeebf03af09b246ae9c"
+    },
+    {
+      "id": "03_all_divisors",
+      "title": "Primality test deliberately never exits early",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int count=0,total=0,checks=0;for(int n=2;n<=20;n++){int prime=1;for(int d=2;d<n;d++){int rem=n%d;checks++;if(rem==0)prime=0;}if(prime){count++;total+=n;}}\n printf(\"%d %d %d\\n\",count,total,checks);return 0;}\n",
+      "stdout": "8 77 171\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "171 remainder operations, including redundant checks after a divisor was found."
+      ],
+      "checks": {
+        "calcCounts": [
+          {
+            "expression": "n%d",
+            "count": 171
+          }
+        ]
+      },
+      "createdAt": "2026-11-06T04:00:10.182Z",
+      "sha256": "0f8d714b35ff726e6d77b3d39e78893ad7eb139ad29b00dd877a4456e2e9c707"
+    },
+    {
+      "id": "04_grow_one_character",
+      "title": "realloc and strcat for each character",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){const char text[]=\"banana\";char*p=malloc(1);if(!p)return 1;p[0]=0;\n for(int i=0;i<(int)strlen(text);i++){size_t n=strlen(p);char*q=realloc(p,n+2);if(!q){free(p);return 1;}p=q;char one[2]={text[i],0};strcat(p,one);}\n printf(\"%s %d\\n\",p,(int)strlen(p));free(p);return 0;}\n",
+      "stdout": "banana 6\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Each successful realloc replaces the old allocation lifetime and updates p.",
+        "Each strcat reads its source through one and writes the destination range."
+      ],
+      "checks": {
+        "calls": {
+          "malloc": 1,
+          "realloc": 6,
+          "strcat": 6,
+          "strlen": 14
+        },
+        "heapObjects": 7,
+        "allHeapEnded": true
+      },
+      "createdAt": "2026-11-06T04:00:10.182Z",
+      "sha256": "c792f2c3c2eda5c35288fbf72706de4b0fa0aa42d07108acac0e71feb95a6ab9"
+    },
+    {
+      "id": "05_reverse_twice",
+      "title": "Repeated strlen and needless double reversal",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nchar*rev(const char*s){int n=(int)strlen(s);char*r=malloc((size_t)n+1);if(!r)return NULL;strcpy(r,s);\n for(int i=0;i<(int)strlen(s)/2;i++){int j=(int)strlen(s)-1-i;char temp=r[i];r[i]=r[j];r[j]=temp;}return r;}\nint main(void){char*a=rev(\"abcde\");if(!a)return 1;char*b=rev(a);if(!b){free(a);return 1;}printf(\"%s %s\\n\",a,b);free(a);free(b);return 0;}\n",
+      "stdout": "edcba abcde\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Two allocations survive their creating rev frames and are freed in main.",
+        "Four actual swaps across two calls; repeated strlen remains observed."
+      ],
+      "checks": {
+        "calls": {
+          "rev": 2,
+          "strlen": 12,
+          "strcpy": 2
+        },
+        "heapObjects": 2,
+        "allHeapEnded": true
+      },
+      "createdAt": "2026-11-06T04:00:10.183Z",
+      "sha256": "4af5adf48745f3227921940186394920ff25d81ad1b2185f0b452323819402cb"
+    },
+    {
+      "id": "06_matrix_scratch",
+      "title": "Allocate a temporary vector for every dot product",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int a[2][3]={{1,2,3},{4,5,6}},b[3][2]={{1,0},{0,1},{1,1}},out[2][2];\n for(int i=0;i<2;i++)for(int j=0;j<2;j++){int*t=malloc(3*sizeof *t);if(!t)return 1;for(int k=0;k<3;k++)t[k]=a[i][k]*b[k][j];int sum=0;for(int k=0;k<3;k++)sum+=t[k];out[i][j]=sum;free(t);}\n printf(\"%d %d %d %d\\n\",out[0][0],out[0][1],out[1][0],out[1][1]);return 0;}\n",
+      "stdout": "4 5 10 11\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Twelve multiply writes and four scratch allocations/frees remain.",
+        "Each out cell is written once after its own three-term sum."
+      ],
+      "checks": {
+        "calls": {
+          "malloc": 4,
+          "free": 4
+        },
+        "heapObjects": 4,
+        "allHeapEnded": true,
+        "calcCounts": [
+          {
+            "expression": "a[i][k]*b[k][j]",
+            "count": 12
+          }
+        ]
+      },
+      "createdAt": "2026-11-06T04:00:10.183Z",
+      "sha256": "1c71adfd79d7794c95c6fe172a3f6e7c2526c15c9c20a5ff3eb65d7c81eb97f3"
+    },
+    {
+      "id": "07_list_rewalk",
+      "title": "Append and recompute a list sum by walking from the head",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct Cell{int value;struct Cell*next;}Cell;\nint sum(Cell*p){int s=0;while(p){s+=p->value;p=p->next;}return s;}\nint main(void){Cell head={0,NULL};int input[4]={3,1,4,1},hops=0,last=0;\n for(int i=0;i<4;i++){Cell*n=malloc(sizeof *n);if(!n)return 1;n->value=input[i];n->next=NULL;Cell*p=&head;while(p->next){p=p->next;hops++;}p->next=n;last=sum(head.next);}\n printf(\"%d %d\\n\",last,hops);Cell*p=head.next;while(p){Cell*next=p->next;free(p);p=next;}return 0;}\n",
+      "stdout": "9 6\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Sum traversals grow 1,2,3,4 nodes; append traversal costs six links.",
+        "A freed node is never read; next is saved first."
+      ],
+      "checks": {
+        "calls": {
+          "sum": 4,
+          "malloc": 4,
+          "free": 4
+        },
+        "heapObjects": 4,
+        "allHeapEnded": true
+      },
+      "createdAt": "2026-11-06T04:00:10.183Z",
+      "sha256": "e5edf10ba83957771a438e59d5f440e1496ee821dc34b7c13c1685e71bc79ada"
+    },
+    {
+      "id": "08_shift_stack",
+      "title": "Implement a stack by shifting every element",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int a[8]={0},size=0,moves=0;for(int x=2;x<=8;x+=2){for(int j=size;j>0;j--){a[j]=a[j-1];moves++;}a[0]=x;size++;}\n while(size){int value=a[0];for(int j=1;j<size;j++){a[j-1]=a[j];moves++;}size--;printf(\"%d \",value);}printf(\"| %d\\n\",moves);return 0;}\n",
+      "stdout": "8 6 4 2 | 12\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Twelve visible shift writes are retained instead of replacing code with an abstract stack operation."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T04:00:10.183Z",
+      "sha256": "afbe085504a3027c1de6b2ba123dc1deb5959911640f6da6cc234abd05818664"
+    },
+    {
+      "id": "09_value_roundtrips",
+      "title": "Pass and return an entire record repeatedly",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct{int v[4];int total;}Packet;\nPacket bump(Packet p,int x){p.v[0]+=x;p.total+=p.v[0];return p;}\nint main(void){Packet original={{1,2,3,4},0};Packet changed=bump(bump(original,2),3);printf(\"%d %d %d\\n\",original.v[0],changed.v[0],changed.total);return 0;}\n",
+      "stdout": "1 6 9\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Copies preserve original.v[0]=1; outer call consumes the inner returned aggregate."
+      ],
+      "checks": {
+        "calls": {
+          "bump": 2
+        }
+      },
+      "createdAt": "2026-11-06T04:00:10.183Z",
+      "sha256": "cc33b235a645b32531b8f6262d0d82c65017c95437c53efe4957aacf9a1552ec"
+    },
+    {
+      "id": "10_jagged_copy",
+      "title": "Build jagged rows and copy each row to scratch",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int**rows=malloc(2*sizeof *rows);if(!rows)return 1;for(int i=0;i<2;i++){rows[i]=calloc(3,sizeof **rows);if(!rows[i])return 1;for(int j=0;j<3;j++)rows[i][j]=i*10+j;}\n int total=0;for(int i=0;i<2;i++){int*t=malloc(3*sizeof *t);if(!t)return 1;memcpy(t,rows[i],3*sizeof *t);for(int j=0;j<3;j++)total+=t[j];free(t);}\n printf(\"%d\\n\",total);for(int i=0;i<2;i++)free(rows[i]);free(rows);return 0;}\n",
+      "stdout": "36\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Two rows, one pointer array and two scratch vectors have distinct allocation identities.",
+        "Double-pointer loads and memcpy source bytes precede the sums."
+      ],
+      "checks": {
+        "heapObjects": 5,
+        "allHeapEnded": true,
+        "calls": {
+          "memcpy": 2
+        }
+      },
+      "createdAt": "2026-11-06T04:00:10.183Z",
+      "sha256": "fcb78515e6f1e0374313bdbf319e46830d4f8c3c5b72d0c6b5637f5c9c8e008e"
+    },
+    {
+      "id": "11_duplicate_tokens",
+      "title": "Copy each token before converting it to a number",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){const char*s=\"4,1,4,2\";char*copy=malloc(strlen(s)+1);if(!copy)return 1;strcpy(copy,s);int total=0,count=0;\n char*p=strtok(copy,\",\");while(p){char*piece=malloc(strlen(p)+1);if(!piece){free(copy);return 1;}strcpy(piece,p);total+=atoi(piece);count++;free(piece);p=strtok(NULL,\",\");}\n printf(\"%d %d\\n\",total,count);free(copy);return 0;}\n",
+      "stdout": "11 4\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "strtok mutates the original copy; temporary pieces do not outlive free."
+      ],
+      "checks": {
+        "calls": {
+          "strtok": 5,
+          "atoi": 4,
+          "malloc": 5,
+          "free": 5
+        },
+        "heapObjects": 5,
+        "allHeapEnded": true
+      },
+      "createdAt": "2026-11-06T04:00:10.183Z",
+      "sha256": "ec8b640fbaeeaaf4be064ce653593b2d246989ae5ab5317d8fc0266c98781e63"
+    },
+    {
+      "id": "12_parse_twice",
+      "title": "Read lines and parse each number twice",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){char line[32];int n=0,a[8]={0},total=0;if(!fgets(line,sizeof line,stdin)||sscanf(line,\"%d\",&n)!=1||n<0||n>8)return 1;\n for(int i=0;i<n;i++){int redundant=0;if(!fgets(line,sizeof line,stdin))return 1;if(sscanf(line,\"%d\",&redundant)!=1)return 1;if(sscanf(line,\"%d\",&a[i])!=1)return 1;total+=a[i];}\n printf(\"%d %d\\n\",n,total);return 0;}\n",
+      "stdout": "4 9\n",
+      "exitCode": 0,
+      "stdin": "4\n3\n1\n4\n1\n",
+      "process": [
+        "Eight element scans actually execute; their writes must not be collapsed into four.",
+        "stdin reads and sscanf memory effects precede each sum."
+      ],
+      "checks": {
+        "calls": {
+          "fgets": 5,
+          "sscanf": 9
+        }
+      },
+      "createdAt": "2026-11-06T04:00:10.183Z",
+      "sha256": "97d00bf0e958dd9e3076ee5b606c8e6997d03b786546aa2cd150d002f50dfdcd"
+    },
+    {
+      "id": "13_subtract_gcd",
+      "title": "Repeated subtraction and redundant calls",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint gcd(int a,int b){while(a!=b){if(a>b)a-=b;else b-=a;}return a;}\nint main(void){int a[3]={18,35,48},b[3]={12,15,18},sum=0;for(int i=0;i<3;i++){int first=gcd(a[i],b[i]);int second=gcd(a[i],b[i]);sum+=first+second;}printf(\"%d\\n\",sum);return 0;}\n",
+      "stdout": "34\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Six gcd calls; each pair repeats identical subtraction work.",
+        "Compound assignments consume current destination and selected other operand."
+      ],
+      "checks": {
+        "calls": {
+          "gcd": 6
+        }
+      },
+      "createdAt": "2026-11-06T04:05:02.466Z",
+      "sha256": "2063d127797a18878140b08b13a2555cd1d9dec033dd12095506ff806290d6f8"
+    },
+    {
+      "id": "14_queue_memmove",
+      "title": "Shift an entire queue on every pop",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int q[8]={0},n=0,total=0;for(int i=1;i<=5;i++){q[n]=i*3;n++;}while(n>0){int x=q[0];memmove(q,q+1,(size_t)(n-1)*sizeof *q);n--;total+=x;}printf(\"%d %d\\n\",total,n);return 0;}\n",
+      "stdout": "45 0\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Five memmove calls including final zero-byte operation.",
+        "Overlapping copy reads original bytes; no fabricated element-by-element destructive overwrite."
+      ],
+      "checks": {
+        "calls": {
+          "memmove": 5
+        }
+      },
+      "createdAt": "2026-11-06T04:05:02.467Z",
+      "sha256": "f9d46a4e6934365ba9ca24857faeb62ec106be371ebe5bf6f415b4ec824095f2"
+    },
+    {
+      "id": "15_deep_shallow",
+      "title": "Redundant deep copies and an explicit shallow alias",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct{int *v;int n;} Box;\nBox duplicate(Box a){Box b;b.n=a.n;b.v=malloc((size_t)b.n*sizeof *b.v);if(b.v)memcpy(b.v,a.v,(size_t)b.n*sizeof *b.v);return b;}\nint main(void){int data[3]={2,4,6};Box a={data,3},b=duplicate(a);if(!b.v)return 1;Box alias=b;Box c=duplicate(b);if(!c.v){free(b.v);return 1;}alias.v[1]=9;c.v[2]=8;printf(\"%d %d %d %d\\n\",a.v[1],b.v[1],c.v[1],c.v[2]);free(b.v);free(c.v);return 0;}\n",
+      "stdout": "4 9 4 8\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Value-copied Box aliases the same pointee; memcpy duplicates only pointed integers.",
+        "alias.v changes b storage, not a or c."
+      ],
+      "checks": {
+        "calls": {
+          "duplicate": 2,
+          "memcpy": 2
+        },
+        "heapObjects": 2,
+        "allHeapEnded": true
+      },
+      "createdAt": "2026-11-06T04:05:02.468Z",
+      "sha256": "2a0b0ab674a43d7693fa43c147d8cf68240f2041de8cf1e48dd3662d4ab80165"
+    },
+    {
+      "id": "16_prefix_rescan",
+      "title": "Build prefixes then repeatedly measure and format them",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){char text[6]=\"abcde\",prefix[6]={0},line[32];int total=0;for(int i=0;i<5;i++){memcpy(prefix,text,(size_t)i+1);prefix[i+1]=0;int n=(int)strlen(prefix);total+=n;snprintf(line,sizeof line,\"%s:%d\",prefix,n);puts(line);}printf(\"%d\\n\",total);return 0;}\n",
+      "stdout": "a:1\nab:2\nabc:3\nabcd:4\nabcde:5\n15\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Five prefix copies, five strlen and snprintf calls followed by visible puts output.",
+        "snprintf writes local string, puts reads it; no terminal output for snprintf."
+      ],
+      "checks": {
+        "calls": {
+          "memcpy": 5,
+          "strlen": 5,
+          "snprintf": 5,
+          "puts": 5
+        }
+      },
+      "createdAt": "2026-11-06T04:05:02.468Z",
+      "sha256": "9546eedf7390bb3c57bbe6d1661ef3b55927c339626653ff28d888e3b3e3daf3"
+    },
+    {
+      "id": "17_shadow_scopes",
+      "title": "Nested shadow variables recreated for every iteration",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int x=100,total=0;for(int i=0;i<3;i++){int x=i+1;{int x=2;total+=x;}total+=x;}printf(\"%d %d\\n\",x,total);return 0;}\n",
+      "stdout": "100 12\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Seven distinct x lifetimes: outer one, loop-body three, inner three.",
+        "Inner scope cleanup does not end outer x."
+      ],
+      "checks": {
+        "objectCounts": {
+          "x": 7
+        }
+      },
+      "createdAt": "2026-11-06T04:05:02.468Z",
+      "sha256": "ca8ac8d1510c449eff0a3150a1d7a521e65b3a15b30f6f418a6898c5adbbcf26"
+    },
+    {
+      "id": "18_vla_rows",
+      "title": "VLA dimensions through redundant row copies",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint row_sum(int n,int row[n]){int scratch[n];for(int i=0;i<n;i++)scratch[i]=row[i];int total=0;for(int i=0;i<n;i++)total+=scratch[i];return total;}\nint main(void){int n=3,a[n][n];for(int i=0;i<n;i++)for(int j=0;j<n;j++)a[i][j]=i*n+j+1;int total=0;for(int i=0;i<n;i++)total+=row_sum(n,a[i]);printf(\"%d %d\\n\",total,(int)(sizeof a/sizeof a[0][0]));return 0;}\n",
+      "stdout": "45 9\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Three scratch VLAs each hold exactly three ints and end on return.",
+        "Row address bookkeeping remains separate from scalar element calculations."
+      ],
+      "checks": {
+        "calls": {
+          "row_sum": 3
+        },
+        "objectCounts": {
+          "scratch": 3
+        }
+      },
+      "createdAt": "2026-11-06T04:05:02.468Z",
+      "sha256": "2f8184f8ff03c7574d7ace6db5eeb224943f43d59323f50e4cffc7a73691e409"
+    },
+    {
+      "id": "19_macro_redundancy",
+      "title": "Statement macro repeated inside unused-work loops",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n#define SWAP(a,b) do{int temporary=(a);(a)=(b);(b)=temporary;}while(0)\n#define STEP(x) ((x)*2+1)\nint main(void){int a[3]={1,2,3};for(int i=0;i<4;i++){SWAP(a[0],a[2]);SWAP(a[0],a[2]);}int sum=0;for(int i=0;i<3;i++)sum+=STEP(a[i]);printf(\"%d %d %d %d\\n\",a[0],a[1],a[2],sum);return 0;}\n",
+      "stdout": "1 2 3 15\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Eight actual swaps despite net identity; each macro-local temporary is a separate lifetime.",
+        "STEP arithmetic is grouped by source macro expansion, not attached to unrelated operand."
+      ],
+      "checks": {
+        "objectCounts": {
+          "temporary": 8
+        }
+      },
+      "createdAt": "2026-11-06T04:05:02.468Z",
+      "sha256": "fbe91ded39152a1e90fd49e8b8b1033449b6b7a815e308d7f09128d823ec8972"
+    },
+    {
+      "id": "20_indirect_wrappers",
+      "title": "Conditional function pointer wrapped twice",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint up(int x){return x+1;}int down(int x){return x-1;}\nint apply(int(*f)(int),int x){int copy=x;return f(copy);}\nint main(void){int total=0;for(int i=0;i<4;i++){int(*f)(int)=(i%2)?down:up;int a=apply(f,i);int b=apply(f,a);total+=b;}printf(\"%d\\n\",total);return 0;}\n",
+      "stdout": "6\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Eight indirect callees resolved to four up and four down frames.",
+        "Return of first apply becomes second call argument without invented direct binding."
+      ],
+      "checks": {
+        "calls": {
+          "apply": 8,
+          "up": 4,
+          "down": 4
+        }
+      },
+      "createdAt": "2026-11-06T04:05:02.468Z",
+      "sha256": "febcb70af3e0becbdf741591688717a9d00ee667ce1d700e7a64e799d964851c"
+    },
+    {
+      "id": "21_goto_selection",
+      "title": "Selection sort written with explicit labels and goto",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int a[4]={4,2,3,1},i=0,j=0,m=0,swaps=0;\nouter:if(i>=3)goto done;m=i;j=i+1;\nscan:if(j>=4)goto exchange;if(a[j]<a[m])m=j;j++;goto scan;\nexchange:{int t=a[i];a[i]=a[m];a[m]=t;swaps++;}i++;goto outer;\ndone:printf(\"%d %d %d %d | %d\\n\",a[0],a[1],a[2],a[3],swaps);return 0;}\n",
+      "stdout": "1 2 3 4 | 3\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Six comparisons and three exchanges including unnecessary self-swaps.",
+        "Goto edges preserve source labels and do not fabricate function return."
+      ],
+      "checks": {
+        "calcCounts": [
+          {
+            "expression": "a[j]<a[m]",
+            "count": 6
+          }
+        ],
+        "objectCounts": {
+          "t": 3
+        }
+      },
+      "createdAt": "2026-11-06T04:05:02.468Z",
+      "sha256": "f552a6f82d8865d4d0c1fc733d5d58f8949d25b63f5d7790959a30fc18dbda5a"
+    },
+    {
+      "id": "22_bfs_matrix",
+      "title": "Small BFS scanning every matrix column",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int edge[5][5]={{0,1,1,0,0},{0,0,0,1,0},{0,0,0,1,0},{0,0,0,0,1},{0}},dist[5],queue[5],head=0,tail=0,checks=0;\nfor(int i=0;i<5;i++)dist[i]=-1;dist[0]=0;queue[tail++]=0;while(head<tail){int u=queue[head++];for(int v=0;v<5;v++){checks++;if(edge[u][v]&&dist[v]<0){dist[v]=dist[u]+1;queue[tail++]=v;}}}for(int i=0;i<5;i++)printf(\"%d \",dist[i]);printf(\"| %d\\n\",checks);return 0;}\n",
+      "stdout": "0 1 1 2 3 | 25\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "25 edge reads, short-circuit skips distance reads on absent edges.",
+        "Four queue writes enqueue newly reached nodes; no inferential graph shortcuts."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T04:05:02.468Z",
+      "sha256": "6581ccce31e250e9f84a90565bbe6475a0457f9bc092eb55bab5700e625b067c"
+    },
+    {
+      "id": "23_sort_record_copies",
+      "title": "qsort comparator needlessly copies complete records",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct{int key;char label[4];} Item;\nint compare(const void*a,const void*b){Item first=*(const Item*)a,second=*(const Item*)b;Item again=first;return (again.key>second.key)-(again.key<second.key);}\nint main(void){Item a[4]={{4,\"d\"},{1,\"a\"},{3,\"c\"},{2,\"b\"}};qsort(a,4,sizeof *a,compare);for(int i=0;i<4;i++)printf(\"%d%s \",a[i].key,a[i].label);puts(\"\");return 0;}\n",
+      "stdout": "1a 2b 3c 4d \n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Comparator frames preserve by-value copies; count may differ across C libraries.",
+        "qsort destination mutation and callback source reads remain connected."
+      ],
+      "checks": {
+        "calls": {
+          "qsort": 1
+        }
+      },
+      "createdAt": "2026-11-06T04:05:02.468Z",
+      "sha256": "ecb6dd6da192513bf053ae26fe2017352582946d1959ca50fd4e278e18609ea9"
+    },
+    {
+      "id": "24_rebuild_vector",
+      "title": "Allocate and copy the entire vector on every append",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int*p=NULL,n=0,copies=0;for(int value=1;value<=6;value++){int*q=malloc((size_t)(n+1)*sizeof *q);if(!q){free(p);return 1;}for(int j=0;j<n;j++){q[j]=p[j];copies++;}q[n]=value;free(p);p=q;n++;}int sum=0;for(int i=0;i<n;i++)sum+=p[i];printf(\"%d %d\\n\",sum,copies);free(p);return 0;}\n",
+      "stdout": "21 15\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Six allocations and 15 copied elements; free(NULL) valid at first iteration.",
+        "No old-pointee read after free; replacement pointer only receives live q."
+      ],
+      "checks": {
+        "calls": {
+          "malloc": 6,
+          "free": 7
+        },
+        "heapObjects": 6,
+        "allHeapEnded": true
+      },
+      "createdAt": "2026-11-06T04:05:02.468Z",
+      "sha256": "c309f1f063f3def202bab5fcbc5ac6c195f310dbfd3ba59b281d80f375e36370"
+    },
+    {
+      "id": "25_runtime_strlen",
+      "title": "Runtime-input counterpart of repeated string growth",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){char text[8];if(scanf(\"%7s\",text)!=1)return 1;char*p=malloc(1);if(!p)return 1;p[0]=0;\nfor(int i=0;i<(int)strlen(text);i++){size_t n=strlen(p);char*q=realloc(p,n+2);if(!q){free(p);return 1;}p=q;char one[2]={text[i],0};strcat(p,one);}printf(\"%s %d\\n\",p,(int)strlen(p));free(p);return 0;}\n",
+      "stdout": "banana 6\n",
+      "exitCode": 0,
+      "stdin": "banana\n",
+      "process": [
+        "Same redundant work as case 04, but condition input is obtained at runtime.",
+        "All 14 strlen calls should have runtime call evidence."
+      ],
+      "checks": {
+        "calls": {
+          "strlen": 14,
+          "realloc": 6
+        },
+        "heapObjects": 7,
+        "allHeapEnded": true
+      },
+      "createdAt": "2026-11-06T04:07:53.217Z",
+      "sha256": "4968fbe164906978a0f8574e5c2daa3c14db3194631c0f42237adb06a3208af5"
+    },
+    {
+      "id": "26_folded_library",
+      "title": "Pure builtin work and actual side-effect calls",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint ticks=0;int touch(void){ticks++;return 3;}\nint main(void){int total=0;for(int i=0;i<4;i++){int n=(int)strlen(\"abc\")+abs(-4);int same=strcmp(\"aa\",\"aa\");total+=n+same+touch();}printf(\"%d %d\\n\",total,ticks);return 0;}\n",
+      "stdout": "40 4\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Source pure builtin expressions may be folded; observed constant plus source AST must identify their meaning.",
+        "touch is never substituted: four actual calls and writes."
+      ],
+      "checks": {
+        "calls": {
+          "touch": 4
+        }
+      },
+      "createdAt": "2026-11-06T04:07:53.218Z",
+      "sha256": "6f84da89eb6959e35dbfe0729d91bc78c9e7703c800639c6aa00a6e33f0e86ed"
+    },
+    {
+      "id": "27_parallel_indices",
+      "title": "Three independent postincrements in one expression",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int a[3]={1,2,3},b[3]={4,5,6},out[3]={0},i=0,j=0,k=0;while(i<3){out[j++]=a[i++]+b[k++]*2;}printf(\"%d %d %d | %d %d %d\\n\",out[0],out[1],out[2],i,j,k);return 0;}\n",
+      "stdout": "9 12 15 | 3 3 3\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Each postfix uses its old index; three distinct index objects have no unsequenced conflict.",
+        "Compiler-chosen valid evaluation order may differ, but out receives 9,12,15."
+      ],
+      "checks": {
+        "writes": [
+          {
+            "object": "i",
+            "values": [
+              "0",
+              "1",
+              "2",
+              "3"
+            ]
+          },
+          {
+            "object": "j",
+            "values": [
+              "0",
+              "1",
+              "2",
+              "3"
+            ]
+          },
+          {
+            "object": "k",
+            "values": [
+              "0",
+              "1",
+              "2",
+              "3"
+            ]
+          }
+        ]
+      },
+      "createdAt": "2026-11-06T04:07:53.218Z",
+      "sha256": "70b8a934f9faec96a0d7ca1353f6b9c6ceb6d4d8ccc5f9f01c4bb03554533b3a"
+    },
+    {
+      "id": "28_comma_steps",
+      "title": "Comma sequencing and redundant increment/decrement",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int i=0,x=0,total=0;for(int pass=0;pass<3;pass++){x=(i++,i*3);total+=(x+=2,x);i++;i--;}printf(\"%d %d %d\\n\",i,x,total);return 0;}\n",
+      "stdout": "3 11 24\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Comma sequences increment before multiplication and x+=2 before consumption.",
+        "Redundant i++/i-- remains recorded."
+      ],
+      "checks": {
+        "writes": [
+          {
+            "object": "i",
+            "values": [
+              "0",
+              "1",
+              "2",
+              "1",
+              "2",
+              "3",
+              "2",
+              "3",
+              "4",
+              "3"
+            ]
+          },
+          {
+            "object": "x",
+            "values": [
+              "0",
+              "3",
+              "5",
+              "6",
+              "8",
+              "9",
+              "11"
+            ]
+          }
+        ]
+      },
+      "createdAt": "2026-11-06T04:07:53.218Z",
+      "sha256": "094b7fc328154f847f43bf2943ff9c1a9352d76a0f37ed2e4c52238a38710684"
+    },
+    {
+      "id": "29_branch_struct",
+      "title": "Conditional aggregate returns with repeated copies",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct{int a,b;} Pair;\nPair make(int x){Pair p={x,x+1};Pair copy=p;return copy;}\nint main(void){int total=0;for(int i=0;i<4;i++){Pair p=(i%2)?make(i):make(i+2);Pair q=p;total+=q.a+q.b;}printf(\"%d\\n\",total);return 0;}\n",
+      "stdout": "24\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Only selected make branch runs, four invocations total.",
+        "Aggregate result feeds p, then copy into q, before field reads."
+      ],
+      "checks": {
+        "calls": {
+          "make": 4
+        }
+      },
+      "createdAt": "2026-11-06T04:07:53.218Z",
+      "sha256": "cf8e6e7faeab2bb0f7168f80363118eb1cc5063a9895d44f42c8b9a3ce8c80c5"
+    },
+    {
+      "id": "30_compound_records",
+      "title": "Compound literal copied repeatedly into a wrapper",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct{int x,y;} Point;\nint measure(Point p){Point copy=p;return copy.x*copy.x+copy.y*copy.y;}\nint main(void){int total=0;for(int i=0;i<4;i++){total+=measure((Point){i,1});total+=measure((Point){i,1});}printf(\"%d\\n\",total);return 0;}\n",
+      "stdout": "36\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Eight measure frames and eight compound-literal evaluations.",
+        "Source temporary lifetimes and by-value argument origins remain distinct."
+      ],
+      "checks": {
+        "calls": {
+          "measure": 8
+        }
+      },
+      "createdAt": "2026-11-06T04:07:53.218Z",
+      "sha256": "1ea39619bd329f847abc3742945ba2454f51b69271e3ade8979556affa069db4"
+    },
+    {
+      "id": "31_naive_decimal",
+      "title": "Convert decimal text through repeated power loops",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint power10(int n){int p=1;for(int i=0;i<n;i++)p*=10;return p;}\nint main(void){char s[6]=\"12034\";int n=(int)strlen(s),answer=0;for(int i=0;i<n;i++){int digit=s[i]-'0';answer+=digit*power10(n-1-i);}printf(\"%d\\n\",answer);return 0;}\n",
+      "stdout": "12034\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Five power10 calls; ten redundant multiply steps in total.",
+        "Each char-to-int promotion and subtraction remains attached to digit expression."
+      ],
+      "checks": {
+        "calls": {
+          "power10": 5
+        },
+        "calcCounts": [
+          {
+            "expression": "p*=10",
+            "count": 10
+          }
+        ]
+      },
+      "createdAt": "2026-11-06T04:07:53.218Z",
+      "sha256": "abd61047474751a1dd423e14df18bb35720334a75bf9efebf8dc8676a5762815"
+    },
+    {
+      "id": "32_merge_allocations",
+      "title": "Recursive merge sort allocating at every merge",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nvoid sort(int*a,int n){if(n<2)return;int m=n/2;sort(a,m);sort(a+m,n-m);int*t=malloc((size_t)n*sizeof *t);if(!t)exit(1);int i=0,j=m,k=0;while(i<m&&j<n){if(a[i]<a[j])t[k++]=a[i++];else t[k++]=a[j++];}while(i<m)t[k++]=a[i++];while(j<n)t[k++]=a[j++];for(i=0;i<n;i++)a[i]=t[i];free(t);}\nint main(void){int a[6]={6,2,5,1,4,3};sort(a,6);for(int i=0;i<6;i++)printf(\"%d \",a[i]);puts(\"\");return 0;}\n",
+      "stdout": "1 2 3 4 5 6 \n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Eleven recursion frames, five temporary heap allocations.",
+        "Parent regions stay live while recursive views share portions of original array."
+      ],
+      "checks": {
+        "calls": {
+          "sort": 11,
+          "malloc": 5,
+          "free": 5
+        },
+        "heapObjects": 5,
+        "allHeapEnded": true
+      },
+      "createdAt": "2026-11-06T04:07:53.218Z",
+      "sha256": "1cd446b8deab8f6eb9628b661b31502636837de33e5b093b4562903172d45266"
+    },
+    {
+      "id": "33_recompute_dp",
+      "title": "Rebuild a complete Fibonacci table for every prefix",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int total=0;for(int n=1;n<=8;n++){int*t=calloc((size_t)n+1,sizeof *t);if(!t)return 1;t[1]=1;for(int j=2;j<=n;j++)t[j]=t[j-1]+t[j-2];total+=t[n];free(t);}printf(\"%d\\n\",total);return 0;}\n",
+      "stdout": "54\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Eight allocations, repeated earlier-prefix work is retained.",
+        "28 table recurrence evaluations produce 54 total."
+      ],
+      "checks": {
+        "calls": {
+          "calloc": 8,
+          "free": 8
+        },
+        "heapObjects": 8,
+        "allHeapEnded": true,
+        "calcCounts": [
+          {
+            "expression": "t[j-1]+t[j-2]",
+            "count": 28
+          }
+        ]
+      },
+      "createdAt": "2026-11-06T04:07:53.218Z",
+      "sha256": "1f6f669706a7804a0da33c3689651a7aa55fccb0bf05a6231ac3720b0d0ff14d"
+    },
+    {
+      "id": "34_matrix_dijkstra",
+      "title": "Repeated full matrix scans with redundant minimum lookup",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int g[5][5]={{0,2,7,99,99},{99,0,1,4,99},{99,99,0,1,7},{99,99,99,0,3},{99,99,99,99,0}},d[5]={0,99,99,99,99},used[5]={0};\nfor(int step=0;step<5;step++){int u=-1;for(int v=0;v<5;v++)if(!used[v]&&(u<0||d[v]<d[u]))u=v;int again=-1;for(int v=0;v<5;v++)if(!used[v]&&(again<0||d[v]<d[again]))again=v;u=again;used[u]=1;for(int v=0;v<5;v++)if(!used[v]&&g[u][v]<99&&d[u]+g[u][v]<d[v])d[v]=d[u]+g[u][v];}\nfor(int v=0;v<5;v++)printf(\"%d \",d[v]);puts(\"\");return 0;}\n",
+      "stdout": "0 2 3 4 7 \n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Two complete minimum scans each round; second duplicates first.",
+        "u<0 guards d[u]; all accesses are valid and all nodes reachable."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T04:07:53.218Z",
+      "sha256": "b46ed4c2088fcf36a0d458949d4714e4c60a6714dea5021a9a2bdb2b110438b1"
+    },
+    {
+      "id": "35_bitfield_counter",
+      "title": "Needlessly update packed fields and restore them",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct{unsigned a:3;unsigned b:5;} Flags;\nint main(void){Flags f={1,3};int total=0;for(int i=0;i<4;i++){f.a+=1;f.b+=2;total+=f.a+f.b;f.b-=1;}printf(\"%u %u %d\\n\",f.a,f.b,total);return 0;}\n",
+      "stdout": "5 7 40\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Field arithmetic uses promoted integer types; values fit all fields.",
+        "Changes to a do not alter b and vice versa; final a=5 b=7."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T04:07:53.218Z",
+      "sha256": "ab39d282a5e464b9a087e922916db588e48956d3b47fd331f617e807e7905905"
+    },
+    {
+      "id": "36_redundant_variadic",
+      "title": "Variadic helper copies argument list then reads both",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n#include <stdarg.h>\nint sumtwice(int n,...){va_list a,b;va_start(a,n);va_copy(b,a);int x=0,y=0;for(int i=0;i<n;i++)x+=va_arg(a,int);for(int i=0;i<n;i++)y+=va_arg(b,int);va_end(a);va_end(b);return x+y;}\nint main(void){int a=sumtwice(4,1,2,3,4),b=sumtwice(3,5,6,7);printf(\"%d %d\\n\",a,b);return 0;}\n",
+      "stdout": "20 36\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "va_copy duplicates cursor state; both loops read original payloads.",
+        "Each argument consumed twice; two invocations remain distinct."
+      ],
+      "checks": {
+        "calls": {
+          "sumtwice": 2
+        }
+      },
+      "createdAt": "2026-11-06T04:07:53.218Z",
+      "sha256": "f22e851721fd93dab3fd84885b1d71282d80358fe9198496022386550e914f87"
+    },
+    {
+      "id": "37_buffered_output",
+      "title": "Small output operations flushed only at the end",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){setvbuf(stdout,NULL,_IOFBF,4096);for(int i=1;i<=3;i++){printf(\"[%d]\",i);fputs(\".\",stdout);}putchar('\\n');fflush(stdout);return 0;}\n",
+      "stdout": "[1].[2].[3].\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Source output belongs to each printing call even if actual WASI write occurs at fflush.",
+        "Calls should not multiply terminal output by treating buffer copies as new output."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T04:09:59.150Z",
+      "sha256": "ce4ea3771f4a1edafac9eb6529fea07dedac66601c435f162813b94c1129974f"
+    },
+    {
+      "id": "38_scan_suppression",
+      "title": "Parse the same string with suppression and percent-n",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){char s[]=\"12 34\",out[32];int a=0,b=0,n=0;sscanf(s,\"%d %d%n\",&a,&b,&n);int redundant=0;sscanf(s,\"%*d %d\",&redundant);snprintf(out,sizeof out,\"%03d:%d:%d\",a,b,n);printf(\"%s %d\\n\",out,redundant);return 0;}\n",
+      "stdout": "012:34:5 34\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "sscanf records writes a=12 b=34 n=5; suppressed input does not consume a destination.",
+        "snprintf writes out and printf emits that buffer exactly once."
+      ],
+      "checks": {
+        "calls": {
+          "sscanf": 2,
+          "snprintf": 1
+        }
+      },
+      "createdAt": "2026-11-06T04:09:59.152Z",
+      "sha256": "2a683b848926abd8027c8d22a7fb44b95af73073a8f82f0e3b05423717462a8f"
+    },
+    {
+      "id": "39_pushback_input",
+      "title": "Read every character twice using one-character pushback",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){int count=0,total=0,c;while((c=getchar())!='\\n'){if(c==EOF)break;ungetc(c,stdin);int again=getchar();count++;total+=again-'0';}printf(\"%d %d\\n\",count,total);return 0;}\n",
+      "stdout": "4 10\n",
+      "exitCode": 0,
+      "stdin": "1234\n",
+      "process": [
+        "Each digit has two library getchar calls but only one external input byte.",
+        "ungetc restores stream data; final newline terminates the bounded input."
+      ],
+      "checks": {
+        "calls": {
+          "getchar": 9,
+          "ungetc": 4
+        }
+      },
+      "createdAt": "2026-11-06T04:09:59.152Z",
+      "sha256": "82989ce097097e7d8670499ffddb03aea4206c9c7e67041f67fc70e54e2eebfd"
+    },
+    {
+      "id": "40_flexible_buffer",
+      "title": "Flexible array rebuilt through unnecessary clone",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct{int n;int values[];} Buffer;\nBuffer* make(int n){Buffer*p=malloc(sizeof *p+(size_t)n*sizeof p->values[0]);if(!p)return NULL;p->n=n;for(int i=0;i<n;i++)p->values[i]=i+1;return p;}\nint main(void){Buffer*a=make(4);if(!a)return 1;size_t bytes=sizeof *a+(size_t)a->n*sizeof a->values[0];Buffer*b=malloc(bytes);if(!b){free(a);return 1;}memcpy(b,a,bytes);b->values[2]+=7;int sum=0;for(int i=0;i<b->n;i++)sum+=b->values[i];printf(\"%d %d\\n\",a->values[2],sum);free(a);free(b);return 0;}\n",
+      "stdout": "3 17\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Both 20-byte allocations include a flexible tail; memcpy covers header and values.",
+        "Pointer member-access extent is based on observed allocation, not fixed sizeof(Buffer) alone."
+      ],
+      "checks": {
+        "heapObjects": 2,
+        "allHeapEnded": true,
+        "calls": {
+          "memcpy": 1
+        }
+      },
+      "createdAt": "2026-11-06T04:09:59.152Z",
+      "sha256": "43bfb2241e7527b4464a5aa40857d0c8e05c868eb80f4d9ce63e7a62a4cea7a1"
+    },
+    {
+      "id": "41_nested_designated",
+      "title": "Repeated assignments to nested designated records",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct{int x,y;} Point;typedef struct{Point p[2];int tag;} Shape;\nint main(void){Shape s={.p={{.y=2,.x=1},{.x=3,.y=4}},.tag=7};int total=0;for(int i=0;i<3;i++){Shape copy=s;copy.p[i%2].x+=i;s=copy;total+=s.p[0].x+s.p[1].x;}printf(\"%d %d %d\\n\",s.p[0].x,s.p[1].x,total);return 0;}\n",
+      "stdout": "3 4 16\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Three complete record copies in each direction; nested changed element respects its byte offset.",
+        "Final x coordinates 3 and 4; totals 4,5,7."
+      ],
+      "checks": {
+        "objectCounts": {
+          "copy": 3
+        }
+      },
+      "createdAt": "2026-11-06T04:09:59.152Z",
+      "sha256": "0364f27c0333fc6dd9e190b0344fb9168bf5f6ca6ec3351cd0de6f6245009c5e"
+    },
+    {
+      "id": "42_matrix_transpose",
+      "title": "Two full transposes with deliberately redundant copies",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nvoid transpose(int a[3][3],int b[3][3]){for(int i=0;i<3;i++)for(int j=0;j<3;j++){int temporary=a[i][j];b[j][i]=temporary;}}\nint main(void){int a[3][3]={{1,2,3},{4,5,6},{7,8,9}},b[3][3],c[3][3];transpose(a,b);transpose(b,c);int total=0;for(int i=0;i<3;i++)for(int j=0;j<3;j++)total+=c[i][j];printf(\"%d %d %d\\n\",c[0][2],c[2][0],total);return 0;}\n",
+      "stdout": "3 7 45\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "18 temporary scalar lifetimes copy each matrix element twice.",
+        "Array-of-array pointer parameters retain row stride and element read targets."
+      ],
+      "checks": {
+        "calls": {
+          "transpose": 2
+        },
+        "objectCounts": {
+          "temporary": 18
+        }
+      },
+      "createdAt": "2026-11-06T04:09:59.152Z",
+      "sha256": "dfbd2b876c5127b4f5c9d6784c264c2f15a7b867bb2c049c361220c74e144dc2"
+    },
+    {
+      "id": "43_mixed_varargs",
+      "title": "Mixed argument types read twice with va_copy",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n#include <stdarg.h>\ndouble combine(int tag,...){va_list a,b;va_start(a,tag);va_copy(b,a);int x=va_arg(a,int);double y=va_arg(a,double);unsigned long long z=va_arg(a,unsigned long long);int xx=va_arg(b,int);double yy=va_arg(b,double);unsigned long long zz=va_arg(b,unsigned long long);va_end(a);va_end(b);return x+y+(double)z+xx+yy+(double)zz;}\nint main(void){double x=combine(0,-3,2.5,9ULL);printf(\"%.1f\\n\",x);return 0;}\n",
+      "stdout": "17.0\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Both cursors yield int -3, double 2.5, unsigned long long 9.",
+        "Different argument alignment and signedness must survive each read."
+      ],
+      "checks": {
+        "calls": {
+          "combine": 1
+        }
+      },
+      "createdAt": "2026-11-06T04:09:59.152Z",
+      "sha256": "d7cf43dcc9ba89ffd24abd2b0ba9199aec8d36019785d8a745c9bb7c50a3057f"
+    },
+    {
+      "id": "44_redundant_float",
+      "title": "Repeated floating conversions with exact binary fractions",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){double a[3]={1.5,2.25,3.75},total=0;for(int i=0;i<3;i++){float copy=(float)a[i];double again=(double)copy;int whole=(int)again;double remainder=again-whole;total+=whole+remainder;}printf(\"%.2f\\n\",total);return 0;}\n",
+      "stdout": "7.50\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Every value roundtrips double to float to double, then splits integer and fractional parts.",
+        "Exact selected values prevent floating comparison/printing ambiguity."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T04:09:59.152Z",
+      "sha256": "7e8839cc4d8ac139b888d5f550a15bbf0f99700733d7eddec329cc8e8966f644"
+    },
+    {
+      "id": "45_decimal_many_allocations",
+      "title": "Long decimal multiplication through many temporary strings",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nstatic void* allocate(size_t n){void*p=malloc(n);if(!p)exit(1);return p;}\nstatic char* duplicate(const char*s){size_t n=strlen(s);char*p=allocate(n+1);memcpy(p,s,n+1);return p;}\nstatic char* reversed(const char*s){size_t n=strlen(s);char*p=allocate(n+1);for(size_t i=0;i<n;i++)p[i]=s[n-1-i];p[n]=0;return p;}\nstatic char* add(const char*a,const char*b){char*x=reversed(a),*y=reversed(b);size_t na=strlen(x),nb=strlen(y),n=na>nb?na:nb;char*t=allocate(n+2);int carry=0;size_t i=0;\n for(;i<n;i++){int left=i<na?x[i]-'0':0;int right=i<nb?y[i]-'0':0;int sum=left+right+carry;t[i]=(char)('0'+sum%10);carry=sum/10;}\n if(carry)t[i++]=(char)('0'+carry);t[i]=0;char*r=reversed(t);free(x);free(y);free(t);return r;}\nstatic char* digit_product(const char*a,int digit){if(!digit)return duplicate(\"0\");char*x=reversed(a);size_t n=strlen(x);char*t=allocate(n+2);int carry=0;size_t i=0;\n for(;i<n;i++){int product=(x[i]-'0')*digit+carry;t[i]=(char)('0'+product%10);carry=product/10;}\n if(carry)t[i++]=(char)('0'+carry);t[i]=0;char*r=reversed(t);free(x);free(t);return r;}\nstatic char* shifted(const char*s,size_t places){if(s[0]=='0'&&s[1]==0)return duplicate(s);size_t n=strlen(s);char*p=allocate(n+places+1);memcpy(p,s,n);for(size_t i=0;i<places;i++)p[n+i]='0';p[n+places]=0;return p;}\nstatic char* multiply(const char*a,const char*b){char*sum=duplicate(\"0\");size_t n=strlen(b);for(size_t i=0;i<n;i++){char*part=digit_product(a,b[n-1-i]-'0');char*shift=shifted(part,i);char*next=add(sum,shift);free(sum);free(part);free(shift);sum=next;}return sum;}\nint main(void){char a[40],b[40];if(scanf(\"%39s %39s\",a,b)!=2)return 1;char*answer=multiply(a,b);puts(answer);free(answer);return 0;}\n",
+      "stdout": "8539734222673565677848730527685\n",
+      "exitCode": 0,
+      "stdin": "3141592653589793 2718281828459045\n",
+      "process": [
+        "Sixteen partial products, sixteen shifts and sixteen additions; all decimal digits are in-bounds.",
+        "Intermediate reversed buffers stay alive until consumed, returned arrays survive their function frames.",
+        "Every temporary heap allocation is eventually freed. Native output compared with independent JavaScript BigInt prediction."
+      ],
+      "checks": {
+        "calls": {
+          "digit_product": 16,
+          "shifted": 16,
+          "add": 16,
+          "multiply": 1
+        },
+        "allHeapEnded": true
+      },
+      "createdAt": "2026-11-06T04:13:03.687Z",
+      "sha256": "faf6ee9a220d76fa59302592dacf052dcad49053f1aceaadf2d522612ca32a2b"
+    },
+    {
+      "id": "46_index_insertion",
+      "title": "Indexed insertion sort with repeated key reads",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\nint main(void){int a[20]={17,3,11,3,9,0,21,8,8,4,19,2,16,1,7,13,6,12,5,10},n=20;\nfor(int i=1;i<n;i++){int key=a[i];int j=i-1;while(j>=0&&a[j]>key){a[j+1]=a[j];j--;}a[j+1]=key;}\nfor(int i=0;i<n;i++)printf(\"%d%s\",a[i],i+1==n?\"\\n\":\" \");return 0;}\n",
+      "stdout": "0 1 2 3 3 4 5 6 7 8 8 9 10 11 12 13 16 17 19 21\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Native and IR output compared with independent JS numeric sort.",
+        "Short circuit prevents reading a[-1]; shifted writes remain individual source assignments."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T04:13:03.689Z",
+      "sha256": "06decab6aea8b87e989acf411e49d83fd94f791f4622415dbf7966231f9fcb64"
+    },
+    {
+      "id": "47_pointer_insertion",
+      "title": "Pointer-based insertion sort on the same data",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\nint main(void){int a[20]={17,3,11,3,9,0,21,8,8,4,19,2,16,1,7,13,6,12,5,10},n=20;\nfor(int i=1;i<n;i++){int key=*(a+i);int*position=a+i;while(position>a&&*(position-1)>key){*position=*(position-1);position--;}*position=key;}\nfor(int i=0;i<n;i++)printf(\"%d%s\",a[i],i+1==n?\"\\n\":\" \");return 0;}\n",
+      "stdout": "0 1 2 3 3 4 5 6 7 8 8 9 10 11 12 13 16 17 19 21\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Same sorted result as indexed version; actual pointer reads and element-size movement retained.",
+        "position-1 is accessed only after position>a."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T04:13:03.689Z",
+      "sha256": "cc6cc57c500ad6258738ed51a053381a11542a33ee99077185fa2b34d62380ad"
+    },
+    {
+      "id": "48_helper_insertion",
+      "title": "Every comparison and move goes through a helper",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint get(const int*a,int index){return a[index];}void put(int*a,int index,int value){a[index]=value;}\nint main(void){int a[20]={17,3,11,3,9,0,21,8,8,4,19,2,16,1,7,13,6,12,5,10},n=20;\nfor(int i=1;i<n;i++){int key=get(a,i);int j=i-1;while(j>=0&&get(a,j)>key){int temporary=get(a,j);put(a,j+1,temporary);j--;}put(a,j+1,key);}\nfor(int i=0;i<n;i++)printf(\"%d%s\",a[i],i+1==n?\"\\n\":\" \");return 0;}\n",
+      "stdout": "0 1 2 3 3 4 5 6 7 8 8 9 10 11 12 13 16 17 19 21\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Function-boundary version preserves all extra calls and temporary values.",
+        "Comparison and movement each read an element separately; no invented single read optimization."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T04:13:03.689Z",
+      "sha256": "fd208ea12bb6c0d55bd5f5988aefa7695079a4d07beeae3096685c6922d6b0be"
+    },
+    {
+      "id": "49_full_copy_bubble",
+      "title": "Bubble sort copies the complete array before every pass",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\nint main(void){int a[20]={17,3,11,3,9,0,21,8,8,4,19,2,16,1,7,13,6,12,5,10},n=20;\nfor(int pass=0;pass<n-1;pass++){int copy[20];memcpy(copy,a,sizeof a);memcpy(a,copy,sizeof a);for(int j=0;j<n-1;j++){if(a[j]>a[j+1]){int t=a[j];a[j]=a[j+1];a[j+1]=t;}}}\nfor(int i=0;i<n;i++)printf(\"%d%s\",a[i],i+1==n?\"\\n\":\" \");return 0;}\n",
+      "stdout": "0 1 2 3 3 4 5 6 7 8 8 9 10 11 12 13 16 17 19 21\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Nineteen complete redundant copy roundtrips and 361 adjacent comparisons.",
+        "Do not hide wasted work just because final output equals insertion variants."
+      ],
+      "checks": {
+        "calls": {
+          "memcpy": 38
+        },
+        "calcCounts": [
+          {
+            "expression": "a[j]>a[j+1]",
+            "count": 361
+          }
+        ],
+        "objectCounts": {
+          "copy": 19
+        }
+      },
+      "createdAt": "2026-11-06T04:13:03.689Z",
+      "sha256": "37f122b2ac6ea1750ca5dfd651a937de213dd20333edb4922624074743b18151"
+    },
+    {
+      "id": "50_static_ring",
+      "title": "Return live static slots while repeatedly overwriting the ring",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint*slot(int x){static int a[3]={0};static int next=0;a[next]=x;int*p=&a[next];next=(next+1)%3;return p;}\nint main(void){int*p[6];for(int i=0;i<6;i++)p[i]=slot(i+1);int total=0;for(int i=0;i<6;i++)total+=*p[i];printf(\"%d %d %d %d\\n\",*p[0],*p[1],*p[2],total);return 0;}\n",
+      "stdout": "4 5 6 30\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Only three static slots exist; pointers 0/3,1/4,2/5 alias.",
+        "Static storage outlives all six slot function frames, and later writes affect older pointers."
+      ],
+      "checks": {
+        "calls": {
+          "slot": 6
+        }
+      },
+      "createdAt": "2026-11-06T04:13:03.689Z",
+      "sha256": "e4c04daff9a3ddd701af788063fac1b6d6f520004713c938cfa4bdd9fce10fa4"
+    },
+    {
+      "id": "51_indirect_expression",
+      "title": "Repeated expression through records, index table and pointer table",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct{int value;} Node;\nint main(void){Node records[5]={{3},{8},{-2},{7},{4}};int list[5]={5,1,6,-3,2},index[5]={4,2,0,3,1};Node*p[5];for(int i=0;i<5;i++)p[i]=&records[4-i];int total=0;\nfor(int pass=0;pass<3;pass++)for(int i=0;i<5;i++){int answer=records[i].value+list[index[i]]*2-p[i]->value;total+=answer;}printf(\"%d\\n\",total);return 0;}\n",
+      "stdout": "66\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Fifteen complete expression groups; address-index work must not replace loaded numeric leaves.",
+        "Each result checked against a saved independent JS calculation."
+      ],
+      "checks": {
+        "calcValues": [
+          {
+            "expression": "records[i].value+list[index[i]]*2-p[i]->value",
+            "values": [
+              "3",
+              "13",
+              "10",
+              "-7",
+              "3",
+              "3",
+              "13",
+              "10",
+              "-7",
+              "3",
+              "3",
+              "13",
+              "10",
+              "-7",
+              "3"
+            ]
+          }
+        ]
+      },
+      "createdAt": "2026-11-06T04:15:54.748Z",
+      "sha256": "30f4305aa75575b2911acd548d0ee10fa58bdce97dccea9ca634475a2871ef74"
+    },
+    {
+      "id": "52_helper_expression",
+      "title": "Same expression with every read behind a function call",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint read_at(const int*a,int i){int copy=a[i];return copy;}\nint main(void){int a[5]={3,8,-2,7,4},b[5]={5,1,6,-3,2},index[5]={4,2,0,3,1},total=0;\nfor(int pass=0;pass<3;pass++)for(int i=0;i<5;i++){int answer=read_at(a,i)+read_at(b,index[i])*2-read_at(a,4-i);total+=answer;}printf(\"%d\\n\",total);return 0;}\n",
+      "stdout": "66\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "45 real read_at calls, each returns the corresponding loaded value.",
+        "Source expression result is grouped without absorbing the function executions."
+      ],
+      "checks": {
+        "calls": {
+          "read_at": 45
+        },
+        "calcValues": [
+          {
+            "expression": "read_at(a,i)+read_at(b,index[i])*2-read_at(a,4-i)",
+            "values": [
+              "3",
+              "13",
+              "10",
+              "-7",
+              "3",
+              "3",
+              "13",
+              "10",
+              "-7",
+              "3",
+              "3",
+              "13",
+              "10",
+              "-7",
+              "3"
+            ]
+          }
+        ]
+      },
+      "createdAt": "2026-11-06T04:15:54.749Z",
+      "sha256": "0cdada12c6c3805cc924de8633ed764a23a31ab592cfc56b2074d651c98a0f85"
+    },
+    {
+      "id": "53_macro_expression",
+      "title": "Same numeric expression hidden behind an ordinary macro",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n#define COMBINE(x,y,z) ((x)+(y)*2-(z))\nint main(void){int a[5]={3,8,-2,7,4},b[5]={5,1,6,-3,2},index[5]={4,2,0,3,1},total=0;\nfor(int pass=0;pass<3;pass++)for(int i=0;i<5;i++){int answer=COMBINE(a[i],b[index[i]],a[4-i]);total+=answer;}printf(\"%d\\n\",total);return 0;}\n",
+      "stdout": "66\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Same fifteen values as records and helper versions; macro parameter storage does not exist.",
+        "Expression grouping may display invocation or expanded source but must preserve numeric result and source location."
+      ],
+      "checks": {
+        "writes": [
+          {
+            "object": "answer",
+            "values": [
+              "3",
+              "13",
+              "10",
+              "-7",
+              "3",
+              "3",
+              "13",
+              "10",
+              "-7",
+              "3",
+              "3",
+              "13",
+              "10",
+              "-7",
+              "3"
+            ]
+          }
+        ]
+      },
+      "createdAt": "2026-11-06T04:15:54.749Z",
+      "sha256": "5e898e545483a7fdb3e4851f5c14bc7272dc588845ce437aa65a42d1c2e8d2c1"
+    },
+    {
+      "id": "54_conditional_updates",
+      "title": "Repeated short-circuit and conditional side effects",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint hits=0;int positive(int x){hits++;return x>0;}\nint main(void){int a[5]={0,2,-3,4,0},total=0;for(int pass=0;pass<2;pass++)for(int i=0;i<5;i++){int x=a[i];int ok=x!=0&&positive(x);int result=ok?(x+=2):(x-=1);total+=result;}printf(\"%d %d\\n\",total,hits);return 0;}\n",
+      "stdout": "8 6\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Only three positive calls per pass; zero short-circuits and nonpositive branch decrements.",
+        "Conditional runs one update only; source arithmetic remains an observed result."
+      ],
+      "checks": {
+        "calls": {
+          "positive": 6
+        },
+        "writes": [
+          {
+            "object": "result",
+            "values": [
+              "-1",
+              "4",
+              "-4",
+              "6",
+              "-1",
+              "-1",
+              "4",
+              "-4",
+              "6",
+              "-1"
+            ]
+          }
+        ]
+      },
+      "createdAt": "2026-11-06T04:15:54.749Z",
+      "sha256": "514ed817c4a5d963560982da7f0ae7bc71d076152d9f0653b4aa8e1143d96fb8"
+    },
+    {
+      "id": "55_unbuffered_input",
+      "title": "Unbuffered counterpart of repeated getchar and ungetc",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){setvbuf(stdin,NULL,_IONBF,0);int count=0,total=0,c;while((c=getchar())!='\\n'){if(c==EOF)break;ungetc(c,stdin);int again=getchar();count++;total+=again-'0';}printf(\"%d %d\\n\",count,total);return 0;}\n",
+      "stdout": "4 10\n",
+      "exitCode": 0,
+      "stdin": "1234\n",
+      "process": [
+        "Same logical reads as case 39, but host input arrives one byte at a time.",
+        "Pushback getchar must not consume another external byte."
+      ],
+      "checks": {
+        "calls": {
+          "getchar": 9,
+          "ungetc": 4
+        }
+      },
+      "createdAt": "2026-11-06T04:15:54.749Z",
+      "sha256": "c9b97ae32fb33754e97f17ec1f90377616a3f28eabcbb1dbd19e336bf0041eaa"
+    },
+    {
+      "id": "56_repeated_strtol",
+      "title": "Parse each token twice with independent end pointers",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint main(void){char s[]=\"17,-2,9\";char*p=s;long total=0;int count=0;while(*p){char*end1;char*end2;long a=strtol(p,&end1,10);long b=strtol(p,&end2,10);if(end1!=end2)return 1;total+=a+b;count++;p=end1;if(*p==',')p++;}printf(\"%ld %d\\n\",total,count);return 0;}\n",
+      "stdout": "48 3\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Six strtol calls; every end pointer aliases a distinct offset in original s.",
+        "Explicit p advancement observes commas and final null without out-of-bounds access."
+      ],
+      "checks": {
+        "calls": {
+          "strtol": 6
+        }
+      },
+      "createdAt": "2026-11-06T04:15:54.749Z",
+      "sha256": "cea574a4b5357c84fbce1a0a347803b70d34d3b796c62beefd6784d41933e16f"
+    },
+    {
+      "id": "57_padding_roundtrip",
+      "title": "Whole-record copies with initialized padding bytes",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\ntypedef struct{char tag;int value;short count;} Record;\nint main(void){Record a,b;memset(&a,0,sizeof a);a.tag='x';a.value=123;a.count=7;for(int i=0;i<4;i++){memcpy(&b,&a,sizeof a);memcpy(&a,&b,sizeof a);}printf(\"%c %d %d %d\\n\",a.tag,a.value,a.count,memcmp(&a,&b,sizeof a)==0);return 0;}\n",
+      "stdout": "x 123 7 1\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "All padding initialized before byte comparison; sizes may differ by ABI, values do not.",
+        "Eight complete copies remain visible despite identity."
+      ],
+      "checks": {
+        "calls": {
+          "memcpy": 8,
+          "memcmp": 1
+        }
+      },
+      "createdAt": "2026-11-06T04:15:54.749Z",
+      "sha256": "6218da6eac22bb8c02c79e858fe53ff0848379d039c2ac9de8bef913aa719e83"
+    },
+    {
+      "id": "58_switch_parser",
+      "title": "A small decimal parser with redundant per-character copying",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nenum State{NUMBER,NEGATIVE};\nint main(void){char input[]=\"12,-3,4;\",copy[2]={0};enum State state=NUMBER;int value=0,total=0;for(int i=0;input[i];i++){copy[0]=input[i];char ch=copy[0];switch(ch){case '-':state=NEGATIVE;break;case ',':case ';':if(state==NEGATIVE)value=-value;total+=value;value=0;state=NUMBER;break;default:value=value*10+(ch-'0');break;}}printf(\"%d\\n\",total);return 0;}\n",
+      "stdout": "13\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Case-label chains, breaks and default arithmetic follow actual input.",
+        "Copy buffer and separate char variable are redundant but both writes remain."
+      ],
+      "checks": {},
+      "createdAt": "2026-11-06T04:15:54.749Z",
+      "sha256": "911aacc127d98f7e9d5d0cb47b1361286eb2a644c9e71c76d3e80254f41b60ae"
+    },
+    {
+      "id": "59_multiline_vla_return",
+      "title": "Separate-line VLA return with two source exit paths",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n\nint sum(int n) {\n    int a[n];\n    int total = 0;\n    for (int i = 0; i < n; i++) {\n        a[i] = i + 1;\n    }\n    for (int i = 0; i < n; i++) {\n        total += a[i];\n    }\n    if (n == 3) {\n        return total;\n    }\n    return total + 1;\n}\nint main(void) {\n    int a = sum(3);\n    int b = sum(4);\n    printf(\"%d %d\\n\", a, b);\n    return 0;\n}\n",
+      "stdout": "6 11\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "First call returns from line 13; second returns from line 15.",
+        "Shared LLVM cleanup must not replace executed return source with closing brace."
+      ],
+      "checks": {
+        "calls": {
+          "sum": 2
+        }
+      },
+      "createdAt": "2026-11-06T04:18:43.973Z",
+      "sha256": "ea751bd692eb57a0ac6d4a03e92811378ded4b495a5d5979a13f6e370bfed168"
+    },
+    {
+      "id": "60_multiline_void_return",
+      "title": "Early void return on a distinct source line",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n\nvoid copy_if(int *out, int x) {\n    if (x < 0) {\n        return;\n    }\n    int temporary = x;\n    *out = temporary;\n}\nint main(void) {\n    int value = 1;\n    copy_if(&value, -1);\n    copy_if(&value, 2);\n    printf(\"%d\\n\", value);\n    return 0;\n}\n",
+      "stdout": "2\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "First copy_if exits on explicit return line; second reaches implicit function end.",
+        "No write to value on early return."
+      ],
+      "checks": {
+        "calls": {
+          "copy_if": 2
+        },
+        "writes": [
+          {
+            "object": "value",
+            "values": [
+              "1",
+              "2"
+            ]
+          }
+        ]
+      },
+      "createdAt": "2026-11-06T04:18:43.975Z",
+      "sha256": "6c5a28a6c9e32a49aef98f912730f1cbf637e71af42c1ee7e83ebfec233f2567"
+    },
+    {
+      "id": "61_multiline_record_return",
+      "title": "Aggregate return on a distinct source line",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n\ntypedef struct { int a, b; } Pair;\nPair make(int x) {\n    Pair p = {x, x + 1};\n    Pair copy = p;\n    return copy;\n}\nint main(void) {\n    Pair p = make(2);\n    printf(\"%d %d\\n\", p.a, p.b);\n    return 0;\n}\n",
+      "stdout": "2 3\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Value snapshot and field writes remain correct.",
+        "Return event should identify return copy, not function closing brace."
+      ],
+      "checks": {
+        "calls": {
+          "make": 1
+        }
+      },
+      "createdAt": "2026-11-06T04:18:43.975Z",
+      "sha256": "e5d887c1aabc6daa62c23fc344ced696bafde12f1e847fde2a28ad1046233206"
+    },
+    {
+      "id": "62_multiline_macro_local",
+      "title": "Macro-local scope with renamed temporary and split calls",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n\n#define EXCHANGE(left,right) do { int saved = (left); (left) = (right); (right) = saved; } while (0)\nint main(void) {\n    int first = 2;\n    int second = 7;\n    EXCHANGE(first, second);\n    EXCHANGE(first, second);\n    printf(\"%d %d\\n\", first, second);\n    return 0;\n}\n",
+      "stdout": "2 7\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Two distinct saved lifetimes; both macros execute despite net identity.",
+        "Compiler macro expansion should identify declaration independently of spelling."
+      ],
+      "checks": {
+        "objectCounts": {
+          "saved": 2
+        }
+      },
+      "createdAt": "2026-11-06T04:18:43.975Z",
+      "sha256": "886365866bd47c2179d8b720300ed9765fae4186ed1689bf1eeab0fe3cca6eaa"
+    },
+    {
+      "id": "63_multiline_scalar_control",
+      "title": "Ordinary scalar return as a location control",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n\nint make(int x) {\n    int copy = x;\n    return copy;\n}\nint main(void) {\n    int value = make(2);\n    printf(\"%d\\n\", value);\n    return 0;\n}\n",
+      "stdout": "2\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Without VLA cleanup or aggregate return storage, scalar return should map directly."
+      ],
+      "checks": {
+        "calls": {
+          "make": 1
+        }
+      },
+      "createdAt": "2026-11-06T04:18:43.975Z",
+      "sha256": "2b9fbd08af9026f6941426b1eb5d21d4133c84d574c811716e123b4826ba1016"
+    },
+    {
+      "id": "64_vla_format_control",
+      "title": "Same VLA algorithm with only whitespace formatting changed",
+      "category": "defined-correct-inefficient",
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nint row_sum(int n,int row[n]){\nint scratch[n];\nfor(int i=0;\ni<n;\ni++)scratch[i]=row[i];\nint total=0;\nfor(int i=0;\ni<n;\ni++)total+=scratch[i];\nreturn total;\n\n}\n\nint main(void){\nint n=3,a[n][n];\nfor(int i=0;\ni<n;\ni++)for(int j=0;\nj<n;\nj++)a[i][j]=i*n+j+1;\nint total=0;\nfor(int i=0;\ni<n;\ni++)total+=row_sum(n,a[i]);\nprintf(\"%d %d\\n\",total,(int)(sizeof a/sizeof a[0][0]));\nreturn 0;\n\n}\n\n",
+      "stdout": "45 9\n",
+      "exitCode": 0,
+      "stdin": "",
+      "process": [
+        "Exactly case 18 with whitespace-only changes; return-source mapping should be stable."
+      ],
+      "checks": {
+        "calls": {
+          "row_sum": 3
+        },
+        "objectCounts": {
+          "scratch": 3
+        }
+      },
+      "createdAt": "2026-11-06T04:19:37.604Z",
+      "sha256": "3a8a89762908f32b63faf9b876cbb024c821fe0ec2950de85e7103308f59aa69"
+    }
+  ]
+}

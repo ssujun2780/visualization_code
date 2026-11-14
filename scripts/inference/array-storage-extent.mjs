@@ -5,6 +5,9 @@ import {compilerTypeIdentity} from './compiler-type-identity.mjs';
 export function arrayStorageExtent(plan,{objects,events}){
   const identity=compilerTypeIdentity(plan.types),raw=new Map((plan.types??[]).map(t=>[t.id,t])),roots=new Map(),cache=new Map(),
     byObject=new Map(objects.map(o=>[o.id,o])),defs=new Map(plan.instructions.map(d=>[d.id,d])),indexed=new Map();
+  // Outer qualifiers change permitted access, not physical subobject extent.
+  // Nested pointer qualifiers and distinct record identities remain intact.
+  const layoutKey=key=>key.replace(/^q\[[^\]]*\]:/,'q[]:');
   const walk=n=>n?[n,...(n.children??[]).flatMap(walk)]:[];
   for(const e of events)if(e.target&&['READ','WRITE'].includes(e.kind))
     for(const n of walk(defs.get(e.instructionId)?.expression))if(n.kind==='ArraySubscriptExpr'&&n.cType){
@@ -35,11 +38,11 @@ export function arrayStorageExtent(plan,{objects,events}){
   function descend(type,base,size,offset,wanted,root=true,depth=0){
     if(!type||depth>32||offset<base||offset>=base+size)return null;
     const key=type.typeKey??(type.kind==='record'||type.kind==='array'?identity.key(type):identity.raw(type.id));
-    if(key===wanted)return root?null:{end:base+size,scalar:true};
+    if(layoutKey(key)===layoutKey(wanted))return root?null:{end:base+size,scalar:true};
     if(type.kind==='array'){
       const bytes=type.elementType?.sizeBits/8;if(!(bytes>0))return {end:base+size,scalar:false};
       const element=type.elementType,k=element.typeKey??(element.kind==='record'||element.kind==='array'?identity.key(element):identity.raw(element.id));
-      if(k===wanted)return {end:base+size,scalar:false,array:true};
+      if(layoutKey(k)===layoutKey(wanted))return {end:base+size,scalar:false,array:true};
       return descend(element,base+Math.floor((offset-base)/bytes)*bytes,bytes,offset,wanted,false,depth+1);
     }
     if(type.kind==='record'){

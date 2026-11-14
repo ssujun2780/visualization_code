@@ -1,5 +1,7 @@
 import {sha256} from './sha256.mjs';
 import {createRelationContext} from '../context.mjs';
+import {assertAddressOrigin} from '../../shared/address-origin.mjs';
+import {storageRoot} from '../../shared/storage-alias.mjs';
 
 export const complete=e=>!!e&&(!e.phase||e.phase==='complete');
 export const unique=items=>[...new Set(items.filter(x=>x!==undefined&&x!==null))];
@@ -30,6 +32,8 @@ export function inputContext(plan,trace,options={}){
     if(data.sourceDigest!==undefined)check(data.sourceDigest===digest(base.plan.sourceMap?.snapshot??base.plan.source),`${name} 소스 스냅샷이 일치하지 않습니다.`);
   }
   const positions=new Map(base.trace.events.map((e,i)=>[e.eventId,i])),observations=new Map(),observationOwners=new Map(),instructionNodes=new Set();
+  for(const e of base.trace.events)for(const input of [...e.inputs??[],...(e.steps??[]).flatMap(s=>s.inputs??[])])
+    assertAddressOrigin(input,{event:base.event,object:base.object,position:id=>positions.get(id),at:positions.get(e.eventId),bindings:plan.bindings});
   const registerObservation=(id,spec)=>{const owners=observationOwners.get(id)??[];if(!owners.some(p=>p.event===spec.event&&p.step===spec.step))owners.push(spec);observationOwners.set(id,owners);if(!observations.has(id))observations.set(id,spec);};
   for(const i of base.plan.instructions){const todo=[i.expression];if(i.sourceNodeId)instructionNodes.add(i.sourceNodeId);
     while(todo.length){const n=todo.pop();if(!n)continue;if(n.nodeId)instructionNodes.add(n.nodeId);if(n.id)instructionNodes.add(n.id);for(const child of n.children??[])todo.push(child);}}
@@ -54,14 +58,23 @@ export function inputContext(plan,trace,options={}){
   };
   return Object.freeze({...base,compilerFacts,observationEvidence,positions,observations,observationOwners,observationFor,instructionNodes,resolveRef,limits:limitsFor(options.limits)});
 }
-export function snapshotOf(c){return {inputDigests:{plan:digest(c.plan),trace:digest(c.trace),structureInference:digest(c.structureInference??null),compilerFacts:digest(c.compilerFacts),observationEvidence:digest(c.observationEvidence)},
-  eventCount:c.trace.events.length,lastExecutionId:c.trace.events.at(-1)?.eventId??null,recordingStatus:c.trace.status??null};}
+// Contexts own frozen input copies. Cache only inside that immutable snapshot,
+// never across recordings or against caller-owned mutable plan/trace objects.
+const snapshots=new WeakMap();
+export function snapshotOf(c){
+  let snapshot=snapshots.get(c);
+  if(!snapshot){snapshot={inputDigests:{plan:digest(c.plan),trace:digest(c.trace),structureInference:digest(c.structureInference??null),compilerFacts:digest(c.compilerFacts),observationEvidence:digest(c.observationEvidence)},
+    eventCount:c.trace.events.length,lastExecutionId:c.trace.events.at(-1)?.eventId??null,recordingStatus:c.trace.status??null};
+    snapshots.set(c,snapshot);}
+  return {...snapshot,inputDigests:{...snapshot.inputDigests}};
+}
 export function storage(c,target,event,{historical=false}={}){
   const o=c.object(target?.objectId),p=c.position(event?.eventId);if(!o||p===undefined)return null;
   const start=c.position(o.createdBy),end=c.position(o.endedBy);
   if(start===undefined||start>p||!historical&&end!==undefined&&end<=p)return null;
   if(!Number.isSafeInteger(target.offset)||target.offset<0||!Number.isSafeInteger(target.size)||target.size<=0||target.offset+target.size>o.size)return null;
-  return {kind:'storage',objectId:o.id,createdBy:o.createdBy,offset:target.offset,size:target.size};
+  const root=storageRoot(id=>c.object(id),o.id);if(!root)return null;
+  return {kind:'storage',objectId:root.object.id,createdBy:root.object.createdBy,offset:root.offset+target.offset,size:target.size};
 }
 export function port(event){if(event.target?.kind?.endsWith('-port'))return {...event.target,kind:'port',portKind:event.target.kind,executionId:event.eventId};
   if(['input','output'].includes(event.action))return {kind:'port',portKind:event.action,channel:event.channel??null,executionId:event.eventId};return null;}

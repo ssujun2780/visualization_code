@@ -1,9 +1,9 @@
 // COPY destinations may have no public subscript AST. Reuse the recorded GEP
 // and its exact public READ instead of parsing source text or inventing events.
-export function copyIndexEvidence(plan,{events,structures,observationPlan,observedTrace}){
+export function copyIndexEvidence(plan,{events,objects=[],structures,observationPlan,observedTrace}){
   if(!observationPlan||!observedTrace)return [];
   const observed=new Map(observedTrace.events.map(e=>[e.eventId,e])),defs=new Map(observationPlan.instructions.map(d=>[d.id,d])),
-    publicDefs=new Map(plan.instructions.map(d=>[d.id,d])),publicByObservation=new Map(events.flatMap(e=>(e.observationIds??[]).map(id=>[id,e]))),out=[];
+    publicDefs=new Map(plan.instructions.map(d=>[d.id,d])),publicById=new Map(events.map(e=>[e.eventId,e])),objectById=new Map(objects.map(o=>[o.id,o])),publicByObservation=new Map(events.flatMap(e=>(e.observationIds??[]).map(id=>[id,e]))),out=[];
   const unwrap=n=>{while(n&&['ImplicitCastExpr','ParenExpr','CStyleCastExpr'].includes(n.kind))n=n.children?.[0];return n;};
   for(const e of events.filter(e=>e.kind==='WRITE'&&e.action==='copy')){
     const raw=(e.observationIds??[]).map(id=>observed.get(id)).find(x=>x?.action==='copy');if(!raw)continue;
@@ -16,7 +16,8 @@ export function copyIndexEvidence(plan,{events,structures,observationPlan,observ
     if(d.inputs?.length!==3||d.inputs[1].value!=='0'||d.inputs[2].value!==defs.get(r.instructionId)?.result||!d.baseType?.startsWith('['))continue;
     const index=Number(read.value?.decimal),reference=address.value?.reference;
     if(!Number.isSafeInteger(index)||index<0||index>=a.capacity||e.target.offset!==a.range.offset+index*a.elementBytes||reference?.targetObjectId!==a.objectId||reference.targetOffset!==e.target.offset)continue;
-    out.push({arrayId:a.id,executionId:e.eventId,activationId:e.activationId,cursorReadExecutionId:read.eventId,declarationId:node.declarationId,index,
+    const created=publicById.get(objectById.get(a.objectId)?.createdBy),declared=publicDefs.get(created?.instructionId);
+    out.push({arrayId:a.id,arrayDeclarationId:a.range.offset===0&&declared?.cType?.kind==='array'?declared.declarationId:null,executionId:e.eventId,activationId:e.activationId,cursorReadExecutionId:read.eventId,declarationId:node.declarationId,index,
       addressObservationId:address.eventId,copyObservationId:raw.eventId,castObservationIds:chain,evidence:'observed whole-element COPY destination GEP and exact index READ'});
   }
   return out;

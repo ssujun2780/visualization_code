@@ -115,7 +115,7 @@ export function arrayStructures(plan,{events,objects,views,runtimeArrays=[]}){
     if(!array.elementTypeViews.some(t=>typeViewId(t)===typeViewId(type)))array.elementTypeViews.push(type);
     if(!array.evidence.includes(evidence))array.evidence.push(evidence);
   }
-  function typedArray(id,type,evidence,offset=0,size=null,declared=false){
+  function typedArray(id,type,evidence,offset=0,size=null,declared=false,availableAtExecutionId=null){
     const o=byObject.get(id),bytes=type?.sizeBits/8;if(!o||!visible(o)||!(bytes>0)||offset<0||offset>=o.size)return;
     size??=o.size-offset;
     const extent=storageExtent(id,type,offset,size);size=extent.size;
@@ -130,7 +130,8 @@ export function arrayStructures(plan,{events,objects,views,runtimeArrays=[]}){
     if(!arrays.has(key))arrays.set(key,{id:`array:${key}`,kind:'array',objectId:id,nodes:viewIds(id),edges:[],
       range:{objectId:id,offset,size},storageIdentity:`storage:${id}:${offset}:${size}`,canonicalElementType:canonical,
       elementBytes:bytes,elementType:type,elementTypeViews:[type],capacity:size/bytes,
-      lifecycle:o.lifecycle,snapshot:'recorded typed range; may include ended storage',evidence:[evidence]});
+      lifecycle:o.lifecycle,availableAtExecutionId:availableAtExecutionId??o.createdBy,
+      snapshot:'recorded typed range; may include ended storage',evidence:[evidence]});
     for(const old of inherited)for(const t of old.elementTypeViews)for(const why of old.evidence)addTypeView(arrays.get(key),t,why);
     if(offset===0&&size===o.size){if(!typed.has(id))typed.set(id,new Map());typed.get(id).set(canonical,type);}
   }
@@ -173,16 +174,16 @@ export function arrayStructures(plan,{events,objects,views,runtimeArrays=[]}){
     if(e.action==='frame.end')for(const id of e.endedObjects??[])alive.delete(id);
     const pointer=e.value?.cType;
     if(pointer?.kind==='pointer'&&pointer.pointee?.sizeBits>0&&e.value.reference?.targetObjectId){
-      const target=byObject.get(e.value.reference.targetObjectId);if(target?.storage==='heap')typedArray(target.id,pointer.pointee,'observed typed pointer target',e.value.reference.targetOffset??0);
+      const target=byObject.get(e.value.reference.targetObjectId);if(target?.storage==='heap')typedArray(target.id,pointer.pointee,'observed typed pointer target',e.value.reference.targetOffset??0,null,false,e.eventId);
     }
     if(e.action==='copy'){
       const source=byObject.get(e.sourceObjectId),sourceTypes=source?.cType?.kind==='array'?[source.cType.elementType]:[...(typed.get(e.sourceObjectId)?.values()??[])];
       for(const type of sourceTypes)if(e.target?.size>=type.sizeBits/8&&(e.sourceOffset??0)%(type.sizeBits/8)===0)
         // Copying one array element into a scalar record does not declare an
         // array at the destination. Declared/indexed arrays retain their own evidence.
-        typedArray(e.target.objectId,type,'observed copy from compiler-typed source range',e.target.offset??0,e.target.size);
+        typedArray(e.target.objectId,type,'observed copy from compiler-typed source range',e.target.offset??0,e.target.size,false,e.eventId);
     }
-    if(e.copiedFrom)for(const type of typed.get(e.copiedFrom.objectId)?.values()??[])typedArray(e.objectId,type,'observed retained range across reallocation',0,null,true);
+    if(e.copiedFrom)for(const type of typed.get(e.copiedFrom.objectId)?.values()??[])typedArray(e.objectId,type,'observed retained range across reallocation',0,null,true,e.eventId);
     const f=fieldAccess.get(e.instructionId),o=byObject.get(e.target?.objectId);
     if(f&&o&&['READ','WRITE'].includes(e.kind))for(const role of roles){
       const own=fields(role).find(x=>same(x,f));if(!own)continue;

@@ -1,0 +1,1611 @@
+{
+  "createdAt": "2026-11-08T13:30:16.789Z",
+  "cases": [
+    {
+      "id": "01_intrusive_sentinel",
+      "category": "list",
+      "style": "professional",
+      "intent": "circular doubly linked list with embedded sentinel",
+      "stdout": "10\n",
+      "expected": {
+        "nodes": 4,
+        "sentinelExcluded": true,
+        "views": [
+          "doubly-linked-list",
+          "pointer-graph"
+        ],
+        "notError": "reciprocal cycles are intentional"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct Link{struct Link *before,*after;} Link;\ntypedef struct Item{int payload;Link link;} Item;\nstatic void insert(Link*at,Link*x){x->before=at->before;x->after=at;at->before->after=x;at->before=x;}\nint main(void){Link anchor={&anchor,&anchor};Item items[4]={0};\n for(int i=0;i<4;i++){items[i].payload=i+1;insert(&anchor,&items[i].link);}\n int sum=0;for(Link*p=anchor.after;p!=&anchor;p=p->after){Item*x=(Item*)((char*)p - offsetof(Item,link));sum+=x->payload;}\n printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "e0ceab23c2232caf964c27ed0ce5f823d24aab7930b6ac3d3f53c893334f9760",
+      "predictedAt": "2026-11-08T13:30:16.793Z"
+    },
+    {
+      "id": "02_circular_single",
+      "category": "list",
+      "style": "ordinary",
+      "intent": "circular singly linked list",
+      "stdout": "10\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "views": [
+          "circular-list",
+          "directed-cycle"
+        ],
+        "notError": "termination is return to head"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*next;}N;\nint main(void){N a[4]={{1,0},{2,0},{3,0},{4,0}};for(int i=0;i<4;i++)a[i].next=&a[(i+1)%4];N*h=&a[0],*p=h;int sum=0;\n do{sum+=p->v;p=p->next;}while(p!=h);printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "646d63cb83f7a6c5a966fb49562f830cf0bba08ebf2e52f6134fe3c0c1d7ac9f",
+      "predictedAt": "2026-11-08T13:30:16.794Z"
+    },
+    {
+      "id": "03_arena_indices",
+      "category": "list",
+      "style": "ordinary",
+      "intent": "singly linked list in a record arena",
+      "stdout": "10\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 3,
+        "terminal": -1,
+        "views": [
+          "indexed-list",
+          "index-graph"
+        ]
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int value,next;}N;\nint main(void){N a[4]={{1,2},{4,-1},{2,3},{3,1}};int i=0,sum=0;while(i>=0){sum+=a[i].value;i=a[i].next;}printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "6b18144e0273616e23fe421138bcb52734406c8b70a0ac234167abe98c9190e1",
+      "predictedAt": "2026-11-08T13:30:16.794Z"
+    },
+    {
+      "id": "04_split_one_based",
+      "category": "list",
+      "style": "novice",
+      "intent": "one-based list split into value and next arrays",
+      "stdout": "10\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 3,
+        "terminal": 0,
+        "views": [
+          "indexed-list",
+          "parallel-array-view"
+        ],
+        "unusedSlot": 0
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int v[5]={0,1,2,3,4};int n[5]={0,2,3,4,0};int i=1,sum=0;\n while(i!=0){int tmp=i;int more=v[tmp];sum=sum+more;int tmp2=n[tmp];i=tmp2;}\n printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "2e1125c513fb6dfebe1aa2ada2b73007b49bd169c7694a1512d926ade6a5014a",
+      "predictedAt": "2026-11-08T13:30:16.795Z"
+    },
+    {
+      "id": "05_doubly_indices",
+      "category": "list",
+      "style": "ordinary",
+      "intent": "doubly linked list encoded with indices",
+      "stdout": "20\n",
+      "expected": {
+        "nodes": 4,
+        "directions": 2,
+        "terminal": -1,
+        "notError": "reverse links are not tree children"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int v,prev,next;}N;\nint main(void){N a[4]={{1,-1,1},{2,0,2},{3,1,3},{4,2,-1}};int total=0;\n for(int i=0;i!=-1;i=a[i].next)total+=a[i].v;for(int i=3;i!=-1;i=a[i].prev)total+=a[i].v;\n printf(\"%d\\n\",total);return 0;}\n",
+      "sha256": "bd2d4af4c8906573d4cd16e1f5dd96e84ead8717784339ad07dafa5a6a0f8841",
+      "predictedAt": "2026-11-08T13:30:16.796Z"
+    },
+    {
+      "id": "06_fragmented_list",
+      "category": "list",
+      "style": "novice-inefficient",
+      "intent": "linked list with redundant allocations and tail rescans",
+      "stdout": "1234\n",
+      "expected": {
+        "nodes": 4,
+        "views": [
+          "linked-list"
+        ],
+        "transient": "scratch allocations are not members"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*n;}N;\nint main(void){N*h=0;for(int i=1;i<=4;i++){int*scratch=malloc(2*sizeof *scratch);if(!scratch)return 1;scratch[0]=i;scratch[1]=i;\n N*x=calloc(1,sizeof*x);if(!x){free(scratch);return 1;}x->v=scratch[1];free(scratch);\n if(!h)h=x;else{N*t=h;while(t->n)t=t->n;t->n=x;}}\n int out=0;while(h){N*t=h;out=out*10+t->v;h=t->n;free(t);}printf(\"%d\\n\",out);return 0;}\n",
+      "sha256": "90c32d3f94cf19c8ab6d603936e77b42486e3e36ff43d97a1fcf00bd10dd9916",
+      "predictedAt": "2026-11-08T13:30:16.797Z"
+    },
+    {
+      "id": "07_shift_queue",
+      "category": "queue",
+      "style": "novice-inefficient",
+      "intent": "FIFO queue that shifts the whole buffer on pop",
+      "stdout": "123\n",
+      "expected": {
+        "behavior": "fifo",
+        "views": [
+          "queue",
+          "array"
+        ],
+        "notEquivalent": "stack despite one length field"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int a[8];int used;}Q;\nint main(void){Q q={0};for(int i=1;i<=3;i++){q.a[q.used]=i;q.used=q.used+1;}int out=0;\n while(q.used){int v=q.a[0];for(int j=1;j<q.used;j++)q.a[j-1]=q.a[j];q.used--;out=out*10+v;}\n printf(\"%d\\n\",out);return 0;}\n",
+      "sha256": "29530f9ac58ac2c23c7f4ab615631b60358a10ff99129f5c49b9e26341b2ff9a",
+      "predictedAt": "2026-11-08T13:30:16.799Z"
+    },
+    {
+      "id": "08_ring_queue",
+      "category": "queue",
+      "style": "professional",
+      "intent": "bounded FIFO with wrap-around and separate length",
+      "stdout": "1234567\n",
+      "expected": {
+        "behavior": "fifo",
+        "capacity": 5,
+        "wraps": true,
+        "views": [
+          "circular-queue",
+          "array"
+        ]
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int a[5];unsigned head,len;}Q;\nstatic int put(Q*q,int x){if(q->len==5)return 0;unsigned at=(q->head+q->len)%5;q->a[at]=x;q->len++;return 1;}\nstatic int take(Q*q,int*out){if(!q->len)return 0;*out=q->a[q->head];q->head=(q->head+1)%5;q->len--;return 1;}\nint main(void){Q q={0};int out=0,x;for(int i=1;i<=5;i++)put(&q,i);for(int i=0;i<2;i++){take(&q,&x);out=out*10+x;}\n put(&q,6);put(&q,7);while(take(&q,&x))out=out*10+x;printf(\"%d\\n\",out);return 0;}\n",
+      "sha256": "a611967e7d72ceee95c71fc97e8c96ba74761936c34902d61714dd3983e1dbe4",
+      "predictedAt": "2026-11-08T13:30:16.800Z"
+    },
+    {
+      "id": "09_array_stack",
+      "category": "stack",
+      "style": "ordinary",
+      "intent": "LIFO stack using a trailing size",
+      "stdout": "321\n",
+      "expected": {
+        "behavior": "lifo",
+        "views": [
+          "stack",
+          "array"
+        ]
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int a[8],n;}S;\nvoid push(S*s,int x){s->a[s->n++]=x;}int pop(S*s){return s->a[--s->n];}\nint main(void){S s={0};push(&s,1);push(&s,2);push(&s,3);int n=0;while(s.n)n=n*10+pop(&s);printf(\"%d\\n\",n);return 0;}\n",
+      "sha256": "48170254d7204fc7e37c2a97fe711877239d4cb7bd7b9021d6b503db79c73155",
+      "predictedAt": "2026-11-08T13:30:16.802Z"
+    },
+    {
+      "id": "10_append_only_log",
+      "category": "ambiguous",
+      "style": "ordinary",
+      "intent": "append-only log; removal behavior not observed",
+      "stdout": "6\n",
+      "expected": {
+        "views": [
+          "active-prefix-array"
+        ],
+        "ambiguous": [
+          "vector",
+          "stack-with-no-pop",
+          "queue-with-no-pop"
+        ],
+        "forbid": "exclusive FIFO/LIFO certainty from append alone"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int a[8],n;}S;\nvoid append(S*s,int x){s->a[s->n++]=x;}\nint main(void){S s={0};append(&s,1);append(&s,2);append(&s,3);int n=0;for(int i=0;i<s.n;i++)n+=s.a[i];printf(\"%d\\n\",n);return 0;}\n",
+      "sha256": "c0b8aac672cdba4630b125dc02e4f7ec3ea795de3e98b58db0198d1b816a4a29",
+      "predictedAt": "2026-11-08T13:30:16.803Z"
+    },
+    {
+      "id": "11_shift_stack",
+      "category": "stack",
+      "style": "novice-inefficient",
+      "intent": "LIFO implemented by shifting on push and pop",
+      "stdout": "321\n",
+      "expected": {
+        "behavior": "lifo",
+        "notEquivalent": "FIFO merely because pops read index zero"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int a[8],n;}S;\nint main(void){S s={0};for(int x=1;x<=3;x++){for(int j=s.n;j>0;j--)s.a[j]=s.a[j-1];s.a[0]=x;s.n++;}\n int n=0;while(s.n){int x=s.a[0];for(int j=1;j<s.n;j++)s.a[j-1]=s.a[j];s.n--;n=n*10+x;}\n printf(\"%d\\n\",n);return 0;}\n",
+      "sha256": "4a82b976a20bd861f77324a80be5b89d14ba5d293c38348ec5d05afc4d664cc3",
+      "predictedAt": "2026-11-08T13:30:16.804Z"
+    },
+    {
+      "id": "12_deque",
+      "category": "deque",
+      "style": "professional",
+      "intent": "ring deque used at both ends",
+      "stdout": "231\n",
+      "expected": {
+        "behavior": "deque",
+        "views": [
+          "deque",
+          "array"
+        ],
+        "forbid": "exclusive stack or queue interpretation"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int a[8],head,n;}D;\nvoid front(D*d,int x){d->head=(d->head+7)%8;d->a[d->head]=x;d->n++;}\nvoid back(D*d,int x){d->a[(d->head+d->n)%8]=x;d->n++;}\nint first(D*d){int x=d->a[d->head];d->head=(d->head+1)%8;d->n--;return x;}\nint last(D*d){d->n--;return d->a[(d->head+d->n)%8];}\nint main(void){D d={0};front(&d,1);back(&d,2);front(&d,3);int a=last(&d),b=first(&d),c=first(&d);printf(\"%d%d%d\\n\",a,b,c);return 0;}\n",
+      "sha256": "776eea31330cd788d72723f69d108b85661e5f1435dae6be4dbceabd7fbad6b5",
+      "predictedAt": "2026-11-08T13:30:16.805Z"
+    },
+    {
+      "id": "13_vector_grow_one",
+      "category": "vector",
+      "style": "novice-inefficient",
+      "intent": "vector reallocating for every inserted element",
+      "stdout": "5 5 14\n",
+      "expected": {
+        "behavior": "dynamic-array",
+        "length": 5,
+        "capacity": 5,
+        "allocations": "growth one at a time, not doubling"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int*p,n,cap;}V;\nint main(void){V v={0};int x[5]={3,1,4,1,5};for(int i=0;i<5;i++){if(v.n==v.cap){int*q=realloc(v.p,(v.cap+1)*sizeof*q);if(!q){free(v.p);return 1;}v.p=q;v.cap++;}v.p[v.n]=x[i];v.n++;}\n int total=0;for(int i=0;i<v.n;i++)total+=v.p[i];printf(\"%d %d %d\\n\",v.n,v.cap,total);free(v.p);return 0;}\n",
+      "sha256": "5186d57835b3cfe72bc07541fa1656020440c71e67b26c9e0d0c2487a6f31a76",
+      "predictedAt": "2026-11-08T13:30:16.806Z"
+    },
+    {
+      "id": "14_hash_chains",
+      "category": "hash",
+      "style": "ordinary",
+      "intent": "hash table with collision chains",
+      "stdout": "9\n",
+      "expected": {
+        "buckets": 3,
+        "entries": 3,
+        "views": [
+          "bucket-array",
+          "linked-lists"
+        ],
+        "ambiguous": "pointer graph is valid; hash intent needs lookup/modulo evidence"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int k;struct N*next;}N;\nint main(void){N*bucket[3]={0};N nodes[3]={{0,0},{3,0},{6,0}};for(int i=0;i<3;i++){int b=nodes[i].k%3;nodes[i].next=bucket[b];bucket[b]=&nodes[i];}\n int sum=0;for(int k=0;k<=6;k+=3){N*p=bucket[k%3];while(p&&p->k!=k)p=p->next;if(p)sum+=p->k;}\n printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "03f6aba9af6f76d8c5e7e243fb39de46c79b74ca9d0521dd2bf824cf16f38350",
+      "predictedAt": "2026-11-08T13:30:16.808Z"
+    },
+    {
+      "id": "15_hash_open",
+      "category": "hash",
+      "style": "ordinary",
+      "intent": "open-addressing table; stored numbers are keys, not graph links",
+      "stdout": "26\n",
+      "expected": {
+        "capacity": 7,
+        "entries": 4,
+        "views": [
+          "array",
+          "hash-slots"
+        ],
+        "forbid": "key values treated as graph edges without index provenance"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int table[7],keys[4]={1,8,15,2};for(int i=0;i<7;i++)table[i]=-1;\n for(int i=0;i<4;i++){int at=keys[i]%7;while(table[at]!=-1)at=(at+1)%7;table[at]=keys[i];}\n int sum=0;for(int i=0;i<4;i++){int at=keys[i]%7;while(table[at]!=keys[i])at=(at+1)%7;sum+=table[at];}printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "3903fff54f9b93fed2a09a2b20895d8c702130661a994b44eb3091879188ddd6",
+      "predictedAt": "2026-11-08T13:30:16.809Z"
+    },
+    {
+      "id": "16_parent_forest",
+      "category": "disjoint-set",
+      "style": "professional",
+      "intent": "parent forest with path compression and union",
+      "stdout": "0 0\n",
+      "expected": {
+        "views": [
+          "parent-forest",
+          "array"
+        ],
+        "terminal": "self-index",
+        "transitions": "two trees merge, then path compression"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint root(int*p,int x){if(p[x]!=x)p[x]=root(p,p[x]);return p[x];}\nint main(void){int p[5]={0,0,1,3,3};int a=root(p,2),b=root(p,4);p[b]=a;int c=root(p,4);printf(\"%d %d\\n\",a,c);return 0;}\n",
+      "sha256": "edbb30a6586e0c7c8f8f8e132cc6578fb832c0848eb7e357624ae21e0d1e92d1",
+      "predictedAt": "2026-11-08T13:30:16.810Z"
+    },
+    {
+      "id": "17_matrix_zero_weight",
+      "category": "graph",
+      "style": "ordinary",
+      "intent": "weighted directed graph in matrix; zero is a valid weight",
+      "stdout": "4\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "absent": -1,
+        "views": [
+          "adjacency-matrix",
+          "directed-graph"
+        ],
+        "forbid": "zero means absent"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int g[4][4]={{-1,0,-1,7},{-1,-1,2,-1},{-1,-1,-1,1},{-1,-1,-1,-1}};\n int q[4]={0},seen[4]={1,0,0,0},h=0,t=1;\n while(h<t){int u=q[h++];for(int v=0;v<4;v++){if(g[u][v]>=0&&!seen[v]){seen[v]=1;q[t++]=v;}}}\n printf(\"%d\\n\",t);return 0;}\n",
+      "sha256": "b81352185e6f2a36af78b3d1bd49344b62db4b89bcedcef4ba143a121025b97b",
+      "predictedAt": "2026-11-08T13:35:14.974Z"
+    },
+    {
+      "id": "18_csr_graph",
+      "category": "graph",
+      "style": "professional",
+      "intent": "compressed sparse row adjacency representation",
+      "stdout": "6\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "views": [
+          "csr",
+          "directed-graph"
+        ],
+        "relations": "offset bounds ranges in destination array"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int offsets[5]={0,2,3,4,4},to[4]={1,2,3,3};int queue[4]={0},seen[4]={1,0,0,0},head=0,tail=1,sum=0;\n while(head<tail){int u=queue[head++];sum+=u;for(int e=offsets[u];e<offsets[u+1];e++){int v=to[e];if(!seen[v]){seen[v]=1;queue[tail++]=v;}}}\n printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "f4217fe9cdeaac25f7671332c1f9bade4b25c397c15fc48dd85bc8a2b4f72bea",
+      "predictedAt": "2026-11-08T13:35:14.975Z"
+    },
+    {
+      "id": "19_edge_relaxation",
+      "category": "graph",
+      "style": "ordinary",
+      "intent": "weighted edge list with repeated relaxation",
+      "stdout": "5\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "views": [
+          "edge-list",
+          "directed-graph"
+        ],
+        "notEquivalent": "record array alone misses endpoint relations"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int a,b,w;}E;\nint main(void){E edges[4]={{0,1,0},{1,2,2},{0,3,7},{2,3,1}};int d[4]={0,999,999,999};\n for(int pass=0;pass<3;pass++)for(int e=0;e<4;e++)if(d[edges[e].a]+edges[e].w<d[edges[e].b])d[edges[e].b]=d[edges[e].a]+edges[e].w;\n printf(\"%d\\n\",d[0]+d[1]+d[2]+d[3]);return 0;}\n",
+      "sha256": "c8770a93f18d66971bbf62b767c121751dd38f1158db47b3dadc0c83373d61a3",
+      "predictedAt": "2026-11-08T13:35:14.986Z"
+    },
+    {
+      "id": "20_sparse_triplets",
+      "category": "matrix",
+      "style": "ordinary",
+      "intent": "sparse matrix in coordinate triples, not intended as edge graph",
+      "stdout": "38\n",
+      "expected": {
+        "views": [
+          "sparse-matrix",
+          "triplet-array"
+        ],
+        "ambiguous": "same triples admit weighted graph interpretation; usage is matrix-vector product"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int a,b,w;}E;\nint main(void){E entries[4]={{0,1,0},{1,2,2},{0,3,7},{2,3,1}};int x[4]={1,2,3,4},y[4]={0};\n for(int e=0;e<4;e++)y[entries[e].a]+=entries[e].w*x[entries[e].b];printf(\"%d\\n\",y[0]+y[1]+y[2]+y[3]);return 0;}\n",
+      "sha256": "4ca3c9da10cd882d0c594936b8bd1848722eaf074171c2ec11db23326e52ed7f",
+      "predictedAt": "2026-11-08T13:35:14.987Z"
+    },
+    {
+      "id": "21_pointer_adjacency",
+      "category": "graph",
+      "style": "ordinary",
+      "intent": "adjacency lists with integer destinations",
+      "stdout": "6\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "views": [
+          "directed-graph",
+          "adjacency-lists"
+        ],
+        "distinction": "edge records are not vertex records"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct E{int to;struct E*next;}E;\nint main(void){E e[4]={{1,0},{2,0},{3,0},{3,0}};e[0].next=&e[1];E*adj[4]={&e[0],&e[2],&e[3],0};\n int seen[4]={1,0,0,0},q[4]={0},h=0,t=1,sum=0;while(h<t){int u=q[h++];sum+=u;for(E*p=adj[u];p;p=p->next)if(!seen[p->to]){seen[p->to]=1;q[t++]=p->to;}}\n printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "4d336684999f209cb5e4542058042321ca7b01a04d30b4d67ed4382971d9ac2a",
+      "predictedAt": "2026-11-08T13:35:14.988Z"
+    },
+    {
+      "id": "22_flat_matrix",
+      "category": "graph",
+      "style": "novice",
+      "intent": "flat adjacency matrix and repeated full scans",
+      "stdout": "4\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "views": [
+          "flat-grid",
+          "adjacency-matrix"
+        ],
+        "stride": 4
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int a[16]={0};a[0*4+1]=1;a[0*4+2]=1;a[1*4+3]=1;a[2*4+3]=1;int seen[4]={1,0,0,0};\n for(int repeat=0;repeat<4;repeat++)for(int i=0;i<4;i++)for(int j=0;j<4;j++)if(seen[i]&&a[i*4+j])seen[j]=1;\n int result=0;for(int i=0;i<4;i++)result+=seen[i];printf(\"%d\\n\",result);return 0;}\n",
+      "sha256": "2a1f33ea3f93a849f7e0e993c0777fcd1bb96219fdf619312f710c0553270be6",
+      "predictedAt": "2026-11-08T13:35:14.989Z"
+    },
+    {
+      "id": "23_row_pointer_grid",
+      "category": "grid",
+      "style": "ordinary",
+      "intent": "rectangular grid with separately allocated rows",
+      "stdout": "21\n",
+      "expected": {
+        "rows": 2,
+        "columns": 3,
+        "views": [
+          "grid",
+          "array-of-row-pointers"
+        ],
+        "forbid": "pointer graph mistaken for linked list"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int**a=calloc(2,sizeof*a);if(!a)return 1;for(int r=0;r<2;r++){a[r]=calloc(3,sizeof**a);if(!a[r]){for(int j=0;j<r;j++)free(a[j]);free(a);return 1;}}\n int sum=0;for(int r=0;r<2;r++)for(int c=0;c<3;c++){a[r][c]=r*3+c+1;sum+=a[r][c];}\n printf(\"%d\\n\",sum);for(int r=0;r<2;r++)free(a[r]);free(a);return 0;}\n",
+      "sha256": "20ce7fb6ca2401ffc4d52b84690dec7c6921707e05a08c4c7b3dc93a9df308eb",
+      "predictedAt": "2026-11-08T13:35:14.990Z"
+    },
+    {
+      "id": "24_dp_table",
+      "category": "grid",
+      "style": "novice",
+      "intent": "path-count DP table; no intended adjacency graph",
+      "stdout": "6\n",
+      "expected": {
+        "rows": 3,
+        "columns": 3,
+        "views": [
+          "grid",
+          "dp-table"
+        ],
+        "forbid": "exclusive adjacency-matrix interpretation from square shape"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int a[3][3]={0};for(int r=0;r<3;r++)for(int c=0;c<3;c++){if(r==0||c==0)a[r][c]=1;else{int x=a[r-1][c];int y=a[r][c-1];int z=x+y;a[r][c]=z;}}\n printf(\"%d\\n\",a[2][2]);return 0;}\n",
+      "sha256": "045cd5ec7a819b837f53f5cacebcd136b0724098e4b7baa148be3180674ee5a2",
+      "predictedAt": "2026-11-08T13:35:14.991Z"
+    },
+    {
+      "id": "25_shared_dag",
+      "category": "graph",
+      "style": "ordinary",
+      "intent": "two branches share one child; directed acyclic graph",
+      "stdout": "14\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "views": [
+          "dag"
+        ],
+        "forbid": "duplicating shared node to pretend unique-parent tree"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int x;struct N*a,*b;}N;\nint sum(N*p){return p?p->x+sum(p->a)+sum(p->b):0;}\nint main(void){N n[4]={{1,0,0},{2,0,0},{3,0,0},{4,0,0}};n[0].a=&n[1];n[0].b=&n[2];n[1].a=&n[3];n[2].a=&n[3];printf(\"%d\\n\",sum(n));return 0;}\n",
+      "sha256": "efe9c3c340a2a332d2fd481127108a264363060a4ef49ab7e5e124a9217cb510",
+      "predictedAt": "2026-11-08T13:35:14.991Z"
+    },
+    {
+      "id": "26_parent_backlinks",
+      "category": "tree",
+      "style": "ordinary",
+      "intent": "binary tree with non-child parent references",
+      "stdout": "6\n",
+      "expected": {
+        "nodes": 3,
+        "childEdges": 2,
+        "parentEdges": 2,
+        "views": [
+          "tree-with-parent-overlay"
+        ],
+        "notError": "full pointer graph is cyclic but child projection is tree"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{struct N*up,*a,*b;int x;}N;\nint sum(N*p){if(!p)return 0;return p->x+sum(p->a)+sum(p->b);}\nint main(void){N n[3]={{0,0,0,1},{0,0,0,2},{0,0,0,3}};n[0].a=&n[1];n[0].b=&n[2];n[1].up=&n[0];n[2].up=&n[0];\n int check=n[1].up->x+n[2].up->x;if(check!=2)return 1;printf(\"%d\\n\",sum(n));return 0;}\n",
+      "sha256": "a69276bdb569536e0ef69fe6ab6871ddbf2fece4a0e9a110d8a4286819de3f1c",
+      "predictedAt": "2026-11-08T13:35:14.992Z"
+    },
+    {
+      "id": "27_tree_iteration_overlay",
+      "category": "tree",
+      "style": "professional",
+      "intent": "tree and iteration chain over the same nodes",
+      "stdout": "15 5\n",
+      "expected": {
+        "nodes": 5,
+        "childEdges": 4,
+        "iterationEdges": 4,
+        "views": [
+          "tree",
+          "linked-list"
+        ],
+        "require": "simultaneous role-specific projections"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*l,*r,*order;}N;\nint sum(N*p){return p?p->v+sum(p->l)+sum(p->r):0;}\nint main(void){N n[5]={0};for(int i=0;i<5;i++){n[i].v=i+1;if(i<4)n[i].order=&n[i+1];}n[0].l=&n[1];n[0].r=&n[2];n[1].l=&n[3];n[1].r=&n[4];\n int count=0;for(N*p=n;p;p=p->order)count++;printf(\"%d %d\\n\",sum(n),count);return 0;}\n",
+      "sha256": "0ca7c13ef55f9d308f9d86ddf911a3cb89dadaf3ae78ed78b65470800ad0461c",
+      "predictedAt": "2026-11-08T13:35:14.993Z"
+    },
+    {
+      "id": "28_implicit_recursive_tree",
+      "category": "tree",
+      "style": "ordinary",
+      "intent": "implicit binary tree through recursive index arguments",
+      "stdout": "28\n",
+      "expected": {
+        "nodes": 7,
+        "edges": 6,
+        "views": [
+          "index-tree"
+        ],
+        "relations": [
+          "2*i+1",
+          "2*i+2"
+        ]
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint visit(const int*a,int i,int count){if(i>=count)return 0;int l=2*i+1;int r=l+1;return a[i]+visit(a,l,count)+visit(a,r,count);}\nint main(void){int a[7]={1,2,3,4,5,6,7};printf(\"%d\\n\",visit(a,0,7));return 0;}\n",
+      "sha256": "f663150f8fe4c79ecc9d849cd093cdd03ba8e6549508105f5c3b194fab8ea6cb",
+      "predictedAt": "2026-11-08T13:35:14.994Z"
+    },
+    {
+      "id": "29_binary_heap",
+      "category": "heap",
+      "style": "ordinary",
+      "intent": "binary min heap with bubbling and sinking",
+      "stdout": "12345\n",
+      "expected": {
+        "nodes": 5,
+        "views": [
+          "heap",
+          "implicit-binary-tree"
+        ],
+        "require": "heap ordering separate from binary-tree topology"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int a[8],n;}H;\nvoid put(H*h,int v){int i=h->n++;while(i>0){int p=(i-1)/2;if(h->a[p]<=v)break;h->a[i]=h->a[p];i=p;}h->a[i]=v;}\nint take(H*h){int out=h->a[0],v=h->a[--h->n],i=0;while(2*i+1<h->n){int c=2*i+1;if(c+1<h->n&&h->a[c+1]<h->a[c])c++;if(v<=h->a[c])break;h->a[i]=h->a[c];i=c;}if(h->n)h->a[i]=v;return out;}\nint main(void){H h={0};int in[5]={5,1,4,2,3};for(int i=0;i<5;i++)put(&h,in[i]);int out=0;while(h.n)out=out*10+take(&h);printf(\"%d\\n\",out);return 0;}\n",
+      "sha256": "7ff8d9604de9ce312dfbc248f9be99f28b7ee7dc8a2f1bb987f631fa3edc736a",
+      "predictedAt": "2026-11-08T13:35:14.997Z"
+    },
+    {
+      "id": "30_fenwick",
+      "category": "tree",
+      "style": "professional",
+      "intent": "Fenwick aggregate index structure",
+      "stdout": "21 6\n",
+      "expected": {
+        "views": [
+          "fenwick-index-relations",
+          "array"
+        ],
+        "forbid": "ordinary complete binary heap from tree intent alone"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nvoid add(int*b,int n,int i,int x){for(;i<=n;i+=i&-i)b[i]+=x;}\nint total(const int*b,int i){int v=0;for(;i>0;i-=i&-i)v+=b[i];return v;}\nint main(void){int b[7]={0};for(int i=1;i<=6;i++)add(b,6,i,i);printf(\"%d %d\\n\",total(b,6),total(b,3));return 0;}\n",
+      "sha256": "65e951ce79d8cf77421e7621cf52beeb538051dc29fa366c086c3233b02cdc8b",
+      "predictedAt": "2026-11-08T13:35:14.998Z"
+    },
+    {
+      "id": "31_segment_tree",
+      "category": "tree",
+      "style": "professional",
+      "intent": "array segment tree with interval metadata in call arguments",
+      "stdout": "14\n",
+      "expected": {
+        "views": [
+          "segment-tree",
+          "implicit-tree"
+        ],
+        "require": "intervals are metadata; physical array remains"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint build(int*t,const int*a,int u,int l,int r){if(l==r)return t[u]=a[l];int m=(l+r)/2;return t[u]=build(t,a,2*u+1,l,m)+build(t,a,2*u+2,m+1,r);}\nint query(const int*t,int u,int l,int r,int lo,int hi){if(hi<l||r<lo)return 0;if(lo<=l&&r<=hi)return t[u];int m=(l+r)/2;return query(t,2*u+1,l,m,lo,hi)+query(t,2*u+2,m+1,r,lo,hi);}\nint main(void){int a[6]={1,2,3,4,5,6},t[24]={0};build(t,a,0,0,5);printf(\"%d\\n\",query(t,0,0,5,1,4));return 0;}\n",
+      "sha256": "d35cf884fdb9e31b1a240abf8794824762bd0789bf98e824d13bcbb97bab8539",
+      "predictedAt": "2026-11-08T13:35:15.001Z"
+    },
+    {
+      "id": "32_trie_pool",
+      "category": "trie",
+      "style": "ordinary",
+      "intent": "index pool with fixed child array in each node",
+      "stdout": "1 0 5\n",
+      "expected": {
+        "nodes": 5,
+        "edges": 4,
+        "views": [
+          "trie",
+          "indexed-tree"
+        ],
+        "require": "nested child slots distinct from scalar payload"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int child[3],end;}N;\nvoid put(N*t,int*used,const char*s){int u=0;while(*s){int c=*s++-'a';if(t[u].child[c]<0)t[u].child[c]=(*used)++;u=t[u].child[c];}t[u].end=1;}\nint has(N*t,const char*s){int u=0;while(*s){int c=*s++-'a';if(t[u].child[c]<0)return 0;u=t[u].child[c];}return t[u].end;}\nint main(void){N t[12];for(int i=0;i<12;i++){t[i].end=0;for(int j=0;j<3;j++)t[i].child[j]=-1;}int used=1;put(t,&used,\"ab\");put(t,&used,\"ac\");put(t,&used,\"b\");printf(\"%d %d %d\\n\",has(t,\"ab\"),has(t,\"aa\"),used);return 0;}\n",
+      "sha256": "b2e0cc08d0cd5ba82dc24b2f723adb9d40337f73af8b3e992681d921ba103013",
+      "predictedAt": "2026-11-08T13:35:15.002Z"
+    },
+    {
+      "id": "33_flexible_children",
+      "category": "tree",
+      "style": "professional",
+      "intent": "variable-arity nodes with flexible array of children",
+      "stdout": "10\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 3,
+        "views": [
+          "multiway-tree"
+        ],
+        "require": "flexible pointer array belongs to node"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int value,count;struct N*child[];}N;\nint main(void){N*root=calloc(1,sizeof*root+3*sizeof(N*));if(!root)return 1;root->value=1;root->count=3;\n for(int i=0;i<3;i++){root->child[i]=calloc(1,sizeof(N));if(!root->child[i]){for(int j=0;j<i;j++)free(root->child[j]);free(root);return 1;}root->child[i]->value=i+2;}\n int sum=root->value;for(int i=0;i<root->count;i++)sum+=root->child[i]->value;printf(\"%d\\n\",sum);\n for(int i=0;i<root->count;i++)free(root->child[i]);free(root);return 0;}\n",
+      "sha256": "3df4f20bb51526a4aa2970f23d045310aaa13855ae5f1731ced02b9abde510b5",
+      "predictedAt": "2026-11-08T13:38:12.960Z"
+    },
+    {
+      "id": "34_child_sibling",
+      "category": "tree",
+      "style": "ordinary",
+      "intent": "general tree encoded first-child and next-sibling",
+      "stdout": "15\n",
+      "expected": {
+        "nodes": 5,
+        "logicalEdges": 4,
+        "views": [
+          "general-tree",
+          "child-sibling-storage"
+        ],
+        "forbid": "sibling edge treated as logical child edge without distinction"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*child,*next;}N;\nint sum(N*p){int out=0;while(p){out+=p->v+sum(p->child);p=p->next;}return out;}\nint main(void){N n[5]={{1,0,0},{2,0,0},{3,0,0},{4,0,0},{5,0,0}};n[0].child=&n[1];n[1].next=&n[2];n[2].next=&n[3];n[1].child=&n[4];printf(\"%d\\n\",sum(n));return 0;}\n",
+      "sha256": "edf3e69d6b7c49ae7af76998885cd96a54f9255c4a07d02c4777dc9a9c415872",
+      "predictedAt": "2026-11-08T13:38:12.962Z"
+    },
+    {
+      "id": "35_bitset_graph",
+      "category": "graph",
+      "style": "professional",
+      "intent": "bit-packed adjacency and frontier traversal",
+      "stdout": "4\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "views": [
+          "bitset-adjacency",
+          "graph"
+        ],
+        "require": "bit position is vertex identity, not integer-as-index"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){unsigned adj[4]={6,8,8,0},seen=1,front=1;while(front){unsigned next=0;for(unsigned u=0;u<4;u++)if(front&(1u<<u))next|=adj[u];front=next&~seen;seen|=front;}\n int count=0;for(unsigned i=0;i<4;i++)if(seen&(1u<<i))count++;printf(\"%d\\n\",count);return 0;}\n",
+      "sha256": "44f13b923b0f9de6fa251b1b518a7e2ea76314fedd933dd8f20521fab85ac2a3",
+      "predictedAt": "2026-11-08T13:38:12.972Z"
+    },
+    {
+      "id": "36_pool_free_list",
+      "category": "pool",
+      "style": "ordinary",
+      "intent": "shared arena contains live list and allocator free list",
+      "stdout": "6\n",
+      "expected": {
+        "liveNodes": 2,
+        "freeNodes": 3,
+        "views": [
+          "two-index-lists",
+          "pool"
+        ],
+        "require": "same next field serves distinct memberships over time"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int value,next,used;}N;\nint main(void){N p[5]={0};for(int i=0;i<5;i++)p[i].next=i==4?-1:i+1;int freehead=0,head=-1;\n for(int v=1;v<=3;v++){int i=freehead;freehead=p[i].next;p[i].used=1;p[i].value=v;p[i].next=head;head=i;}\n int drop=head;head=p[head].next;p[drop].used=0;p[drop].next=freehead;freehead=drop;\n int i=freehead;freehead=p[i].next;p[i].used=1;p[i].value=5;p[i].next=head;head=i;\n int out=0;for(int j=head;j!=-1;j=p[j].next)out+=p[j].value;\n int old=head;head=p[head].next;p[old].used=0;p[old].next=freehead;freehead=old;\n printf(\"%d\\n\",out-(p[head].value));return 0;}\n",
+      "sha256": "dacbefe7526c168887589590efc4c08cb70f510c232a80c58301705fcf87f069",
+      "predictedAt": "2026-11-08T13:38:12.973Z"
+    },
+    {
+      "id": "37_pointer_to_pointer",
+      "category": "list",
+      "style": "professional",
+      "intent": "generic unlink through pointer-to-pointer and safe reclamation",
+      "stdout": "13\n",
+      "expected": {
+        "initialNodes": 3,
+        "finalNodes": 2,
+        "views": [
+          "linked-list"
+        ],
+        "require": "indirection is a cursor to a link, not an extra data node"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int x;struct N*next;}N;\nint main(void){N*head=0;for(int i=3;i>=1;i--){N*p=malloc(sizeof*p);if(!p){while(head){N*q=head;head=q->next;free(q);}return 1;}p->x=i;p->next=head;head=p;}\n N**slot=&head;while(*slot){if((*slot)->x==2){N*old=*slot;*slot=old->next;free(old);}else slot=&(*slot)->next;}\n int sum=0;while(head){N*p=head;sum=sum*10+p->x;head=p->next;free(p);}printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "2e449aa30c3b92aa8f309f1eab456c2a1feb6d7273a03d0581819bb76091e367",
+      "predictedAt": "2026-11-08T13:38:12.975Z"
+    },
+    {
+      "id": "38_unrolled_list",
+      "category": "list",
+      "style": "professional",
+      "intent": "unrolled list of partially occupied blocks",
+      "stdout": "36\n",
+      "expected": {
+        "blocks": 3,
+        "logicalItems": 8,
+        "views": [
+          "block-list",
+          "chunked-sequence"
+        ],
+        "require": "unused tail slot excluded from logical sequence"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct B{int a[3],n;struct B*next;}B;\nint main(void){B b[3]={0};b[0].next=&b[1];b[1].next=&b[2];B*p=b;\n for(int x=1;x<=8;x++){if(p->n==3)p=p->next;p->a[p->n++]=x;}\n int sum=0;for(p=b;p;p=p->next)for(int i=0;i<p->n;i++)sum+=p->a[i];printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "2606aab86c843d7a3d5baa7c083f9385e4f781d88a16e532f010b14883aaea45",
+      "predictedAt": "2026-11-08T13:38:12.976Z"
+    },
+    {
+      "id": "39_skip_list",
+      "category": "list",
+      "style": "professional",
+      "intent": "deterministic three-level skip list",
+      "stdout": "1 10\n",
+      "expected": {
+        "payloadNodes": 4,
+        "levels": 3,
+        "views": [
+          "skip-list",
+          "multiple-chain-overlays"
+        ],
+        "require": "head sentinel and level membership distinguished"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int key;struct N*next[3];}N;\nint main(void){N head={0},n[4]={0};for(int i=0;i<4;i++){n[i].key=i+1;for(int l=0;l<3;l++)if((i+1)%(1<<l)==0){N*p=&head;while(p->next[l])p=p->next[l];p->next[l]=&n[i];}}\n N*p=&head;int target=3;for(int l=2;l>=0;l--)while(p->next[l]&&p->next[l]->key<target)p=p->next[l];p=p->next[0];int found=p&&p->key==target;\n int sum=0;for(p=head.next[0];p;p=p->next[0])sum+=p->key;printf(\"%d %d\\n\",found,sum);return 0;}\n",
+      "sha256": "00a81cba570806c370e49f141d2f64ca05ef07bb24068d17f1db0179155dd6c2",
+      "predictedAt": "2026-11-08T13:38:12.977Z"
+    },
+    {
+      "id": "40_btree_multikey",
+      "category": "tree",
+      "style": "professional",
+      "intent": "multiway search tree with multiple keys in each node",
+      "stdout": "36\n",
+      "expected": {
+        "nodes": 4,
+        "keys": 8,
+        "edges": 3,
+        "views": [
+          "multiway-search-tree",
+          "nested-arrays"
+        ],
+        "require": "keys are entries within nodes, not extra pointer nodes"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int count,keys[2];struct N*child[3];}N;\nint total(N*p){if(!p)return 0;int sum=0;for(int i=0;i<p->count;i++)sum+=p->keys[i];for(int i=0;i<=p->count;i++)sum+=total(p->child[i]);return sum;}\nint main(void){N a={2,{1,2},{0}},b={2,{4,5},{0}},c={2,{7,8},{0}},r={2,{3,6},{&a,&b,&c}};printf(\"%d\\n\",total(&r));return 0;}\n",
+      "sha256": "15c5616cae37cad6603c12dae20e74852766513b2d41fa5194070484829c080f",
+      "predictedAt": "2026-11-08T13:38:12.979Z"
+    },
+    {
+      "id": "41_avl_rotation",
+      "category": "tree",
+      "style": "professional",
+      "intent": "AVL insertion with height and rotation updates",
+      "stdout": "1234567\n",
+      "expected": {
+        "nodes": 7,
+        "views": [
+          "binary-tree",
+          "avl-candidate"
+        ],
+        "require": "temporary rewiring preserved; height ordering needs independent evidence"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v,h;struct N*l,*r;}N;\nint height(N*p){return p?p->h:0;}void fix(N*p){int l=height(p->l),r=height(p->r);p->h=1+(l>r?l:r);}\nN*right(N*p){N*q=p->l;p->l=q->r;q->r=p;fix(p);fix(q);return q;}N*left(N*p){N*q=p->r;p->r=q->l;q->l=p;fix(p);fix(q);return q;}\nN*insert(N*p,N*x){if(!p)return x;if(x->v<p->v)p->l=insert(p->l,x);else p->r=insert(p->r,x);fix(p);\n int b=height(p->l)-height(p->r);if(b>1){if(x->v>p->l->v)p->l=left(p->l);return right(p);}if(b < -1){if(x->v<p->r->v)p->r=right(p->r);return left(p);}return p;}\nvoid visit(N*p,int*out){if(!p)return;visit(p->l,out);*out=*out*10+p->v;visit(p->r,out);}\nint main(void){N n[7]={0},*root=0;for(int i=0;i<7;i++){n[i].v=i+1;n[i].h=1;root=insert(root,&n[i]);}int out=0;visit(root,&out);printf(\"%d\\n\",out);return 0;}\n",
+      "sha256": "384440537868d0be90270755c04ea533265a76fb2906fdcc35c124927a5d86b7",
+      "predictedAt": "2026-11-08T13:38:12.980Z"
+    },
+    {
+      "id": "42_sorted_array_priority",
+      "category": "queue",
+      "style": "novice-inefficient",
+      "intent": "priority queue by sorted insertion and full-array shifts",
+      "stdout": "12345\n",
+      "expected": {
+        "behavior": "minimum-priority",
+        "views": [
+          "sorted-array",
+          "priority-queue"
+        ],
+        "forbid": "FIFO due to removal from index zero"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int a[8]={0},n=0,in[5]={5,1,4,2,3};for(int t=0;t<5;t++){int pos=n;while(pos>0&&a[pos-1]>in[t]){a[pos]=a[pos-1];pos--;}a[pos]=in[t];n++;}\n int out=0;while(n){out=out*10+a[0];for(int j=1;j<n;j++)a[j-1]=a[j];n--;}printf(\"%d\\n\",out);return 0;}\n",
+      "sha256": "4e9f3bcd9449a093b43d3b9a0dd4410c1f6fc120bbafeb63bc2776419ceb0ff6",
+      "predictedAt": "2026-11-08T13:38:12.983Z"
+    },
+    {
+      "id": "43_queue_two_stacks",
+      "category": "queue",
+      "style": "professional",
+      "intent": "FIFO implemented with two LIFO buffers",
+      "stdout": "1234\n",
+      "expected": {
+        "behavior": "fifo",
+        "views": [
+          "queue",
+          "two-stacks"
+        ],
+        "require": "component stacks and composite queue both valid"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int in[8],out[8],ni,no;}Q;\nvoid put(Q*q,int v){q->in[q->ni++]=v;}int take(Q*q){if(!q->no)while(q->ni)q->out[q->no++]=q->in[--q->ni];return q->out[--q->no];}\nint main(void){Q q={0};put(&q,1);put(&q,2);put(&q,3);int r=take(&q);put(&q,4);while(q.ni||q.no)r=r*10+take(&q);printf(\"%d\\n\",r);return 0;}\n",
+      "sha256": "454b0cd7a4a145bb5c5389eeb64228acb207ee3ac1fac6e5ef572c09f74713d0",
+      "predictedAt": "2026-11-08T13:38:12.986Z"
+    },
+    {
+      "id": "44_type_erased_list",
+      "category": "list",
+      "style": "professional",
+      "intent": "void-pointer payload list with callback processing",
+      "stdout": "10\n",
+      "expected": {
+        "nodes": 4,
+        "views": [
+          "linked-list",
+          "payload-references"
+        ],
+        "require": "void pointers retain observed target identity"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct L{void*data;struct L*next;}L;\nvoid each(L*p,void(*f)(void*,void*),void*ctx){for(;p;p=p->next)f(p->data,ctx);}void sum(void*p,void*c){*(int*)c+=*(int*)p;}\nint main(void){int a[4]={1,2,3,4},result=0;L links[4]={0};for(int i=0;i<4;i++){links[i].data=&a[i];if(i<3)links[i].next=&links[i+1];}\n each(links,sum,&result);printf(\"%d\\n\",result);return 0;}\n",
+      "sha256": "fdea67b8e440ec9cc923a4f48985e7d647d961491773ade8cdd2da008e682e6e",
+      "predictedAt": "2026-11-08T13:38:12.988Z"
+    },
+    {
+      "id": "45_topology_transitions",
+      "category": "graph",
+      "style": "ordinary",
+      "intent": "safe topology changes tree to DAG to cycle to tree",
+      "stdout": "12\n",
+      "expected": {
+        "nodes": 3,
+        "stages": [
+          "tree",
+          "dag",
+          "cycle",
+          "tree"
+        ],
+        "require": "per-event topology; no historical union as current structure"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*a,*b;}N;\nint bounded(N*p){int s=0;for(int i=0;i<3&&p;i++){s+=p->v;p=p->a;}return s;}\nint main(void){N n[3]={{1,0,0},{2,0,0},{3,0,0}};N*root=n;n[0].a=&n[1];n[0].b=&n[2];int out=bounded(root);\n n[1].b=&n[2];out+=bounded(root);n[2].a=root;out+=bounded(root);n[2].a=0;n[1].b=0;out+=bounded(root);printf(\"%d\\n\",out);return 0;}\n",
+      "sha256": "28147071af0a3fabc57d06e1f8b732892ec692122c56f4ca818530316f260c4e",
+      "predictedAt": "2026-11-08T13:38:12.989Z"
+    },
+    {
+      "id": "46_name_decoy",
+      "category": "negative-control",
+      "style": "novice",
+      "intent": "names suggest tree but values are independent counters",
+      "stdout": "22\n",
+      "expected": {
+        "views": [
+          "independent-arrays"
+        ],
+        "forbid": "graph edges from names or repeated small integers"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int left[4]={1,2,3,0},right[4]={3,2,1,0},parent[4]={0,1,2,3},root=4,total=0;\n for(int i=0;i<4;i++){int node=left[i]+right[i]+parent[i];total+=node;}printf(\"%d\\n\",total+root);return 0;}\n",
+      "sha256": "19c82fdcba11ffffdd28f1b4b3318666a4ebaf6d020ddcf1349ccff056864efa",
+      "predictedAt": "2026-11-08T13:38:12.991Z"
+    },
+    {
+      "id": "47_empty_and_single",
+      "category": "ambiguous",
+      "style": "ordinary",
+      "intent": "empty list and singleton with no link traversal",
+      "stdout": "7\n",
+      "expected": {
+        "views": [
+          "empty-pointer",
+          "singleton-record"
+        ],
+        "ambiguous": [
+          "list",
+          "tree",
+          "graph-node"
+        ],
+        "forbid": "claiming intended container from one unlinked record"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*next;}N;\nint main(void){N*empty=0;N only={7,0};N*root=&only;printf(\"%d\\n\",empty?0:root->v);return 0;}\n",
+      "sha256": "5cb7f5b99627a71ef7f9ed15678ecab5c5de326ba75f8f9f05db0eb3850508ae",
+      "predictedAt": "2026-11-08T13:38:12.992Z"
+    },
+    {
+      "id": "48_two_shared_lists",
+      "category": "graph",
+      "style": "ordinary",
+      "intent": "two list heads share a tail; logical lists overlap",
+      "stdout": "123 923\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 3,
+        "views": [
+          "two-list-views",
+          "shared-tail-dag"
+        ],
+        "require": "tail object identity not duplicated"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*next;}N;\nint digits(N*p){int n=0;while(p){n=n*10+p->v;p=p->next;}return n;}\nint main(void){N a={1,0},b={2,0},c={3,0},d={9,0};a.next=&b;b.next=&c;d.next=&b;printf(\"%d %d\\n\",digits(&a),digits(&d));return 0;}\n",
+      "sha256": "cdbb39255573b1975ea727f9ed6e44ecfe25e34b899ecba2df00f07f127b976b",
+      "predictedAt": "2026-11-08T13:38:12.993Z"
+    },
+    {
+      "id": "49_shared_dag_named_root",
+      "category": "graph",
+      "style": "controlled-representation-variant",
+      "intent": "two branches share one child; directed acyclic graph",
+      "stdout": "14\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "views": [
+          "dag"
+        ],
+        "forbid": "duplicating shared node to pretend unique-parent tree",
+        "invariance": "adding a root alias must preserve graph identity",
+        "pairedWith": "25_shared_dag"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int x;struct N*a,*b;}N;\nint sum(N*p){return p?p->x+sum(p->a)+sum(p->b):0;}\nint main(void){N n[4]={{1,0,0},{2,0,0},{3,0,0},{4,0,0}};n[0].a=&n[1];n[0].b=&n[2];n[1].a=&n[3];n[2].a=&n[3];N*root=n;printf(\"%d\\n\",sum(root));return 0;}\n\n",
+      "sha256": "f57c1305ff8d26ba69306b4cbf9493228f340ad72233d662ca3a18a32d6f927d",
+      "predictedAt": "2026-11-08T13:40:13.342Z"
+    },
+    {
+      "id": "50_parent_named_root",
+      "category": "tree",
+      "style": "controlled-representation-variant",
+      "intent": "binary tree with non-child parent references",
+      "stdout": "6\n",
+      "expected": {
+        "nodes": 3,
+        "childEdges": 2,
+        "parentEdges": 2,
+        "views": [
+          "tree-with-parent-overlay"
+        ],
+        "notError": "full pointer graph is cyclic but child projection is tree",
+        "invariance": "adding a root alias does not change child roles",
+        "pairedWith": "26_parent_backlinks"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{struct N*up,*a,*b;int x;}N;\nint sum(N*p){if(!p)return 0;return p->x+sum(p->a)+sum(p->b);}\nint main(void){N n[3]={{0,0,0,1},{0,0,0,2},{0,0,0,3}};n[0].a=&n[1];n[0].b=&n[2];n[1].up=&n[0];n[2].up=&n[0];\n int check=n[1].up->x+n[2].up->x;if(check!=2)return 1;N*root=n;printf(\"%d\\n\",sum(root));return 0;}\n\n",
+      "sha256": "15400604026e713c69250988b07ebec13946289bb39f7f0a159709be81f471d1",
+      "predictedAt": "2026-11-08T13:40:13.344Z"
+    },
+    {
+      "id": "51_tree_named_root",
+      "category": "tree",
+      "style": "controlled-representation-variant",
+      "intent": "tree and iteration chain over the same nodes",
+      "stdout": "15 5\n",
+      "expected": {
+        "nodes": 5,
+        "childEdges": 4,
+        "iterationEdges": 4,
+        "views": [
+          "tree",
+          "linked-list"
+        ],
+        "require": "simultaneous role-specific projections",
+        "invariance": "same tree and iteration overlay",
+        "pairedWith": "27_tree_iteration_overlay"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*l,*r,*order;}N;\nint sum(N*p){return p?p->v+sum(p->l)+sum(p->r):0;}\nint main(void){N n[5]={0};for(int i=0;i<5;i++){n[i].v=i+1;if(i<4)n[i].order=&n[i+1];}n[0].l=&n[1];n[0].r=&n[2];n[1].l=&n[3];n[1].r=&n[4];\n N*root=n;int count=0;for(N*p=root;p;p=p->order)count++;printf(\"%d %d\\n\",sum(root),count);return 0;}\n\n",
+      "sha256": "ec609d54dcfc28a7e29be7c85047280282f48b99d6157d3ba351ae12dd9a7ad0",
+      "predictedAt": "2026-11-08T13:40:13.344Z"
+    },
+    {
+      "id": "52_shared_heads",
+      "category": "graph",
+      "style": "controlled-representation-variant",
+      "intent": "two list heads share a tail; logical lists overlap",
+      "stdout": "123 923\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 3,
+        "views": [
+          "two-list-views",
+          "shared-tail-dag"
+        ],
+        "require": "tail object identity not duplicated",
+        "invariance": "explicit root aliases do not create new payload nodes",
+        "pairedWith": "48_two_shared_lists"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*next;}N;\nint digits(N*p){int n=0;while(p){n=n*10+p->v;p=p->next;}return n;}\nint main(void){N a={1,0},b={2,0},c={3,0},d={9,0};a.next=&b;b.next=&c;d.next=&b;N*one=&a,*two=&d;printf(\"%d %d\\n\",digits(one),digits(two));return 0;}\n\n",
+      "sha256": "b5ad732fca94bcfe82df9d14ed429c57c8d62996a16b403eb17dc35798521bb0",
+      "predictedAt": "2026-11-08T13:40:13.346Z"
+    },
+    {
+      "id": "53_shift_queue_helpers",
+      "category": "queue",
+      "style": "ordinary",
+      "intent": "same shifting FIFO with insert/remove helpers",
+      "stdout": "123\n",
+      "expected": {
+        "behavior": "fifo",
+        "pairedWith": "07_shift_queue",
+        "invariance": "extracting functions must not change queue meaning"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int a[8],used;}Q;\nvoid push(Q*q,int x){q->a[q->used]=x;q->used++;}int pop(Q*q){int v=q->a[0];for(int i=1;i<q->used;i++)q->a[i-1]=q->a[i];q->used--;return v;}\nint main(void){Q q={0};for(int i=1;i<=3;i++)push(&q,i);int out=0;while(q.used)out=out*10+pop(&q);printf(\"%d\\n\",out);return 0;}\n",
+      "sha256": "55844ced0efd71b547caa0496b720bb6f715020bc221e24d215c91189d3868e1",
+      "predictedAt": "2026-11-08T13:40:13.347Z"
+    },
+    {
+      "id": "54_flat_matrix_bits",
+      "category": "graph",
+      "style": "controlled-representation-variant",
+      "intent": "flat adjacency matrix and repeated full scans",
+      "stdout": "4\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "views": [
+          "flat-grid",
+          "adjacency-matrix"
+        ],
+        "stride": 4,
+        "invariance": "same 4-column flattened grid with equivalent integer address arithmetic",
+        "pairedWith": "22_flat_matrix"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int a[16]={0};a[0*4+1]=1;a[0*4+2]=1;a[1*4+3]=1;a[2*4+3]=1;int seen[4]={1,0,0,0};\n for(int repeat=0;repeat<4;repeat++)for(int i=0;i<4;i++)for(int j=0;j<4;j++)if(seen[i]&&a[(i<<2)|j])seen[j]=1;\n int result=0;for(int i=0;i<4;i++)result+=seen[i];printf(\"%d\\n\",result);return 0;}\n\n",
+      "sha256": "2022220bf0ccfcd86f694b44fdc8cf9b7308e70a6621f435d976d7e9f67f17b7",
+      "predictedAt": "2026-11-08T13:40:13.349Z"
+    },
+    {
+      "id": "55_circular_shifted_head",
+      "category": "list",
+      "style": "controlled-representation-variant",
+      "intent": "circular singly linked list",
+      "stdout": "10\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "views": [
+          "circular-list",
+          "directed-cycle"
+        ],
+        "notError": "termination is return to head",
+        "invariance": "rotating traversal start does not remove a payload node",
+        "pairedWith": "02_circular_single"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*next;}N;\nint main(void){N a[4]={{1,0},{2,0},{3,0},{4,0}};for(int i=0;i<4;i++)a[i].next=&a[(i+1)%4];N*h=&a[2],*p=h;int sum=0;\n do{sum+=p->v;p=p->next;}while(p!=h);printf(\"%d\\n\",sum);return 0;}\n\n",
+      "sha256": "36d24e4c256f5548a574791141589baadfa77d1c2d1d4f8a4e72c80c0b6b3c55",
+      "predictedAt": "2026-11-08T13:40:13.360Z"
+    },
+    {
+      "id": "56_real_sentinel",
+      "category": "list",
+      "style": "ordinary",
+      "intent": "circular list with an actual dummy node",
+      "stdout": "10\n",
+      "expected": {
+        "nodes": 4,
+        "sentinelNodes": 1,
+        "views": [
+          "circular-list"
+        ],
+        "pairedWith": "02_circular_single",
+        "require": "dummy is excluded; payload start in paired case is not"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*next;}N;\nint main(void){N a[4]={{1,0},{2,0},{3,0},{4,0}},anchor={999,0};anchor.next=a;for(int i=0;i<3;i++)a[i].next=&a[i+1];a[3].next=&anchor;\n N*head=&anchor;int sum=0;for(N*p=head->next;p!=head;p=p->next)sum+=p->v;printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "2dbe4925805341eaa3000bcb59dca51c1e58fc1eef8370d503732cf5ff021b31",
+      "predictedAt": "2026-11-08T13:40:13.360Z"
+    },
+    {
+      "id": "57_storage_reuse",
+      "category": "list",
+      "style": "ordinary",
+      "intent": "destroyed list followed by separately created list",
+      "stdout": "3 9\n",
+      "expected": {
+        "views": [
+          "list-lifetime-history"
+        ],
+        "require": "equal numerical addresses must not merge old and new object lifetimes"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*next;}N;\nint main(void){int results[2]={0};for(int round=0;round<2;round++){N*head=0;for(int i=0;i<2;i++){N*p=calloc(1,sizeof*p);if(!p){while(head){N*q=head;head=q->next;free(q);}return 1;}p->v=round*3+i+1;p->next=head;head=p;}\n for(N*p=head;p;p=p->next)results[round]+=p->v;while(head){N*p=head;head=p->next;free(p);}}\n printf(\"%d %d\\n\",results[0],results[1]);return 0;}\n",
+      "sha256": "4bf5d41db62581e8fdb5a9ddea1c0b96fe8c7de6b9c2dd2a99c636810ce79e6f",
+      "predictedAt": "2026-11-08T13:40:13.362Z"
+    },
+    {
+      "id": "58_permutation_gather",
+      "category": "ambiguous",
+      "style": "ordinary",
+      "intent": "permutation gather into a second array",
+      "stdout": "3142\n",
+      "expected": {
+        "views": [
+          "permutation",
+          "arrays"
+        ],
+        "ambiguous": "permutation also defines a graph; generic index graph is compatible, exclusive list intent is not"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int p[4]={2,0,3,1},a[4]={1,2,3,4},b[4]={0};for(int i=0;i<4;i++)b[i]=a[p[i]];int out=0;for(int i=0;i<4;i++)out=out*10+b[i];printf(\"%d\\n\",out);return 0;}\n",
+      "sha256": "b501282a0cf0396dc0e41c41d79d5eca807e128ef5c1b9feba2114a8d87db515",
+      "predictedAt": "2026-11-08T13:40:13.363Z"
+    },
+    {
+      "id": "59_flat_record_list",
+      "category": "list",
+      "style": "novice",
+      "intent": "list records manually packed into an integer array",
+      "stdout": "10\n",
+      "expected": {
+        "nodes": 4,
+        "views": [
+          "indexed-list",
+          "flat-record-grid"
+        ],
+        "require": "record fields implied by stride; no C struct available"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int a[12]={1,-1,2,4,3,-1,2,0,3,3,2,1};int i=0,sum=0;\n while(i!=-1){int base=i*3;int v=a[base];sum+=v;int next=a[base+2];i=next;}printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "9fbef9a5ab68cc986b02f5157a3906d2aee483e3b496e8d71218cf9dbddf7c71",
+      "predictedAt": "2026-11-08T13:40:13.365Z"
+    },
+    {
+      "id": "60_no_struct_pointer_list",
+      "category": "list",
+      "style": "unusual-valid",
+      "intent": "list nodes are two-slot void pointer arrays",
+      "stdout": "10\n",
+      "expected": {
+        "nodes": 4,
+        "views": [
+          "linked-list",
+          "nested-pointer-arrays"
+        ],
+        "require": "data role and next role without struct metadata"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int values[4]={1,2,3,4};void*nodes[4][2]={0};for(int i=0;i<4;i++){nodes[i][0]=&values[i];nodes[i][1]=i<3?nodes[i+1]:NULL;}\n int sum=0;void**p=nodes[0];while(p){sum+=*(int*)p[0];p=(void**)p[1];}printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "2c1d0a2d1239fd5240783aabaa1a3158dce98947dc262c55b8ffd2b6c155b557",
+      "predictedAt": "2026-11-08T13:40:13.367Z"
+    },
+    {
+      "id": "61_vertex_edge_objects",
+      "category": "graph",
+      "style": "professional",
+      "intent": "vertex objects and separate edge objects",
+      "stdout": "6\n",
+      "expected": {
+        "nodes": 3,
+        "edges": 3,
+        "views": [
+          "directed-graph",
+          "bipartite-storage"
+        ],
+        "require": "edge object next pointer is not a logical vertex edge"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct V V;typedef struct E{V*to;struct E*next;}E;struct V{int id,value;E*edges;};\nint main(void){V v[3]={{0,1,0},{1,2,0},{2,3,0}};E e[3]={{&v[1],0},{&v[2],0},{&v[2],0}};e[0].next=&e[1];v[0].edges=&e[0];v[1].edges=&e[2];\n V*q[3]={&v[0]};int seen[3]={1,0,0},h=0,t=1,sum=0;while(h<t){V*u=q[h++];sum+=u->value;for(E*p=u->edges;p;p=p->next)if(!seen[p->to->id]){seen[p->to->id]=1;q[t++]=p->to;}}\n printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "55147b385eb8ba8c14032f5f53717e0f9ebb0c5f185a95fd98f2de7dd99cd6ea",
+      "predictedAt": "2026-11-08T13:40:13.371Z"
+    },
+    {
+      "id": "62_negative_tree_names",
+      "category": "negative-control",
+      "style": "novice",
+      "intent": "field names resemble tree links but are scalar payload",
+      "stdout": "12\n",
+      "expected": {
+        "views": [
+          "record-array"
+        ],
+        "forbid": "inventing links from left/right/parent field names"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int left,right,parent;}Tree;\nint main(void){Tree nodes[3]={{1,2,0},{2,1,0},{3,2,1}};int sum=0;for(int i=0;i<3;i++)sum+=nodes[i].left+nodes[i].right+nodes[i].parent;printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "4be99a8a184b21f2812d668624c434428447f86e66e96d29dc2053318a408f73",
+      "predictedAt": "2026-11-08T13:40:13.372Z"
+    },
+    {
+      "id": "63_spaghetti_stack",
+      "category": "stack",
+      "style": "novice-inefficient",
+      "intent": "global LIFO using goto, repeated copies and helper-free control",
+      "stdout": "321\n",
+      "expected": {
+        "behavior": "lifo",
+        "views": [
+          "stack",
+          "array"
+        ],
+        "require": "same semantic behavior despite noncanonical control flow"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint data[12],copy[12],size;\nint main(void){int x=1,out=0;again:if(x>3)goto taking;for(int i=0;i<size;i++)copy[i]=data[i];copy[size]=x;\n for(int i=0;i<=size;i++)data[i]=copy[i];size=size+1;x=x+1;goto again;\n taking:if(size==0)goto done;int value=data[size-1];out=out*10+value;size=size-1;for(int i=0;i<size;i++){copy[i]=data[i];data[i]=copy[i];}goto taking;\n done:printf(\"%d\\n\",out);return 0;}\n",
+      "sha256": "e95d6d39fa48e6294fa0c18296f98a9ea728c340ce2e395865ef87acc57f059f",
+      "predictedAt": "2026-11-08T13:40:13.374Z"
+    },
+    {
+      "id": "64_graph_looks_like_tree",
+      "category": "ambiguous",
+      "style": "ordinary",
+      "intent": "general directed graph currently happens to be a tree",
+      "stdout": "6\n",
+      "expected": {
+        "nodes": 3,
+        "edges": 2,
+        "views": [
+          "directed-graph",
+          "tree-at-this-snapshot"
+        ],
+        "forbid": "claiming the programmer intended a tree from current topology alone"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct V{int value,count;struct V*out[3];}V;\nint main(void){V v[3]={{1,0,{0}},{2,0,{0}},{3,0,{0}}};v[0].out[v[0].count++]=&v[1];v[0].out[v[0].count++]=&v[2];int sum=v[0].value;\n for(int i=0;i<v[0].count;i++)sum+=v[0].out[i]->value;printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "61d50e75127ddac120eeae3ad43993c46228e0fcb6a74530a83152585685d254",
+      "predictedAt": "2026-11-08T13:40:13.375Z"
+    },
+    {
+      "id": "65_red_black_sentinel",
+      "category": "tree",
+      "style": "professional",
+      "intent": "red-black insertion with shared black nil sentinel",
+      "stdout": "28\n",
+      "expected": {
+        "nodes": 7,
+        "sentinelNodes": 1,
+        "views": [
+          "binary-tree",
+          "red-black-candidate"
+        ],
+        "require": "shared nil is terminal, not a shared payload child; colors are separate invariant evidence"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int key,red;struct N*l,*r,*p;}N;\nN nil;N*root;\nvoid left(N*x){N*y=x->r;x->r=y->l;if(y->l!=&nil)y->l->p=x;y->p=x->p;if(x->p==&nil)root=y;else if(x==x->p->l)x->p->l=y;else x->p->r=y;y->l=x;x->p=y;}\nvoid right(N*x){N*y=x->l;x->l=y->r;if(y->r!=&nil)y->r->p=x;y->p=x->p;if(x->p==&nil)root=y;else if(x==x->p->r)x->p->r=y;else x->p->l=y;y->r=x;x->p=y;}\nvoid insert(N*z){N*y=&nil,*x=root;while(x!=&nil){y=x;x=z->key<x->key?x->l:x->r;}z->p=y;if(y==&nil)root=z;else if(z->key<y->key)y->l=z;else y->r=z;z->l=z->r=&nil;z->red=1;\n while(z->p->red){if(z->p==z->p->p->l){N*u=z->p->p->r;if(u->red){z->p->red=0;u->red=0;z->p->p->red=1;z=z->p->p;}else{if(z==z->p->r){z=z->p;left(z);}z->p->red=0;z->p->p->red=1;right(z->p->p);}}\n else{N*u=z->p->p->l;if(u->red){z->p->red=0;u->red=0;z->p->p->red=1;z=z->p->p;}else{if(z==z->p->l){z=z->p;right(z);}z->p->red=0;z->p->p->red=1;left(z->p->p);}}}root->red=0;}\nint check(N*p,int lo,int hi){if(p==&nil)return 1;if(p->key<=lo||p->key>=hi)return -1;if(p->red&&(p->l->red||p->r->red))return -1;int l=check(p->l,lo,p->key),r=check(p->r,p->key,hi);return l<0||r<0||l!=r?-1:l+!p->red;}\nint sum(N*p){if(p==&nil)return 0;return p->key+sum(p->l)+sum(p->r);}\nint main(void){nil.l=nil.r=nil.p=&nil;root=&nil;N a[7]={0};for(int i=0;i<7;i++){a[i].key=i+1;insert(&a[i]);if(root->red||check(root,-1,100)<0)return 2;}printf(\"%d\\n\",sum(root));return 0;}\n",
+      "sha256": "b76166afd43b027ef828cef96af4d2e0b288f8d3b76def246c27b4726f44a322",
+      "predictedAt": "2026-11-08T13:43:41.717Z"
+    },
+    {
+      "id": "66_rope",
+      "category": "tree",
+      "style": "professional",
+      "intent": "rope with string leaves and subtree lengths",
+      "stdout": "bd\n",
+      "expected": {
+        "nodes": 3,
+        "views": [
+          "rope",
+          "binary-tree",
+          "string-leaves"
+        ],
+        "require": "weight and leaf bytes do not imply BST keys"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct R{int length,leftLength;const char*text;struct R*l,*r;}R;\nchar at(R*p,int k){if(p->text)return p->text[k];return k<p->leftLength?at(p->l,k):at(p->r,k-p->leftLength);}\nint main(void){R a={2,0,\"ab\",0,0},b={3,0,\"cde\",0,0},c={5,2,0,&a,&b};R*root=&c;printf(\"%c%c\\n\",at(root,1),at(root,3));return 0;}\n",
+      "sha256": "f29c191f71611750eb3bdab4e087c8c7a792d1ab894dbb01e1b307febe2245bc",
+      "predictedAt": "2026-11-08T13:43:41.719Z"
+    },
+    {
+      "id": "67_tagged_expression",
+      "category": "tree",
+      "style": "professional",
+      "intent": "expression tree uses a tag and union payload",
+      "stdout": "14\n",
+      "expected": {
+        "nodes": 5,
+        "edges": 4,
+        "views": [
+          "expression-tree",
+          "tagged-records"
+        ],
+        "require": "only selected union member is interpreted"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N N;struct N{int tag;union{int value;struct{N*l,*r;}pair;}u;};\nint eval(N*p){if(p->tag==0)return p->u.value;if(p->tag==1)return eval(p->u.pair.l)+eval(p->u.pair.r);return eval(p->u.pair.l)*eval(p->u.pair.r);}\nint main(void){N a={.tag=0,.u.value=2},b={.tag=0,.u.value=3},c={.tag=0,.u.value=4},m={.tag=2,.u.pair={&b,&c}},s={.tag=1,.u.pair={&a,&m}};N*root=&s;printf(\"%d\\n\",eval(root));return 0;}\n",
+      "sha256": "6741bebec7696a0ffaf5def6a6e80dac2c08d009ee52d1e42dd8207d3d22d86f",
+      "predictedAt": "2026-11-08T13:43:41.720Z"
+    },
+    {
+      "id": "68_dual_membership",
+      "category": "list",
+      "style": "professional",
+      "intent": "same nodes have two independent list memberships",
+      "stdout": "1234 4321\n",
+      "expected": {
+        "nodes": 4,
+        "views": [
+          "two-lists",
+          "shared-storage"
+        ],
+        "require": "opposite ordering fields are independent lists, not one forced cyclic tree"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*a,*b;}N;\nint forward(N*p){int n=0;while(p){n=n*10+p->v;p=p->a;}return n;}int backward(N*p){int n=0;while(p){n=n*10+p->v;p=p->b;}return n;}\nint main(void){N a[4]={0};for(int i=0;i<4;i++){a[i].v=i+1;if(i<3)a[i].a=&a[i+1];if(i>0)a[i].b=&a[i-1];}N*h1=a,*h2=&a[3];printf(\"%d %d\\n\",forward(h1),backward(h2));return 0;}\n",
+      "sha256": "f8a84578faab1318d2180e9d9d0ac5b06711b2c943f9e28bae639fe794b066e2",
+      "predictedAt": "2026-11-08T13:43:41.721Z"
+    },
+    {
+      "id": "69_persistent_versions",
+      "category": "tree",
+      "style": "professional",
+      "intent": "two immutable tree versions share one leaf",
+      "stdout": "6 10\n",
+      "expected": {
+        "physicalNodes": 6,
+        "versionNodeCounts": [
+          3,
+          4
+        ],
+        "views": [
+          "two-tree-versions",
+          "sharing-dag"
+        ],
+        "require": "equal payloads do not merge different nodes; shared leaf is not copied"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*l,*r;}N;\nint sum(N*p){return p?p->v+sum(p->l)+sum(p->r):0;}\nint main(void){N a={1,0,0},b={3,0,0},r1={2,&a,&b},c={4,0,0},b2={3,0,&c},r2={2,&a,&b2};N*versions[2]={&r1,&r2};\n int results[2];for(int i=0;i<2;i++)results[i]=sum(versions[i]);printf(\"%d %d\\n\",results[0],results[1]);return 0;}\n",
+      "sha256": "b1b2f14234dc8dc59aff8fc64fb6a8679ef227cd23965b29c2133530c05d64cd",
+      "predictedAt": "2026-11-08T13:43:41.722Z"
+    },
+    {
+      "id": "70_input_chain",
+      "category": "input-dependent",
+      "style": "ordinary",
+      "intent": "same source builds a chain for input zero",
+      "stdout": "6\n",
+      "expected": {
+        "nodes": 3,
+        "edges": 2,
+        "shape": "chain",
+        "pairedWith": "71_input_tree"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*a,*b;}N;\nint sum(N*p){if(!p)return 0;return p->v+sum(p->a)+sum(p->b);}\nint main(void){int mode;if(scanf(\"%d\",&mode)!=1)return 1;N n[3]={{1,0,0},{2,0,0},{3,0,0}};N*root=n;n[0].a=&n[1];if(mode)n[0].b=&n[2];else n[1].a=&n[2];printf(\"%d\\n\",sum(root));return 0;}\n",
+      "stdin": "0\n",
+      "sha256": "4622988d95b4469a6ecc06252dca2e34526b443b4548e665483ca5455ad66a3c",
+      "predictedAt": "2026-11-08T13:43:41.723Z"
+    },
+    {
+      "id": "71_input_tree",
+      "category": "input-dependent",
+      "style": "ordinary",
+      "intent": "same source builds a branching tree for input one",
+      "stdout": "6\n",
+      "expected": {
+        "nodes": 3,
+        "edges": 2,
+        "shape": "branching-tree",
+        "pairedWith": "70_input_chain"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*a,*b;}N;\nint sum(N*p){if(!p)return 0;return p->v+sum(p->a)+sum(p->b);}\nint main(void){int mode;if(scanf(\"%d\",&mode)!=1)return 1;N n[3]={{1,0,0},{2,0,0},{3,0,0}};N*root=n;n[0].a=&n[1];if(mode)n[0].b=&n[2];else n[1].a=&n[2];printf(\"%d\\n\",sum(root));return 0;}\n",
+      "stdin": "1\n",
+      "sha256": "4622988d95b4469a6ecc06252dca2e34526b443b4548e665483ca5455ad66a3c",
+      "predictedAt": "2026-11-08T13:43:41.723Z"
+    },
+    {
+      "id": "72_dynamic_index_arena",
+      "category": "list",
+      "style": "novice-inefficient",
+      "intent": "record arena grows one slot at a time while links remain indices",
+      "stdout": "10\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 3,
+        "views": [
+          "dynamic-array",
+          "indexed-list"
+        ],
+        "require": "allocation relocation does not invalidate logical integer links"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int v,next;}N;typedef struct{N*a;int len,cap;}G;\nint append(G*g,int v){N*p=realloc(g->a,(g->len+1)*sizeof*p);if(!p)return 0;g->a=p;g->cap=g->len+1;int i=g->len;g->a[i].v=v;g->a[i].next=-1;if(i)g->a[i-1].next=i;g->len++;return 1;}\nint main(void){G g={0};for(int i=1;i<=4;i++)if(!append(&g,i)){free(g.a);return 1;}int sum=0;for(int i=0;i!=-1;i=g.a[i].next)sum+=g.a[i].v;printf(\"%d\\n\",sum);free(g.a);return 0;}\n",
+      "sha256": "4bb871e3ead62cc10d66f2d2837cbd04078bf2332a4c31af838dc9fcbd030f45",
+      "predictedAt": "2026-11-08T13:43:41.724Z"
+    },
+    {
+      "id": "73_renamed_reordered_dag",
+      "category": "graph",
+      "style": "controlled-representation-variant",
+      "intent": "same shared DAG with opaque names and reordered fields",
+      "stdout": "14\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "pairedWith": "49_shared_dag_named_root",
+        "require": "same topology despite type/field/variable/function renaming and member layout change"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct Qx{struct Qx*Mz;int Wu;struct Qx*Ax;}Qx;\nint Fp(Qx*Rt){return Rt?Rt->Wu+Fp(Rt->Ax)+Fp(Rt->Mz):0;}\nint main(void){Qx Jk[4]={{.Wu=1},{.Wu=2},{.Wu=3},{.Wu=4}};Jk[0].Ax=&Jk[1];Jk[0].Mz=&Jk[2];Jk[1].Ax=&Jk[3];Jk[2].Ax=&Jk[3];Qx*Zz=Jk;printf(\"%d\\n\",Fp(Zz));return 0;}\n",
+      "sha256": "e1315d5f5abf3694d4b665b6cfae8e0f36f9666b50bcac43137157523f1fc3aa",
+      "predictedAt": "2026-11-08T13:46:12.037Z"
+    },
+    {
+      "id": "74_wide_heap",
+      "category": "heap",
+      "style": "controlled-representation-variant",
+      "intent": "same heap with 64-bit payloads and 32-bit indices",
+      "stdout": "12345\n",
+      "expected": {
+        "nodes": 5,
+        "views": [
+          "heap",
+          "implicit-binary-tree"
+        ],
+        "require": "element byte width is not an inference shortcut",
+        "pairedWith": "29_binary_heap"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{long long a[8];int n;}H;\nvoid put(H*h,long long v){int i=h->n++;while(i>0){int p=(i-1)/2;if(h->a[p]<=v)break;h->a[i]=h->a[p];i=p;}h->a[i]=v;}\nlong long take(H*h){long long out=h->a[0],v=h->a[--h->n];int i=0;while(2*i+1<h->n){int c=2*i+1;if(c+1<h->n&&h->a[c+1]<h->a[c])c++;if(v<=h->a[c])break;h->a[i]=h->a[c];i=c;}if(h->n)h->a[i]=v;return out;}\nint main(void){H h={0};int in[5]={5,1,4,2,3};for(int i=0;i<5;i++)put(&h,in[i]);long long out=0;while(h.n)out=out*10+take(&h);printf(\"%lld\\n\",out);return 0;}\n\n",
+      "sha256": "476c537380d43bdb99233d43a07d115891a8e59ae73b7d3d759a28d50474ec35",
+      "predictedAt": "2026-11-08T13:46:12.039Z"
+    },
+    {
+      "id": "75_macro_list",
+      "category": "list",
+      "style": "ordinary",
+      "intent": "list insertion and traversal expressed through macros",
+      "stdout": "321\n",
+      "expected": {
+        "nodes": 3,
+        "views": [
+          "linked-list"
+        ],
+        "require": "macro expansion must retain root/field identity"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int v;struct N*n;}N;\n#define PUSH(h,o) do{(o)->n=(h);(h)=(o);}while(0)\n#define NEXT(p) ((p)->n)\nint main(void){N a[3]={{1,0},{2,0},{3,0}},*head=0;for(int i=0;i<3;i++)PUSH(head,&a[i]);int out=0;for(N*p=head;p;p=NEXT(p))out=out*10+p->v;printf(\"%d\\n\",out);return 0;}\n",
+      "sha256": "0f06435e8c4672420dbda50ecd948e1e6d1818ca8fe63814765c29bdc8d32b8c",
+      "predictedAt": "2026-11-08T13:46:12.041Z"
+    },
+    {
+      "id": "76_separate_vector_state",
+      "category": "array",
+      "style": "novice-inefficient",
+      "intent": "dynamic vector state in separate globals, no owner struct",
+      "stdout": "4 10\n",
+      "expected": {
+        "views": [
+          "dynamic-array"
+        ],
+        "require": "pointer/count/capacity can live in separate storage objects"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint*buffer;int count,capacity;\nint push(int x){if(count==capacity){int*p=realloc(buffer,(capacity+1)*sizeof*p);if(!p)return 0;buffer=p;capacity++;}buffer[count]=x;count++;return 1;}\nint main(void){for(int i=1;i<=4;i++)if(!push(i)){free(buffer);return 1;}int sum=0;for(int i=0;i<count;i++)sum+=buffer[i];printf(\"%d %d\\n\",count,sum);free(buffer);return 0;}\n",
+      "sha256": "4d5255a0799bacde138da577646c210b7a58c5b96ee75a6b988990d6c453324d",
+      "predictedAt": "2026-11-08T13:46:12.042Z"
+    },
+    {
+      "id": "77_csr_weighted_parallel",
+      "category": "graph",
+      "style": "professional",
+      "intent": "CSR graph with parallel destination and weight arrays",
+      "stdout": "5\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "views": [
+          "csr",
+          "weighted-graph"
+        ],
+        "zeroWeightValid": true,
+        "require": "offset, target and weight roles linked by edge cursor"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int start[5]={0,2,3,4,4},dst[4]={1,3,2,3},cost[4]={0,7,2,1},d[4]={0,999,999,999};\n for(int pass=0;pass<3;pass++)for(int u=0;u<4;u++)for(int e=start[u];e<start[u+1];e++)if(d[u]+cost[e]<d[dst[e]])d[dst[e]]=d[u]+cost[e];\n printf(\"%d\\n\",d[0]+d[1]+d[2]+d[3]);return 0;}\n",
+      "sha256": "b59f28dd35ca6f2b10d108bb9ee38f4445f5d8b9c4a47e05a43433f70df27125",
+      "predictedAt": "2026-11-08T13:46:12.043Z"
+    },
+    {
+      "id": "78_relative_offset_list",
+      "category": "list",
+      "style": "professional",
+      "intent": "arena links encode relative byte offsets rather than element indices",
+      "stdout": "10\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 3,
+        "views": [
+          "offset-list"
+        ],
+        "require": "byte stride conversion and allocation identity retained"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct{int value,next;}N;\nint main(void){N*a=calloc(4,sizeof*a);if(!a)return 1;int order[4]={0,2,3,1};for(int i=0;i<4;i++){a[order[i]].value=i+1;a[order[i]].next=i==3?-1:(int)(order[i+1]*sizeof*a);}\n unsigned char*base=(unsigned char*)a;int at=0,sum=0;while(at!=-1){N*p=(N*)(base+at);sum+=p->value;at=p->next;}\n printf(\"%d\\n\",sum);free(a);return 0;}\n",
+      "sha256": "4701c3369d3d5de31e44d0513ec2d0cabb84f2873b34304d5cba428be592e032",
+      "predictedAt": "2026-11-08T13:46:12.044Z"
+    },
+    {
+      "id": "79_parallel_edge_list",
+      "category": "graph",
+      "style": "novice",
+      "intent": "edge list split across unrelated-looking integer arrays",
+      "stdout": "5\n",
+      "expected": {
+        "nodes": 4,
+        "edges": 4,
+        "pairedWith": "19_edge_relaxation",
+        "views": [
+          "edge-list",
+          "weighted-graph"
+        ],
+        "require": "edge cursor joins source/target/weight roles without structs"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int p[4]={0,1,0,2},q[4]={1,2,3,3},r[4]={0,2,7,1},d[4]={0,999,999,999};\n for(int repeat=0;repeat<3;repeat++)for(int i=0;i<4;i++){int from=p[i],to=q[i],weight=r[i];int maybe=d[from]+weight;if(maybe<d[to])d[to]=maybe;}\n printf(\"%d\\n\",d[0]+d[1]+d[2]+d[3]);return 0;}\n",
+      "sha256": "2f0fd0ae3f9295c70f8bc6e2a447dfce27ba88576385fdabb96bcbf37e1a4e6c",
+      "predictedAt": "2026-11-08T13:46:12.045Z"
+    },
+    {
+      "id": "80_tree_without_heap_order",
+      "category": "tree",
+      "style": "ordinary",
+      "intent": "complete binary tree with unordered payloads; no heap intent",
+      "stdout": "28\n",
+      "expected": {
+        "nodes": 7,
+        "edges": 6,
+        "views": [
+          "implicit-binary-tree"
+        ],
+        "forbid": "failure of heap ordering treated as malformed generic tree"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint main(void){int a[7]={4,1,7,3,6,2,5},queue[7]={0},head=0,tail=1,sum=0;while(head<tail){int u=queue[head++];sum+=a[u];int l=2*u+1,r=2*u+2;if(l<7)queue[tail++]=l;if(r<7)queue[tail++]=r;}\n printf(\"%d\\n\",sum);return 0;}\n",
+      "sha256": "34d26a932f25618ce6a50181c1f8a7c354340eb5d7bda6d140fe91e7ef1f2ffa",
+      "predictedAt": "2026-11-08T13:46:12.047Z"
+    },
+    {
+      "id": "81_tentative_minimal",
+      "category": "backend-isolation",
+      "style": "minimal-normal-C",
+      "intent": "isolate uninitialized file-scope declaration with required C zero initialization",
+      "stdout": "7\n",
+      "expected": {
+        "structure": "scalar",
+        "prediction": "C requires g initially zero; backend behavior is under investigation"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\nint g;int main(void){g+=7;printf(\"%d\n\",g);return 0;}\n",
+      "sha256": "0397afb1655842cadf087c87dfa7db535e01540b1ed1173d93f2e6ca998ba9b6",
+      "predictedAt": "2026-11-08T13:47:38.777Z",
+      "excluded": true,
+      "exclusionReason": "Audit generator escaped C string newline incorrectly; rejected before API. Not a model failure or intentional error test.",
+      "excludedSourceArtifact": "test-results/codex_code-results/structure-diversity-2026-11-08/81_tentative_minimal/source-rejected.c.txt"
+    },
+    {
+      "id": "82_spaghetti_explicit_zero",
+      "category": "stack",
+      "style": "controlled-zero-initialization-variant",
+      "intent": "global LIFO using goto, repeated copies and helper-free control",
+      "stdout": "321\n",
+      "expected": {
+        "behavior": "lifo",
+        "views": [
+          "stack",
+          "array"
+        ],
+        "require": "same semantic behavior despite noncanonical control flow",
+        "pairedWith": "63_spaghetti_stack",
+        "distinction": "explicit initializers; same C initial values; separate actual run, not repaired original trace"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint data[12]={0},copy[12]={0},size=0;\nint main(void){int x=1,out=0;again:if(x>3)goto taking;for(int i=0;i<size;i++)copy[i]=data[i];copy[size]=x;\n for(int i=0;i<=size;i++)data[i]=copy[i];size=size+1;x=x+1;goto again;\n taking:if(size==0)goto done;int value=data[size-1];out=out*10+value;size=size-1;for(int i=0;i<size;i++){copy[i]=data[i];data[i]=copy[i];}goto taking;\n done:printf(\"%d\\n\",out);return 0;}\n\n",
+      "sha256": "58ba4a524c9c20d4faf0b6cc5107e6c4c3425a8297bfe10dbeac5c05979ca89c",
+      "predictedAt": "2026-11-08T13:47:38.779Z"
+    },
+    {
+      "id": "83_rb_explicit_zero",
+      "category": "tree",
+      "style": "controlled-zero-initialization-variant",
+      "intent": "red-black insertion with shared black nil sentinel",
+      "stdout": "28\n",
+      "expected": {
+        "nodes": 7,
+        "sentinelNodes": 1,
+        "views": [
+          "binary-tree",
+          "red-black-candidate"
+        ],
+        "require": "shared nil is terminal, not a shared payload child; colors are separate invariant evidence",
+        "pairedWith": "65_red_black_sentinel",
+        "distinction": "explicit initializers; same C initial values; separate actual run, not repaired original trace"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\ntypedef struct N{int key,red;struct N*l,*r,*p;}N;\nN nil={0};N*root=0;\nvoid left(N*x){N*y=x->r;x->r=y->l;if(y->l!=&nil)y->l->p=x;y->p=x->p;if(x->p==&nil)root=y;else if(x==x->p->l)x->p->l=y;else x->p->r=y;y->l=x;x->p=y;}\nvoid right(N*x){N*y=x->l;x->l=y->r;if(y->r!=&nil)y->r->p=x;y->p=x->p;if(x->p==&nil)root=y;else if(x==x->p->r)x->p->r=y;else x->p->l=y;y->r=x;x->p=y;}\nvoid insert(N*z){N*y=&nil,*x=root;while(x!=&nil){y=x;x=z->key<x->key?x->l:x->r;}z->p=y;if(y==&nil)root=z;else if(z->key<y->key)y->l=z;else y->r=z;z->l=z->r=&nil;z->red=1;\n while(z->p->red){if(z->p==z->p->p->l){N*u=z->p->p->r;if(u->red){z->p->red=0;u->red=0;z->p->p->red=1;z=z->p->p;}else{if(z==z->p->r){z=z->p;left(z);}z->p->red=0;z->p->p->red=1;right(z->p->p);}}\n else{N*u=z->p->p->l;if(u->red){z->p->red=0;u->red=0;z->p->p->red=1;z=z->p->p;}else{if(z==z->p->l){z=z->p;right(z);}z->p->red=0;z->p->p->red=1;left(z->p->p);}}}root->red=0;}\nint check(N*p,int lo,int hi){if(p==&nil)return 1;if(p->key<=lo||p->key>=hi)return -1;if(p->red&&(p->l->red||p->r->red))return -1;int l=check(p->l,lo,p->key),r=check(p->r,p->key,hi);return l<0||r<0||l!=r?-1:l+!p->red;}\nint sum(N*p){if(p==&nil)return 0;return p->key+sum(p->l)+sum(p->r);}\nint main(void){nil.l=nil.r=nil.p=&nil;root=&nil;N a[7]={0};for(int i=0;i<7;i++){a[i].key=i+1;insert(&a[i]);if(root->red||check(root,-1,100)<0)return 2;}printf(\"%d\\n\",sum(root));return 0;}\n\n",
+      "sha256": "06aaa6cb4eb74940816c616d1142abf8931efefd0cc021dfb5273dcf2f266595",
+      "predictedAt": "2026-11-08T13:47:38.780Z"
+    },
+    {
+      "id": "84_vector_explicit_zero",
+      "category": "array",
+      "style": "controlled-zero-initialization-variant",
+      "intent": "dynamic vector state in separate globals, no owner struct",
+      "stdout": "4 10\n",
+      "expected": {
+        "views": [
+          "dynamic-array"
+        ],
+        "require": "pointer/count/capacity can live in separate storage objects",
+        "pairedWith": "76_separate_vector_state",
+        "distinction": "explicit initializers; same C initial values; separate actual run, not repaired original trace"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\n\nint*buffer=0;int count=0,capacity=0;\nint push(int x){if(count==capacity){int*p=realloc(buffer,(capacity+1)*sizeof*p);if(!p)return 0;buffer=p;capacity++;}buffer[count]=x;count++;return 1;}\nint main(void){for(int i=1;i<=4;i++)if(!push(i)){free(buffer);return 1;}int sum=0;for(int i=0;i<count;i++)sum+=buffer[i];printf(\"%d %d\\n\",count,sum);free(buffer);return 0;}\n\n",
+      "sha256": "865bbbf60c590bcf9bf325df54fdef0a14595520722df25081c628dc2d09d836",
+      "predictedAt": "2026-11-08T13:47:38.781Z"
+    },
+    {
+      "id": "85_initialized_minimal",
+      "category": "backend-isolation",
+      "style": "minimal-normal-C",
+      "intent": "same scalar with explicit zero initializer",
+      "stdout": "7\n",
+      "expected": {
+        "structure": "scalar",
+        "pairedWith": "81_tentative_minimal"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\nint g=0;int main(void){g+=7;printf(\"%d\n\",g);return 0;}\n",
+      "sha256": "14f1e6df0edfc43df853d68f14bda87f2eb086738c1c4129b4262f843ad87606",
+      "predictedAt": "2026-11-08T13:47:38.792Z",
+      "excluded": true,
+      "exclusionReason": "Audit generator escaped C string newline incorrectly; rejected before API. Not a model failure or intentional error test.",
+      "excludedSourceArtifact": "test-results/codex_code-results/structure-diversity-2026-11-08/85_initialized_minimal/source-rejected.c.txt"
+    },
+    {
+      "id": "86_tentative_minimal_corrected",
+      "category": "backend-isolation",
+      "style": "minimal-normal-C",
+      "intent": "tentative global definition",
+      "stdout": "7\n",
+      "expected": {
+        "structure": "scalar",
+        "initial": 0
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\nint g;int main(void){g+=7;printf(\"%d\\n\",g);return 0;}\n",
+      "sha256": "eed8c94440ae32eab8ead99f045abf829078e129cf705a480200a5a79a8f6f23",
+      "predictedAt": "2026-11-08T13:48:24.544Z"
+    },
+    {
+      "id": "87_initialized_minimal_corrected",
+      "category": "backend-isolation",
+      "style": "minimal-normal-C",
+      "intent": "explicitly initialized global definition",
+      "stdout": "7\n",
+      "expected": {
+        "structure": "scalar",
+        "initial": 0,
+        "pairedWith": "86_tentative_minimal_corrected"
+      },
+      "source": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stddef.h>\nint g=0;int main(void){g+=7;printf(\"%d\\n\",g);return 0;}\n",
+      "sha256": "cfc416498cf5e95652caf0eb72a04c2127350628ba1584e50267ba8133cd64fb",
+      "predictedAt": "2026-11-08T13:48:24.545Z"
+    }
+  ]
+}

@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import * as generation from '../scripts/model/index.mjs';
-import {inferStructures,inferStructuresAsync,createInferenceView,queryBSTOrder} from '../scripts/inference/index.mjs';
+import {inferStructures,inferStructuresAsync,createInferenceView,queryBSTOrder,decodeInference} from '../scripts/inference/index.mjs';
 import {traceWithInference} from '../scripts/pipeline/trace-with-inference.mjs';
 import {recordObservedTrace} from '../scripts/model/recorded-result.mjs';
 
@@ -87,6 +87,10 @@ test('independent CLI consumes saved IR without C source and writes only inferen
     assert.match(cli.stdout,/completed/);assert.deepEqual(await fs.readdir(output),['inference.json']);
     const inference=JSON.parse(await fs.readFile(path.join(output,'inference.json'),'utf8'));
     assert.deepEqual(inference,inferStructures(result.plan,result.trace,{observationPlan:result.observations.plan,observedTrace:result.observations.trace}));
+    const sharedOutput=path.join(folder,'shared');
+    await exec(process.execPath,['scripts/infer-structures.mjs',folder,'--out-dir',sharedOutput,'--shared'],{cwd:root});
+    const shared=JSON.parse(await fs.readFile(path.join(sharedOutput,'inference.json'),'utf8'));
+    assert.equal(shared.encoding,'inference-shared-v1');assert.deepEqual(decodeInference(shared),inference);
     assert.deepEqual(await Promise.all(['plan.json','trace.json'].map(f=>fs.readFile(path.join(folder,f),'utf8'))),before);
   }finally{
     assert.equal(path.dirname(path.resolve(folder)),path.resolve(tmpdir()));

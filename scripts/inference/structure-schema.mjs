@@ -12,6 +12,7 @@ import {validateSequenceLookups} from './sequence-contract.mjs';
 import {validateStorageSemantics} from './semantic-contract.mjs';
 import {validateExtendedSemantics} from './extension-contract.mjs';
 import {validateStateHistory} from './state-history.mjs';
+import {verificationStates,historyProofSize} from './history-evidence.mjs';
 // Visualization metadata is validated independently of execution recording.
 export function validateStructureTrace(plan,trace){
   validateStorageSemantics(plan,trace);
@@ -23,8 +24,10 @@ export function validateStructureTrace(plan,trace){
   const objects=new Map((trace.objects??[]).map(o=>[o.id,o])),structureViews=new Map((trace.views??[]).map(v=>[v.id,v]));
   for(const s of trace.structures??[]){
     if(s.states)validateStateHistory(s,positions);
-    if(s.proofStates){const count=s.proofStates.reduce((n,st)=>n+st.nodes.length,0);
-      if(s.kind!=='range-aggregate-candidate'||!Number.isSafeInteger(s.coverage?.maxProofNodes)||count>s.coverage.maxProofNodes||count!==s.coverage.retainedProofNodes)
+    if(s.proofStates){const count=s.proofStates.reduce((n,st)=>n+historyProofSize(s,st),0),proofIds=s.proofStates.map(st=>st.afterExecutionId);
+      if(!['range-aggregate-candidate','linked-structure','rooted-index-structure','index-tree'].includes(s.kind)||
+        new Set(proofIds).size!==proofIds.length||proofIds.some(id=>!positions.has(id)||s.states.some(st=>st.afterExecutionId===id))||
+        !Number.isSafeInteger(s.coverage?.maxProofNodes)||count>s.coverage.maxProofNodes||count!==s.coverage.retainedProofNodes)
         throw new Error('추론 판정 근거의 보관 한도가 올바르지 않습니다.');}
     if(s.kind==='array-work'){
       const arrays=new Map(s.arrays.map(a=>[a.arrayId,a])),transfers=new Set(s.transfers.map(t=>t.id)),temps=new Set(s.temporaries.map(t=>t.id));
@@ -71,7 +74,20 @@ export function validateStructureTrace(plan,trace){
       for(const evidence of [...s.formulaEvidence,...s.comparisonEvidence])
         if(!ids.has(evidence.executionId)||[...evidence.inputExecutionIds??[],...evidence.readExecutionIds??[]].some(id=>!ids.has(id)))
           throw new Error('인덱스 관계의 실행 근거가 없습니다.');
-      for(const state of s.states){
+      for(const p of s.formulaEvidence){
+       if(JSON.stringify([...new Set((p.derivedAccesses??[]).map(a=>a.executionId))])!==JSON.stringify(p.derivedAccessExecutionIds??[]))
+         throw new Error('인덱스 산식의 주소 접근 목록이 일치하지 않습니다.');
+       for(const access of p.derivedAccesses??[]){
+        const e=executions.get(access.executionId),calc=executions.get(p.executionId),step=calc?.steps?.find(x=>x.nodeId===p.sourceNodeId),seen=new Set(),pending=[...e?.addressInputs??[]],
+          r=access.direction==='copy-source'&&e?.action==='copy'?{objectId:e.sourceObjectId,offset:e.sourceOffset??0,size:e.sourceSize??e.target?.size}:e?.target;
+        while(pending.length){const id=pending.pop();if(seen.has(id))continue;seen.add(id);pending.push(...executions.get(id)?.dataInputs??[]);}
+        if(!step||!seen.has(p.executionId)||r?.objectId!==s.objectId||
+          ['objectId','offset','size'].some(k=>r[k]!==access.range?.[k])||access.index!==p.output||
+          Math.floor((r.offset-s.range.offset)/s.elementBytes)!==p.output||Number(step.value?.decimal??step.value?.signed)!==p.output)
+          throw new Error('인덱스 산식과 실제 원소 주소 출처가 다릅니다.');
+       }
+      }
+      for(const state of verificationStates(s,positions)){
         if(!ids.has(state.afterExecutionId)||!['satisfied','violated','unknown'].includes(state.max.status)||!['satisfied','violated','unknown'].includes(state.min.status))
           throw new Error('인덱스 트리 상태의 사건 또는 순서 검사 상태가 올바르지 않습니다.');
       }
@@ -110,7 +126,7 @@ export function validateStructureTrace(plan,trace){
       const nodes=new Set(s.logicalNodes.map(n=>n.id));
       for(const n of s.logicalNodes)if(!objects.has(n.objectId)||n.offset<0||n.size<=0||n.offset+n.size>objects.get(n.objectId).size)
         throw new Error('논리 노드가 실제 저장 범위를 벗어납니다.');
-      for(const state of s.states){
+      for(const state of verificationStates(s,positions)){
         if(!ids.has(state.afterExecutionId))throw new Error('연결 구조 상태의 실행 사건이 없습니다.');
         for(const id of [...state.activeMembers,...state.detachedMembers,...state.endedMembers,...state.orders.flatMap(o=>o.nodeIds)])
           if(!nodes.has(id))throw new Error('연결 구조 상태의 논리 노드가 없습니다.');
@@ -125,7 +141,7 @@ export function validateStructureTrace(plan,trace){
         (state.length>state.capacity||state.byteOffset+state.capacity*state.elementBytes>objects.get(state.backingObjectId).size))throw new Error('동적 배열 후보가 실제 저장 범위를 벗어납니다.');
     }
   }
-  validateStructureOverlays(trace);
+  validateStructureOverlays(trace,plan);
   validateRecordIndexStructures(trace);
   validateLinkedProjections(trace);
   validateValueIndexStructures(trace);

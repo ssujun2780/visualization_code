@@ -1,0 +1,2 @@
+#include <stdio.h>
+typedef struct{int a,b,w;}E;E edges[3]={{0,1,1},{1,2,2},{2,3,3}},copy[3];int p[4]={0,0,0,0};int main(void){int s=0;for(int i=0;i<3;i++){copy[i]=edges[i];s+=copy[i].w;}printf("%d ",s);return 0;}

@@ -1,5 +1,6 @@
 // Source/animation IR closes a function field after its returned value reaches
 // the recorded receiver. C execution and raw lifetime observations stay intact.
+import {inputSourceIds} from '../shared/address-origin.mjs';
 const unique=a=>[...new Set(a)];
 const referenceKeys=new Set(['eventId','executionId','dataInputs','addressInputs','controlInputs','calleeInputs','storageDataInputs']);
 const location=e=>({executionId:e.eventId,instructionId:e.instructionId,activationId:e.activationId,
@@ -12,7 +13,7 @@ export function returnTransfers(events,deliveries,plan){
     definitions=new Map((plan?.instructions??[]).map(d=>[d.id,d]));
   for(const e of events){
     if(e.phase!=='complete'||e.kind==='SPACE')continue;
-    for(const id of unique([...(e.inputs??[]).map(i=>i.executionId),...e.addressInputs??[],...e.calleeInputs??[]].filter(Boolean))){
+    for(const id of unique([...(e.inputs??[]).flatMap(inputSourceIds),...e.addressInputs??[],...e.calleeInputs??[]].filter(Boolean))){
       if(!uses.has(id))uses.set(id,[]);uses.get(id).push(e);
     }
     if(e.action==='argument'&&e.callExecutionId){if(!argumentsByCall.has(e.callExecutionId))argumentsByCall.set(e.callExecutionId,[]);argumentsByCall.get(e.callExecutionId).push(e);}
@@ -33,7 +34,7 @@ export function returnTransfers(events,deliveries,plan){
         if(next.length){for(const e of next)queue.push({event:e,producer:event.eventId});continue;}
       }
       if(event.action==='call'){
-        const parameters=(argumentsByCall.get(event.eventId)??[]).filter(e=>(e.inputs??[]).some(i=>i.executionId===producer));
+        const parameters=(argumentsByCall.get(event.eventId)??[]).filter(e=>(e.inputs??[]).some(i=>inputSourceIds(i).includes(producer)));
         if(parameters.length){for(const e of parameters)queue.push({event:e,producer});continue;}
       }
       receivers.set(event.eventId,location(event));
@@ -79,12 +80,18 @@ export function remapExecutionReferences(value,mapping,seen=new WeakSet()){
   }
 }
 
-export function orderReturnCleanup(events,deliveries,plan){
+export function orderReturnCleanup(events,deliveries,plan,{running=false}={}){
   const positions=new Map(events.map((e,i)=>[e.eventId,i])),byId=new Map(events.map(e=>[e.eventId,e])),
     transfers=returnTransfers(events,deliveries,plan),pending=new Map(),moved=new Set();
   for(const [i,e]of events.entries())e.recordedOrder=i;
   for(const transfer of transfers){
     const returned=byId.get(transfer.returnExecutionId),end=byId.get(transfer.frameEndExecutionId),after=transfer.completionExecutionId;
+    // A suspended execution has not necessarily reached the return consumer.
+    // Keep cleanup pending rather than publishing an end that must later move
+    // backwards in the already displayed prefix. Raw lifetimes stay intact.
+    if(running&&!after&&!['void','discarded','not-returned'].includes(transfer.status)){
+      returned.cleanupPending=true;moved.add(end.eventId);continue;
+    }
     returned.delivery=structuredClone(transfer);
     if(after&&positions.get(after)>positions.get(end.eventId)){
       end.cleanupAfterExecutionId=after;end.returnExecutionId=returned.eventId;end.callExecutionId=transfer.callExecutionId;

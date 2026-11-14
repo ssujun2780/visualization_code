@@ -3,6 +3,8 @@
 import {observedArrayPrefixes} from './observed-array-prefix.mjs';
 import {createValueFlow} from './observed-value-flow.mjs';
 import {copyIndexEvidence} from './copy-index-evidence.mjs';
+import {indexedAddress,addressIndexAccesses} from './address-index-evidence.mjs';
+import {endpointPrefix} from './endpoint-prefix.mjs';
 const walk=n=>n?[n,...(n.children??[]).flatMap(walk)]:[];
 const unwrap=n=>{while(n&&['ImplicitCastExpr','CStyleCastExpr','ParenExpr'].includes(n.kind))n=n.children?.[0];return n;};
 const unique=a=>[...new Set(a)];
@@ -48,10 +50,10 @@ export function bindIndexRelations(plan,copyAccesses=[],workAccesses=[]){
     if(!nodes.has(n.nodeId))nodes.set(n.nodeId,{node:n,functionId:d.functionId});
     const id=n.kind==='VarDecl'?declarationNodes.get(n.nodeId):n.operator==='='?unwrap(n.children?.[0])?.declarationId:null;
     if(id){if(!assignments.has(id))assignments.set(id,new Map());assignments.get(id).set(n.nodeId,n.kind==='VarDecl'?n.children.at(-1):n.children[1]);}
-    if(n.kind==='ArraySubscriptExpr'){
-      const key=baseKey(n.children[0]);if(!key)continue;
+    const address=indexedAddress(n);if(address){
+      const key=baseKey(address.base);if(!key)continue;
       let group=groups.get(key);if(!group)groups.set(key,group={key,accesses:new Map()});
-      group.accesses.set(n.nodeId,{nodeId:n.nodeId,functionId:d.functionId,index:n.children[1]});
+      group.accesses.set(n.nodeId,{nodeId:n.nodeId,functionId:d.functionId,index:address.index});
     }
   }
   // A child index passed to a recursive/helper parameter is still an index
@@ -111,7 +113,7 @@ export function bindIndexRelations(plan,copyAccesses=[],workAccesses=[]){
       }
       const reciprocal=['parent','child'].every(form=>descriptor.forms.some(f=>f.form===form));
       candidates.push({id:`index-relation${candidates.length+1}`,baseKey:group.key,...descriptor,siblingForms,reciprocal,
-        copyAccessEvidence:copyAccesses.filter(a=>workAccesses.some(x=>x.target.arrayId===a.arrayId&&x.sourceNodeIds.some(id=>group.accesses.has(id)))),
+        copyAccessEvidence:copyAccesses.filter(a=>a.arrayDeclarationId&&group.key===`declaration:${a.arrayDeclarationId}`||workAccesses.some(x=>x.target.arrayId===a.arrayId&&x.sourceNodeIds.some(id=>group.accesses.has(id)))),
         accessNodeIds:accesses.map(a=>a.nodeId),status:reciprocal?'supported':'partial'});
     }
   }
@@ -158,23 +160,25 @@ function edgeStatus(values,parent,child){
   const a=values.get(parent),b=values.get(child);return a===undefined||a===null||b===undefined||b===null?'unknown':a===b?'equal':a>b?'max':'min';
 }
 
-export function indexRelationStructures(plan,{events,objects,views=[],structures=[],valueFlow,observationPlan,observedTrace}){
+export function indexRelationStructures(plan,{events,objects,views=[],structures=[],valueFlow,observationPlan,observedTrace,inferenceBudget}){
   valueFlow??=createValueFlow(plan,{events,objects});
-  const copies=copyIndexEvidence(plan,{events,structures,observationPlan,observedTrace});
-  if(copies.length)bindIndexRelations(plan,copies,structures.find(s=>s.kind==='array-work')?.accesses??[]);
+  const copies=copyIndexEvidence(plan,{events,objects,structures,observationPlan,observedTrace});
+  const accesses=addressIndexAccesses(plan,{events,objects,structures,inferenceBudget},structures.find(s=>s.kind==='array-work')?.accesses??[]);
+  bindIndexRelations(plan,copies,accesses);
   const candidates=plan.structureBindings?.indexRelations?.candidates??[];
   if(!candidates.length)return [];
   const arrays=structures.filter(s=>s.kind==='array'),work=structures.find(s=>s.kind==='array-work'),byEvent=new Map(events.map(e=>[e.eventId,e])),
     sequences=new Map(events.map((e,i)=>[e.eventId,i])),defs=new Map(plan.instructions.map(d=>[d.id,d])),objectDeclarations=new Map(),contexts=new Map();
   for(const o of objects)objectDeclarations.set(o.id,defs.get(byEvent.get(o.createdBy)?.instructionId)?.declarationId);
-  const accesses=work?.accesses??[];
   for(const c of candidates){
     const own=accesses.filter(a=>a.sourceNodeIds.some(id=>c.accessNodeIds.includes(id))&&
-      !(a.axes??[]).some(axis=>axis.axis===0&&axis.index&&a.cursors.some(r=>r.declarationId===axis.index.declarationId&&r.value+axis.index.offset!==a.target.index))),arrayIds=unique(own.map(a=>a.target.arrayId));
+      !(a.axes??[]).some(axis=>axis.axis===0&&axis.index&&a.cursors.some(r=>r.declarationId===axis.index.declarationId&&r.value+axis.index.offset!==a.target.index))),
+      copyProofs=c.copyAccessEvidence??[],arrayIds=unique([...own.map(a=>a.target.arrayId),...copyProofs.map(p=>p.arrayId)]);
     for(const arrayId of arrayIds){const a=arrays.find(a=>a.id===arrayId);if(!a||!integer(c.base)||c.base<0||c.base>=a.capacity)continue;
       const key=`${arrayId}:${c.degree}:${c.base}`;let context=contexts.get(key);
       if(!context)contexts.set(key,context={id:`index-tree:${key}`,array:a,degree:c.degree,base:c.base,firstChildOffset:c.firstChildOffset,candidates:[],formulaEvidence:[],comparisons:[]});
-      context.candidates.push({candidate:c,activationIds:new Set(own.filter(x=>x.target.arrayId===arrayId).map(x=>x.activationId))});
+      context.candidates.push({candidate:c,activationIds:new Set([...own.filter(x=>x.target.arrayId===arrayId).flatMap(x=>x.indexActivationIds??[x.activationId]),
+        ...copyProofs.filter(p=>p.arrayId===arrayId).map(p=>p.activationId)])});
     }
   }
   // Comparisons nominate record properties, never member names. Each property
@@ -205,12 +209,17 @@ export function indexRelationStructures(plan,{events,objects,views=[],structures
           expected=input===null?null:f.form==='parent'?Math.trunc((input+f.offset)/f.degree):input*f.scale+f.offset,
           valid=output===expected&&integer(parentIndex)&&integer(childIndex)&&parentIndex>=context.base&&childIndex>context.base&&parentOf(context,childIndex)===parentIndex,
           observed=accesses.filter(a=>a.target.arrayId===context.array.id&&
-            (a.target.index===parentIndex&&a.activationId===e.activationId||a.target.index===childIndex&&
-              (byEvent.get(a.executionId)?.addressInputs??[]).some(id=>dependsOn(id,e.eventId))));
+            ([parentIndex,childIndex].includes(a.target.index)&&(a.indexActivationIds??[a.activationId]).includes(e.activationId)||
+              a.target.index===output&&(byEvent.get(a.executionId)?.addressInputs??[]).some(id=>dependsOn(id,e.eventId))));
         context.formulaEvidence.push({executionId:e.eventId,sourceNodeId:step.nodeId,formulaId:f.id,form:f.form,inputExecutionIds:reads,input,output,parentIndex,childIndex,
           siblingSourceIndex:f.form==='sibling'?input:null,observedAccessExecutionIds:observed.map(a=>a.executionId),
           childAccessExecutionIds:observed.filter(a=>a.target.index===childIndex&&
-            (byEvent.get(a.executionId)?.addressInputs??[]).some(id=>dependsOn(id,e.eventId))).map(a=>a.executionId),
+            (f.form==='parent'||(byEvent.get(a.executionId)?.addressInputs??[]).some(id=>dependsOn(id,e.eventId)))).map(a=>a.executionId),
+          derivedAccesses:observed.filter(a=>a.target.index===output&&
+            (byEvent.get(a.executionId)?.addressInputs??[]).some(id=>dependsOn(id,e.eventId))).map(a=>({executionId:a.executionId,direction:a.direction,
+              range:{objectId:a.target.objectId,offset:a.target.offset,size:a.target.size},index:a.target.index})),
+          derivedAccessExecutionIds:unique(observed.filter(a=>a.target.index===output&&
+            (byEvent.get(a.executionId)?.addressInputs??[]).some(id=>dependsOn(id,e.eventId))).map(a=>a.executionId)),
           status:input===null||output===null?'partial':valid?'supported':'contradicted'});
       }
     }
@@ -247,12 +256,12 @@ export function indexRelationStructures(plan,{events,objects,views=[],structures
   const results=[];
   for(const context of contexts.values()){
     const a=context.array,owner=structures.find(s=>s.kind==='array-structure'&&sameRange(s.range,a.range)),
-      prefix=observedArrayPrefixes(plan,{events,valueFlow},a,{start:context.base}),maxCheckedEdges=4096,
+      prefix=observedArrayPrefixes(plan,{events,valueFlow},a,{start:context.base,accesses}),endpoints=endpointPrefix({events,objects,valueFlow},a,owner,context.base),maxCheckedEdges=4096,
       totalPhysicalEdges=Math.max(0,a.capacity-context.base-1),checkedChildren=totalPhysicalEdges<=maxCheckedEdges?
         Array.from({length:totalPhysicalEdges},(_,i)=>context.base+1+i):unique(accesses.filter(x=>x.target.arrayId===a.id).map(x=>x.target.index)
           .filter(i=>integer(i)&&i>context.base&&i<a.capacity)).slice(0,maxCheckedEdges),
       indices=unique(checkedChildren.flatMap(i=>[i,parentOf(context,i)])),values=new Map(),states=[],observations=[],
-      stateIds=new Set([...(owner?.states?.map(s=>s.afterExecutionId)??[]),...prefix.proofs.map(p=>p.afterExecutionId)]),directions=unique(context.comparisons.map(c=>c.directionCandidate).filter(Boolean));
+      stateIds=new Set([...(owner?.states?.map(s=>s.afterExecutionId)??[]),...[...prefix.proofs,...endpoints.proofs].map(p=>p.afterExecutionId)]),directions=unique(context.comparisons.map(c=>c.directionCandidate).filter(Boolean));
     let active=activeState(owner,-1,sequences,a.capacity,context.base);
     for(let sequence=0;sequence<events.length;sequence++){
       const e=events[sequence],memoryEvent=['READ','WRITE','SPACE'].includes(e.kind)&&inArray(a,e.target??(e.memoryState&&e.objectId?{objectId:e.objectId,offset:0,size:e.memoryState.byteLength}:null));
@@ -264,9 +273,9 @@ export function indexRelationStructures(plan,{events,objects,views=[],structures
       const countChange=['WRITE','SPACE'].includes(e.kind)&&prefix.proofs.some(p=>p.countSources.some(r=>e.target?.objectId===r.range.objectId||e.objectId===r.range.objectId));
       if(!memoryEvent&&!stateIds.has(e.eventId)&&!countChange)continue;
       active=activeState(owner,sequence,sequences,a.capacity,context.base);
-      const scanned=prefix.at(e.eventId);
+      const scanned=prefix.at(e.eventId)??endpoints.at(e.eventId);
       if(active.count===null&&scanned)active={status:'observed',start:context.base,count:Math.max(0,scanned.count-context.base),
-        physicalPrefixLength:scanned.count,sourceStatus:'completed-prefix-scan',active:true,sourceExecutionId:scanned.afterExecutionId,
+        physicalPrefixLength:scanned.count,sourceStatus:'observed-prefix-membership',active:true,sourceExecutionId:scanned.afterExecutionId,
         evidenceExecutionIds:scanned.evidenceExecutionIds};
       const activeEdges=active.count===null?null:Math.max(0,active.count-1),limit=active.count===null?a.capacity:context.base+active.count,
         checked=checkedChildren.filter(i=>i<limit),counts={max:0,min:0,equal:0,unknown:0},samples={max:[],min:[]};
@@ -288,7 +297,7 @@ export function indexRelationStructures(plan,{events,objects,views=[],structures
         address:'range.offset+index*elementBytes',representation:'lazy-index-relations'},
       candidateIds:context.candidates.map(x=>x.candidate.id),status:context.formulaEvidence.some(e=>e.status==='contradicted')?'contradicted':reciprocal&&!alternatives.length?'supported':'partial',
       alternativeGroupId:`index-interpretation:${a.id}`,interpretationPolicy:'alternative descriptors of the same storage, not separate trees',
-      formulaEvidence:context.formulaEvidence,comparisonEvidence:context.comparisons,prefixMembershipEvidence:prefix.proofs,
+      formulaEvidence:context.formulaEvidence,comparisonEvidence:context.comparisons,prefixMembershipEvidence:[...prefix.proofs,...endpoints.proofs],
       direction:{candidate:directions.length===1?directions[0]:null,status:directions.length===1?'comparison-candidate':directions.length?'conflicting':'unknown',
         invariantProven:false},observations,states,
       verification:{maxCheckedEdges,checkedChildIndices:totalPhysicalEdges<=maxCheckedEdges?null:checkedChildren,

@@ -19,11 +19,14 @@ export function countedQueueStructures(plan,trace){
       if(!read||num(read.value)!==x.target.index||!axis?.index||axis.index.offset!==0)continue;
       accesses.push({x,read,cursor:key(read.target)});
     }
-    const fronts=[...new Set(accesses.filter(x=>x.x.kind==='READ').map(x=>x.cursor))],backs=[...new Set(accesses.filter(x=>x.x.kind==='WRITE').map(x=>x.cursor))];
+    const grouped={READ:new Map(),WRITE:new Map()};
+    for(const x of accesses){const map=grouped[x.x.kind],list=map.get(x.cursor)??[];list.push(x);map.set(x.cursor,list);}
+    const fronts=[...grouped.READ.keys()],backs=[...grouped.WRITE.keys()];
     for(const front of fronts)for(const back of backs){if(front===back)continue;
-      const timelines=new Map([front,back].map(k=>[k,slotTimeline(accesses.find(x=>x.cursor===k).read.target,events)]));
-      const selected=accesses.filter(x=>x.cursor===front&&x.x.kind==='READ'||x.cursor===back&&x.x.kind==='WRITE');
-      if(selected.length!==own.length)continue;
+      const frontAccesses=grouped.READ.get(front),backAccesses=grouped.WRITE.get(back);
+      if(frontAccesses.length+backAccesses.length!==own.length)continue;
+      const selected=[...frontAccesses,...backAccesses].sort((a,b)=>pos.get(a.x.executionId)-pos.get(b.x.executionId));
+      const timelines=new Map([[front,slotTimeline(frontAccesses[0].read.target,events)],[back,slotTimeline(backAccesses[0].read.target,events)]]);
       const ops=[];let broken=false;
       for(let i=0;i<selected.length;i++){
         const {x,read,cursor}=selected[i],at=pos.get(x.executionId),until=i+1<selected.length?pos.get(selected[i+1].read.eventId):events.length,

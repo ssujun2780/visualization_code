@@ -1,5 +1,6 @@
 import {appendCandidateState,structureStateAt} from './state-history.mjs';
 import {recordEvidence} from './record-evidence.mjs';
+import {affineUpdateStructures} from './affine-updates.mjs';
 import {num,key,unique} from './storage-semantics.mjs';
 import {callContext} from './call-context.mjs';
 export function deferredUpdateStructures(plan,trace,{maxStates=2048}={}){
@@ -63,7 +64,7 @@ export function deferredUpdateStructures(plan,trace,{maxStates=2048}={}){
 
   }
  }
- return [...groups.values()].filter(g=>g.states.length).map(g=>({...g,kind:'deferred-update-candidate',nodes:[],edges:[],intent:'unconfirmed',discoveredAtExecutionId:g.coverage.firstStateExecutionId,coverage:g.coverage,limitations:['actual aggregate and tag values only; deferred child updates are not fabricated','coupled updates alone do not prove lazy propagation; observed push and clear are separate evidence']}));
+ return [...[...groups.values()].filter(g=>g.states.length).map(g=>({...g,kind:'deferred-update-candidate',nodes:[],edges:[],intent:'unconfirmed',discoveredAtExecutionId:g.coverage.firstStateExecutionId,coverage:g.coverage,limitations:['actual aggregate and tag values only; deferred child updates are not fabricated','coupled updates alone do not prove lazy propagation; observed push and clear are separate evidence']})),...affineUpdateStructures(plan,trace,{maxStates})];
 }
 
 // A conditional record selection can be related to component merging without

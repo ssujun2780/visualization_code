@@ -2,8 +2,9 @@ import {recordIR} from './ir-record.mjs';
 
 // A rejected conversion is an engine failure, never a fault invented in the
 // user's C program. Keep raw observations separate from playable public IR.
-export function recordObservedTrace(plan,observationPlan,raw){
-  try{return {trace:recordIR(plan,observationPlan,raw)};}
+export function recordObservedTrace(plan,observationPlan,raw,{onExecution=()=>{}}={}){
+  let trace;
+  try{trace=recordIR(plan,observationPlan,raw);}
   catch(error){
     const instruction=plan.instructions.find(d=>d.id===error.context?.instructionId);
     const diagnostic={code:'engine-error',stage:'ir-recording',message:error.message,
@@ -16,4 +17,6 @@ export function recordObservedTrace(plan,observationPlan,raw){
       coverage:{execution:raw.status,irConversion:'failed',observationEvents:raw.events.length,irEvents:1,irGaps:['ir-recording-failed']}},
       conversionFailure:{stage:'ir-recording',diagnostic,stack:error.stack??String(error),observedStatus:raw.status,observedExitCode:raw.exitCode??null}};
   }
+  onExecution(trace);
+  return {trace};
 }

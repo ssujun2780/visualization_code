@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {evaluateStructureConditions,queryStructureRelations,queryStructureConditions,queryBSTOrder,
-  recommendStructureViews,setStructurePresentation,resolveStructurePresentation} from '../scripts/inference/index.mjs';
+  recommendStructureViews,setStructurePresentation,resolveStructurePresentation,inferStructures,validateStructureTrace} from '../scripts/inference/index.mjs';
 import {traceWithStructureView as traceModel} from './helpers/structure-runner.mjs';
 import {topology} from '../scripts/shared/topology.mjs';
 import {validateBSTOverlays} from '../scripts/inference/bst-contract.mjs';
@@ -123,8 +123,8 @@ test('record storage: masks, changing colours, key violations, scoped recommenda
   const corrupt=structuredClone(t),semantic=corrupt.structures.find(s=>s.id===candidate);
   semantic.states[0].relation.afterExecutionId=t.events.at(-1).eventId;
   assert.throws(()=>validateBSTOverlays(corrupt),/condition relation/);
-  const omitted=structuredClone(t),limited=omitted.structures.find(s=>s.id===candidate);
-  limited.coverage.omittedStates=1;limited.states=limited.states.filter(s=>t.events.findIndex(e=>e.eventId===s.afterExecutionId)<=t.events.findIndex(e=>e.eventId===A));
+  const limited=inferStructures(r.plan,t,{limits:{maxStates:2}}),omitted={...t,structures:limited.structures};
+  validateStructureTrace(r.plan,omitted);
   assert.equal(queryStructureConditions(omitted,{target,candidateId:candidate,afterExecutionId:at(t,'E'),expected:'avl'}).assessment,'incomplete');
   assert.throws(()=>queryStructureConditions(t,{target,expected:'red-black',bindings:{color:{kind:'record',offset:0,size:4,redValue:1,blackValue:1}}}),/서로 다른/);
 });

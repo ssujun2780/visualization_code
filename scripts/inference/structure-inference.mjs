@@ -41,6 +41,7 @@ import {deferredUpdateStructures,partitionSelectionStructures} from './composed-
 import {boundStructureHistory} from './state-history.mjs';
 import {createInferenceBudget,historyDiagnostics} from './inference-limits.mjs';
 import {retainHistoryEvidence} from './history-evidence.mjs';
+import {createSharedValues} from './shared-values.mjs';
 
 function readonly(value,seen=new WeakSet()){
   if(!value||typeof value!=='object'||seen.has(value))return value;
@@ -58,10 +59,11 @@ export function inferStructures(plan,trace,{observationPlan,observedTrace,limits
   ({plan,trace,observationPlan,observedTrace}=readonly(structuredClone({plan,trace,observationPlan,observedTrace})));
   const view={...plan,coverage:{...plan.coverage,structureInference:{...plan.coverage?.structureInference}},structureBindings:{}},diagnostics=[],groups=[],structures=[];
   const failed=(stage,error)=>diagnostics.push({code:error.code??'structure-inference-failed',stage,message:error.message??String(error),scope:'visualization-only'});
-  for(const bind of [bindArrayStructures,bindArrayWork,bindIndexRelations,bindLinkedStructures]){
-    try{if(bind===bindLinkedStructures)bind(view,trace);else bind(view);}catch(error){failed(bind.name,error);}
-  }
   const context={...trace,structures,observationPlan,observedTrace,inferenceBudget,valueFlow:createValueFlow(view,{...trace,inferenceBudget})};
+  for(const bind of [bindArrayStructures,bindArrayWork,bindIndexRelations,bindLinkedStructures]){
+    inferenceBudget.setStage(bind.name);
+    try{if(bind===bindLinkedStructures)bind(view,context);else bind(view);}catch(error){failed(bind.name,error);}
+  }
   function stage(name,build){inferenceBudget.setStage(name);try{const added=build();structures.push(...added);groups.push({name,structures:added});}catch(error){failed(name,error);}}
   stage('historical-records',()=>{
     const definitions=new Map(view.instructions.map(d=>[d.id,d])),events=new Map(trace.events.map(e=>[e.eventId,e])),
@@ -108,8 +110,16 @@ export function inferStructures(plan,trace,{observationPlan,observedTrace,limits
     catch(error){failed(group.name,error);}
   }
   inferenceBudget.setStage('history-retention');
-  accepted=retainHistoryEvidence(accepted,accepted.map(s=>boundStructureHistory(s,inferenceBudget.limits.maxStates)),trace,inferenceBudget);
+  const bounded=accepted.map(s=>boundStructureHistory(s,inferenceBudget.limits.maxStates)),retentionChanged=bounded.some((s,i)=>s!==accepted[i]);
+  accepted=retainHistoryEvidence(accepted,bounded,trace,inferenceBudget);
+  if(retentionChanged)try{validateStructureTrace(view,{...trace,structures:accepted});}catch(error){
+    failed('history-retention',error);
+    const retained=new Map(accepted.map(s=>[s.id,s]));accepted=[];
+    for(const group of groups){const kept=group.structures.map(s=>retained.get(s.id)).filter(Boolean);
+      try{validateStructureTrace(view,{...trace,structures:[...accepted,...kept]});accepted.push(...kept);}catch(error){failed(group.name,error);}
+    }
+  }
   diagnostics.push(...inferenceBudget.diagnostics(),...historyDiagnostics(accepted));
-  return {schemaVersion:1,scope:{programId:plan.programId??null,runId:trace.runId??null},status:diagnostics.length?'partial':'completed',structures:accepted,
-    bindings:view.structureBindings,storageBindings:buildStructureStorageBindings(trace,accepted),coverage:view.coverage.structureInference??{},diagnostics};
+  return createSharedValues().intern({schemaVersion:1,scope:{programId:plan.programId??null,runId:trace.runId??null},status:diagnostics.length?'partial':'completed',structures:accepted,
+    bindings:view.structureBindings,storageBindings:buildStructureStorageBindings(trace,accepted),coverage:view.coverage.structureInference??{},diagnostics});
 }

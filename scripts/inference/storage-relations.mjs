@@ -4,6 +4,7 @@ import {observeScalarBytes} from './observed-scalar-bytes.mjs';
 import {createValueFlow} from './observed-value-flow.mjs';
 import {topology} from '../shared/topology.mjs';
 import {resolveStructurePresentation} from './structure-presentation.mjs';
+import {structureQueryIndex,structureQueryContext} from './query-index.mjs';
 const walk=n=>n?[n,...(n.children??[]).flatMap(walk)]:[];
 const unwrap=n=>{while(n&&['ImplicitCastExpr','CStyleCastExpr','ParenExpr'].includes(n.kind))n=n.children?.[0];return n;};
 const unique=a=>[...new Set(a)];
@@ -14,7 +15,7 @@ const overlap=(a,b)=>a.objectId===b.objectId&&a.offset<b.offset+b.size&&b.offset
 function targetExpression(d){let n=unwrap(d?.expression);if(n?.kind==='VarDecl')return null;if(n?.kind==='CompoundAssignOperator'||n?.operator==='='||['++','--'].includes(n?.operator))n=unwrap(n.children?.[0]);return n;}
 
 export function storageRelationStructures(plan,{events,objects,structures=[],valueFlow,resultDeliveries=[]}){
-  const defs=new Map(plan.instructions.map(d=>[d.id,d])),byEvent=new Map(events.map(e=>[e.eventId,e])),
+  const defs=new Map(plan.instructions.map(d=>[d.id,d])),byEvent=new Map(events.map(e=>[e.eventId,e])),eventOrder=new Map(events.map((e,i)=>[e.eventId,i])),
     byObject=new Map(objects.filter(o=>defs.get(byEvent.get(o.createdBy)?.instructionId)?.visibility!=='implementation').map(o=>[o.id,o])),
     flow=valueFlow??createValueFlow(plan,{events,resultDeliveries}),arrays=structures.filter(s=>s.kind==='array'),
     nodes=new Map(),slots=new Map(),changes=[],alive=new Set(),relations=[];
@@ -31,6 +32,17 @@ export function storageRelationStructures(plan,{events,objects,structures=[],val
   function owner(range,e,expression,reference=false){
     const typed=[...nodes.values()].filter(n=>n.kind==='record'&&contains(n.range,range)).sort((a,b)=>a.range.size-b.range.size)[0];
     if(typed)return typed.id;
+    // A member write can precede every pointer to its containing record.
+    // Use the already known compiler array layout at this event, rather than
+    // making that member an independent node until a later pointer read.
+    const records=arrays.filter(a=>a.elementType?.kind==='record'&&a.elementBytes>0&&contains(a.range,range)&&
+      (!a.discoveredAtExecutionId||eventOrder.get(a.discoveredAtExecutionId)<=eventOrder.get(e.eventId))).sort((a,b)=>a.range.size-b.range.size);
+    for(const a of records){
+      const offset=a.range.offset+Math.floor((range.offset-a.range.offset)/a.elementBytes)*a.elementBytes;
+      if(contains({objectId:a.objectId,offset,size:a.elementBytes},range)){
+        const found=record(a.objectId,offset,a.elementType,e);if(found)return found;
+      }
+    }
     // A flexible/member array can extend past its record's fixed header.
     const field=walk(expression).find(n=>n.kind==='MemberExpr'&&n.cType?.kind==='array');
     if(field){
@@ -67,7 +79,7 @@ export function storageRelationStructures(plan,{events,objects,structures=[],val
   // in an earlier state. Byte writes invalidate all overlapping observed slots.
   for(const e of events){
     const ended=unique([...(e.action==='object.end'?[e.objectId]:[]),...(e.action==='frame.end'?e.endedObjects??[]:[])]),upserts=[];
-    if(e.action==='object.begin'){alive.add(e.objectId);record(e.objectId,0,byObject.get(e.objectId)?.cType,e);}
+    if(e.action==='object.begin'&&byObject.has(e.objectId)){alive.add(e.objectId);record(e.objectId,0,byObject.get(e.objectId)?.cType,e);}
     for(const id of ended)alive.delete(id);
     const ref=e.value?.reference;
     if(ref?.targetObjectId)record(ref.targetObjectId,ref.targetOffset??0,e.value.cType?.pointee,e);
@@ -210,21 +222,27 @@ export function storageRelationStructures(plan,{events,objects,structures=[],val
   return result;
 }
 
-export function queryStorageReferences(graph,trace,{afterExecutionId,roleIds=null,includeEnded=false,view='auto',expected=null,preferences,slot='primary'}={}){
-  const explicitView=view!=='auto',selection=trace.programId&&trace.runId?resolveStructurePresentation(trace,{target:{structureId:graph.id},afterExecutionId,preferences,slot,roleIds}):null;
+export function queryStorageReferences(graph,trace,{afterExecutionId,roleIds=null,includeEnded=false,view='auto',expected=null,preferences,slot='primary',resolvePresentation=true,includeTopology=true}={}){
+  const explicitView=view!=='auto',selection=resolvePresentation&&trace.programId&&trace.runId?resolveStructurePresentation(trace,{target:{structureId:graph.id},afterExecutionId,preferences,slot,roleIds}):null;
+  if(selection?.reconnection?.status==='reconnect-needed')return {
+    afterExecutionId:afterExecutionId??trace.events.at(-1)?.eventId,nodes:[],edges:[],topology:null,relationAvailable:false,
+    presentation:{...selection,assessment:'incomplete',warnings:[]},scope:'selected relation unavailable until user roles reconnect'};
   if(selection?.locked){view=selection.view;expected=selection.expected;roleIds=selection.roleIds;}
   else if(view==='auto'&&selection){view=selection.view;expected??=selection.expected;}
-  const positions=new Map(trace.events.map((e,i)=>[e.eventId,i])),at=afterExecutionId===undefined?trace.events.length-1:positions.get(afterExecutionId);
-  if(at===undefined)throw new RangeError('관측한 실행 식별자가 필요합니다.');
-  const edges=new Map(),ended=new Set();
-  for(const c of graph.changes){if(positions.get(c.afterExecutionId)>at)break;
-    for(const e of c.upsertEdges)edges.set(e.id,e);for(const id of c.endedObjectIds)ended.add(id);}
+  const {positions,at}=structureQueryContext(trace,afterExecutionId),index=structureQueryIndex(trace);
+  let history=index?.storageGraphs.get(graph);
+  if(!history||at<history.at)history={at:-1,next:0,edges:new Map(),ended:new Set()};
+  const {edges,ended}=history;
+  while(history.next<graph.changes.length){const c=graph.changes[history.next];if(positions.get(c.afterExecutionId)>at)break;
+    for(const e of c.upsertEdges)edges.set(e.id,e);for(const id of c.endedObjectIds)ended.add(id);history.next++;}
+  history.at=at;index?.storageGraphs.set(graph,history);
   const nodes=graph.nodes.filter(n=>positions.get(n.discoveredAtExecutionId)<=at&&(includeEnded||!ended.has(n.range.objectId))),ids=new Set(nodes.map(n=>n.id)),
     selected=[...edges.values()].filter(e=>ids.has(e.from)&&(!roleIds||roleIds.includes(e.roleId))).map(e=>({...e,
       status:ended.has(e.source.objectId)?'ended-source':e.target&&ended.has(e.target.objectId)?'ended-target':e.status}));
-  const links=selected.filter(e=>e.status==='in-bounds'&&ids.has(e.to)),used=new Set(links.flatMap(e=>[e.from,e.to])),
-    shown=roleIds?nodes.filter(n=>used.has(n.id)||selected.some(e=>e.from===n.id)):nodes,shape=topology(shown,links),warnings=[];
-  const knownExpectation=['tree','forest','chain'].includes(expected),unknown=selected.some(e=>!['in-bounds','null'].includes(e.status));
+  const links=selected.filter(e=>e.status==='in-bounds'&&ids.has(e.to)),used=new Set(links.flatMap(e=>[e.from,e.to])),sources=new Set(selected.map(e=>e.from)),
+    shown=roleIds?nodes.filter(n=>used.has(n.id)||sources.has(n.id)):nodes,
+    knownExpectation=['tree','forest','chain'].includes(expected),shape=includeTopology||knownExpectation?topology(shown,links):null,warnings=[];
+  const unknown=selected.some(e=>!['in-bounds','null'].includes(e.status));
   if(knownExpectation){
     if(shape.cyclic)warnings.push({code:'cycle',message:'선택한 관계에 순환이 관측되었습니다.',category:'structure-expectation'});
     const incoming=new Map(),outgoing=new Map();for(const e of links){incoming.set(e.to,(incoming.get(e.to)??0)+1);outgoing.set(e.from,(outgoing.get(e.from)??0)+1);}

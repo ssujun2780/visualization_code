@@ -1,4 +1,7 @@
 import {comparisonDiagram,inferLexicographicOrder,comparisonOperation} from './bst-key-order.mjs';
+import {scalarPayload,comparePayload,numericType} from './scalar-domain.mjs';
+import {addressSelectionControls} from './address-selection-controls.mjs';
+const signOf=(query,key)=>comparePayload(query.keyPayload??scalarPayload(query.value),key.keyPayload??scalarPayload(key.value)).sign;
 const unique=a=>[...new Set(a)],rels=new Set(['<','<=','>','>=','==','!=']);
 const same=(a,b)=>a?.objectId===b?.objectId&&a?.offset===b?.offset&&a?.size===b?.size;
 
@@ -10,7 +13,8 @@ export function compositeProofs({plan,events,byEvent,pos,defs,valueFlow,linkSlot
     const found=linkSlots.get(e.target&&`${e.target.objectId}:${e.target.offset}:${e.target.size}`);
     if(!found||!['READ','WRITE'].includes(e.kind))continue;
     const link={...found,event:e};
-    for(const branchId of [...e.controlInputs??[]].sort((a,b)=>pos.get(b)-pos.get(a))){
+    const routing=addressSelectionControls(e,valueFlow);
+    for(const branchId of [...routing].sort((a,b)=>pos.get(b)-pos.get(a))){
       const branch=byEvent.get(branchId);if(!['branch','conditional'].includes(branch?.action))continue;
       const components=new Map(),guards=[],guardIds=new Set([branchId]),usedGuards=new Set(),calcs=new Set();let failed=false;
       function contexts(x){for(const id of x.contexts??[])if(!guardIds.has(id)){guardIds.add(id);guards.push(id);}}
@@ -25,7 +29,7 @@ export function compositeProofs({plan,events,byEvent,pos,defs,valueFlow,linkSlot
           const da=descriptor(a,link,pos.get(e.eventId)),db=descriptor(b,link,pos.get(e.eventId));
           if(!!da!==!!db){
             const d=da??db,other=da?b:a,k=(da?a:b).reads.find(r=>same(r.target,keyRange(d,link.node))),q=other.event,id=origin(other);
-            if(!k||!id||integer(k.value)===null||integer(q.value)===null)return null;
+            if(!k||!id||signOf(q,k)===null)return null;
             const old=components.get(d.id);if(old&&old.query.id!==id)return null;
             components.set(d.id,{descriptor:d,keyRead:k,query:{id,read:q,reads:other.reads}});
             return {op:x.op,args:da?[{literal:'0'},{component:d.id}]:[{component:d.id},{literal:'0'}]};
@@ -36,7 +40,7 @@ export function compositeProofs({plan,events,byEvent,pos,defs,valueFlow,linkSlot
       const producer=firstInput(branch),truth=integer(branch.condition),tree=expression(producer);
       let predicate=reduce(tree);if(!predicate||truth===null)continue;
       predicate={op:truth!==0n?'!=':'==',args:[predicate,{literal:'0'}]};
-      for(const id of e.controlInputs??[])if(id!==branchId&&!guardIds.has(id)){guardIds.add(id);guards.push(id);}
+      for(const id of routing)if(id!==branchId&&!guardIds.has(id)){guardIds.add(id);guards.push(id);}
       // Only control predicates which contributed to the compared result are
       // followed. A key's initialization is not a comparison dependency.
       for(let i=0;i<guards.length;i++){
@@ -50,7 +54,7 @@ export function compositeProofs({plan,events,byEvent,pos,defs,valueFlow,linkSlot
           // Pointer/null and loop guards do not define an integer key. An
           // opaque scalar policy inside a called comparator cannot be ignored.
           if(components.size!==before||guard.activationId!==e.activationId&&(guard.dataInputs??[]).some(id=>valueFlow.dependencyReads(id).some(r=>
-            ['signed','unsigned'].includes(r.value?.cType?.signedness))))failed=true;
+            numericType(r.value?.cType))))failed=true;
           discard();
           continue;
         }
@@ -61,14 +65,17 @@ export function compositeProofs({plan,events,byEvent,pos,defs,valueFlow,linkSlot
       if(failed||!components.size)continue;
       const list=[...components.values()],representative=list.at(-1),transfer=movement(e,link,representative.query,representative.keyRead,representative.descriptor);
       if(!transfer||transfer.kind==='insertion'&&list.some(c=>!movement(e,link,c.query,c.keyRead,c.descriptor)))continue;
-      const actual=new Map(list.map(c=>{const a=integer(c.query.read.value),b=integer(c.keyRead.value);return [c.descriptor.id,a<b?-1n:a>b?1n:0n];}));
+      const actual=new Map(list.map(c=>[c.descriptor.id,BigInt(signOf(c.query.read,c.keyRead))]));
       if(evaluate(predicate,actual)!==1n)continue;
       paths.push({components:list,predicate,proof:{afterExecutionId:transfer.executionId,comparisonExecutionId:producer?.executionId,
         branchExecutionId:branchId,calculationExecutionIds:[...calcs],keyReadExecutionId:representative.keyRead.eventId,
         queryReadExecutionId:representative.query.read.eventId,linkExecutionId:e.eventId,transferExecutionId:transfer.executionId,
         callExecutionId:transfer.callExecutionId??null,kind:transfer.kind,roleId:link.role.id,keyRange:representative.keyRead.target,linkRange:e.target,
+        ...(transfer.transferStringKey?{transferStringKey:transfer.transferStringKey}:{}),
         guardExecutionIds:[...usedGuards],componentReads:list.map(c=>({componentId:c.descriptor.id,keyReadExecutionId:c.keyRead.eventId,
-          queryReadExecutionId:c.query.read.eventId,keyRange:c.keyRead.target})),predicate}});
+          queryReadExecutionId:c.query.read.eventId,keyRange:c.keyRead.target,
+          ...c.keyRead.stringKey?{stringComparison:{key:c.keyRead.stringKey,query:c.query.read.stringKey}}:{}})),
+        ...representative.keyRead.stringKey?{stringComparison:{key:representative.keyRead.stringKey,query:representative.query.read.stringKey}}:{},predicate}});
       break;
     }
   }
@@ -84,7 +91,7 @@ export function compositeProofs({plan,events,byEvent,pos,defs,valueFlow,linkSlot
     for(const p of matching)for(const c of p.components){const {read,...d}=c.descriptor;descriptors.set(d.id,d);}
     const components=ids.map(id=>descriptors.get(id)),roles=unique(matching.map(p=>p.proof.roleId)).sort(),proofs=[];
     for(const p of matching){if(proofs.some(q=>q.linkExecutionId===p.proof.linkExecutionId&&q.branchExecutionId===p.proof.branchExecutionId))continue;
-      const zeros=new Map(ids.map(id=>[id,0n])),equal=p.components.length===ids.length&&p.components.every(c=>integer(c.keyRead.value)===integer(c.query.read.value));
+      const zeros=new Map(ids.map(id=>[id,0n])),equal=p.components.length===ids.length&&p.components.every(c=>signOf(c.query.read,c.keyRead)===0);
       // Equality may be encountered at an ancestor before inserting farther
       // down that subtree. Tie the later insertion to the SAME query storage.
       const continued=equal&&p.proof.kind!=='insertion'?matching.find(q=>q.proof.kind==='insertion'&&

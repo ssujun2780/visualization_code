@@ -10,7 +10,8 @@ export async function runModelCore(source,options={},notify=()=>{}) {
   } catch(error) {
     analysis=error.analysis??analysis;
     const status=error.stage!=="ir-conversion"?"compile-error":error.name==="UnsupportedC"||/지원하지 않는/.test(error.message)?"unsupported":"engine-error";
-    const diagnostic={code:status,message:error.message,stage:error.stage??'compilation',source:error.source??error.context?.source??null};
+    const diagnostic={code:status,message:error.message,stage:error.stage??'compilation',source:error.source??error.context?.source??null,
+      ...(error.code?{causeCode:error.code}:{})};
     return {plan:null,ast:analysis?.ast??null,llvm:analysis?.llvm??null,instrumentedLLVM:null,stdout:"",stderr:"",compilerDiagnostics:error.message,
       ...(error.stage==='ir-conversion'?{conversionFailure:{stage:'ir-planning',diagnostic,stack:error.stack}}:{}),
       trace:{schemaVersion:3,status,exitCode:null,events:[{schemaVersion:3,eventId:"x1",executionId:"x1",instructionId:null,kind:"ERROR",action:"fault",phase:"failed",evidence:"compiler",diagnostic}],diagnostics:[diagnostic],objects:[],frames:[],coverage:{execution:"not started"}}};
@@ -33,12 +34,14 @@ export async function runModelCore(source,options={},notify=()=>{}) {
     const raw={status,exitCode:null,events:[...recorder.events,{schemaVersion:2,eventId,
       kind:'ERROR',phase:'fault',diagnostic,evidence:status==='link-error'?'linker':'engine'}],objects:[],frames:[],diagnostics:[diagnostic],
       ...(status==='link-error'?{coverage:{execution:'not started'}}:{})};
-    const recorded=recordObservedTrace(generated.plan,generated.observationPlan,raw);
+    const recorded=recordObservedTrace(generated.plan,generated.observationPlan,raw,options);
     return {plan:generated.plan,ast:analysis.ast,llvm:analysis.llvm,instrumentedLLVM:generated.llvm,stdout:"",stderr:"",
       compilerDiagnostics:analysis.diagnostics+error.message,...recorded,
       ...(options.includeObservations||recorded.conversionFailure?{observations:{plan:generated.observationPlan,trace:raw}}:{})};
   }
-  const observedTrace=recorder.finish(execution),recorded=recordObservedTrace(generated.plan,generated.observationPlan,observedTrace);
+  const observedTrace=recorder.finish(execution),recorded=recordObservedTrace(generated.plan,generated.observationPlan,observedTrace,
+    {...options,onExecution:trace=>notify({type:'execution',trace,stdout:execution.stdout,stderr:execution.stderr,
+      compilerDiagnostics:analysis.diagnostics+(execution.compilerDiagnostics??'')})});
   return {plan:generated.plan,...recorded,...(options.includeObservations||recorded.conversionFailure?{observations:{plan:generated.observationPlan,trace:observedTrace}}:{}),ast:analysis.ast,llvm:analysis.llvm,instrumentedLLVM:generated.llvm,stdout:execution.stdout,stderr:execution.stderr,
     compilerDiagnostics:analysis.diagnostics+(execution.compilerDiagnostics??"")};
 }

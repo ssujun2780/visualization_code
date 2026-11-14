@@ -2,6 +2,7 @@ import {readFile,mkdir} from 'node:fs/promises';
 import {resolve,join} from 'node:path';
 import {inferExecutionRelationsAsync} from './execution-relations/index.mjs';
 import {writeJSON} from './shared/json-output.mjs';
+import {readExecutionFiles} from './shared/execution-files.mjs';
 
 try{
   const args=process.argv.slice(2);
@@ -17,7 +18,7 @@ try{
       }else if(!arg.startsWith('-')&&!hasInput){input=arg;hasInput=true;}else throw new Error(`알 수 없는 인자: ${arg}`);
     }
     const directory=resolve(input),destination=resolve(output??input),read=path=>readFile(path,'utf8').then(JSON.parse);
-    const [plan,trace,structureInference,compilerFacts,observationEvidence]=await Promise.all([read(join(directory,'plan.json')),read(join(directory,'trace.json')),structureFile?read(resolve(structureFile)):undefined,compilerFile?read(resolve(compilerFile)):undefined,observationFile?read(resolve(observationFile)):undefined]);
+    const [{plan,trace},structureInference,compilerFacts,observationEvidence]=await Promise.all([readExecutionFiles(directory,{includeObservations:false}),structureFile?read(resolve(structureFile)):undefined,compilerFile?read(resolve(compilerFile)):undefined,observationFile?read(resolve(observationFile)):undefined]);
     const result=await inferExecutionRelationsAsync(plan,trace,{timeoutMs,structureInference,compilerFacts,observationEvidence,outputSchemaVersion});
     const artifact=outputSchemaVersion===2?'execution-relations-v2.json':'execution-relations.json';
     await mkdir(destination,{recursive:true});await writeJSON(join(destination,artifact),result);

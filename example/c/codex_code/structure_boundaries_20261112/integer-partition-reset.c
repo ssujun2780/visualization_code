@@ -1,0 +1,2 @@
+#include <stdio.h>
+int p[3]; int f(int x){return p[x]==x?x:(p[x]=f(p[x]));} void join(int a,int b){a=f(a);b=f(b);if(a!=b)p[b]=a;} int main(void){for(int i=0;i<3;i++)p[i]=i;join(0,1);printf("%d ",f(1));for(int i=0;i<3;i++)p[i]=i;printf("%d ",f(1));return 0;}
