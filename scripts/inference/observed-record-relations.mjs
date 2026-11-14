@@ -11,7 +11,7 @@ export function observedRecordRelations(raw){
         to=nodes.find(v=>v.objectId===edge.targetObjectId&&v.address===edge.address);
       if(from&&to)links.push({from:from.id,to:to.id,offset:edge.offset});
     }
-    groups.push({type,nodes:nodes.map(v=>v.id),edges:links,...topology(nodes,links),snapshot:'last observed references, including ended objects'});
+    groups.push({id:`historical-record:${type}`,type,nodes:nodes.map(v=>v.id),edges:links,...topology(nodes,links),snapshot:'last observed references, including ended objects'});
   }
   return groups;
 }

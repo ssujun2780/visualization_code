@@ -103,7 +103,10 @@ test('bounded relation history is incomplete instead of reusing the final retain
  const base=cases.find(c=>c.id==='partition-self'),r=runs.get(base.id)??await run(base.id,base.source,base.stdout,true),
   [s]=partitionStructures(r.plan,r.trace,{maxNodes:3,maxStates:3});assert.ok(s.coverage.truncated);
  assert.equal(queryDisjointSet(s,r.trace,{afterExecutionId:r.trace.events.at(-1).eventId}).status,'incomplete');
- assert.equal(queryDisjointSet(s,r.trace,{afterExecutionId:r.trace.events.at(-1).eventId}).historyGap,true);
+   // The current contract retains a prefix AND the latest snapshot. Only the
+   // omitted interval is a history gap; node truncation is a separate limit.
+   assert.equal(queryDisjointSet(s,r.trace,{afterExecutionId:s.coverage.historyGapFromExecutionId}).historyGap,true);
+   assert.ok(!queryDisjointSet(s,r.trace,{afterExecutionId:r.trace.events.at(-1).eventId}).historyGap);
 });
 test('independent validation rejects changed membership, ranges, reads, values and future evidence; manual view stays first',async()=>{
  for(const id of ['partition-self','segment-recursive']){

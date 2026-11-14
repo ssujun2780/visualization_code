@@ -4,23 +4,30 @@ import {affineUpdateStructures} from './affine-updates.mjs';
 import {num,key,unique} from './storage-semantics.mjs';
 import {callContext} from './call-context.mjs';
 export function deferredUpdateStructures(plan,trace,{maxStates=2048}={}){
- const c=recordEvidence(plan,trace),calls=callContext(c.events),aggregates=c.structures.filter(s=>s.kind==='range-aggregate-candidate'),groups=new Map(),updates=[],neutral={'+':0,'*':1,'^':0,'|':0};
- const layout=(aggregate,index,at)=>{const st=structureStateAt(aggregate,c.pos,at,c.objects);if(st?.historyGap||st?.lifetimeGap)return null;const node=st?.nodes.find(n=>n.index===index);return node?.coverage&&node.complete?{node,afterExecutionId:st.afterExecutionId}:null;},
+ const c=recordEvidence(plan,trace),calls=callContext(c.events),aggregates=c.structures.filter(s=>s.kind==='range-aggregate-candidate'),groups=new Map(),updates=[],neutral={'+':0,'*':1,'^':0,'|':0},pairedLayouts=new Map();
+ const layout=(aggregate,index,at)=>{const st=structureStateAt(aggregate,c.pos,at,c.objects);if(st?.historyGap||st?.lifetimeGap)return null;const node=st?.nodes.find(n=>n.index===index);
+   if(node?.coverage&&node.complete)return {node,afterExecutionId:st.afterExecutionId};
+   const prior=pairedLayouts.get(`${aggregate.id}:${index}:${node?.writeExecutionId}`);
+   // Assignment invalidates the aggregate VALUE proof. Its previously observed
+   // interval is retained only across a witnessed paired tag application, and
+   // only while that exact write is current. An unrelated overwrite breaks it.
+   return prior&&node?.writeExecutionId===prior.writeExecutionId&&c.pos.get(prior.writeExecutionId)<=at?prior.shape:null;},
   sameIndex=(a,b)=>a.cell.index===b.cell.index&&c.dependencies(a.w.addressInputs).some(x=>x.kind==='READ'&&c.dependencies(b.w.addressInputs).some(y=>y.kind==='READ'&&c.identity(x.eventId,y.eventId)));
  for(const w of c.events){if(w.action!=='write')continue;const cell=c.cell(w.target);if(!cell)continue;
-  const producer=c.byId.get(w.dataInputs?.[0]),calc=producer?.kind==='CALC'?producer:null,step=calc?.steps?.at(-1),operands=step?.inputs.map(i=>c.flow.sourceReadOperand(i,calc,step))??[],op=step?.operator.replace(/=$/,'');
+  const producer=c.byId.get(w.dataInputs?.[0]),calc=producer?.kind==='CALC'?producer:null,step=calc?.steps?.at(-1),operands=step?.inputs.map(i=>c.flow.sourceReadOperand(i,calc,step))??[],op=step?.operator?.replace(/=$/,'');
   let delta=null,operator=step?.operator??'assign';
   if(op in neutral&&operands[0]&&key(operands[0].target)===key(w.target)){delta=operands[1];operator=op;}
   else if(!calc&&producer?.kind==='READ')delta=producer;
   updates.push({w,cell,calc,delta,operator,dependencies:c.dependencies(w.dataInputs)});
  }
  for(const tag of updates){if(!tag.delta)continue;for(const update of updates){if(update===tag||!calls.common(update.w,tag.w)||!sameIndex(update,tag)||update.cell.arrayId===tag.cell.arrayId)continue;
-   const aggregate=aggregates.find(s=>s.arrayId===update.cell.arrayId),shape=aggregate&&layout(aggregate,update.cell.index,c.pos.get(update.w.eventId)),node=shape?.node;
+   const aggregate=aggregates.find(s=>s.arrayId===update.cell.arrayId),shape=aggregate&&layout(aggregate,update.cell.index,c.pos.get(update.w.eventId)-1),node=shape?.node;
    if(!node?.coverage||!update.dependencies.some(e=>e.kind==='READ'&&c.identity(e.eventId,tag.delta.eventId)))continue;
    const id=`deferred-update:${aggregate.arrayId}:${tag.cell.arrayId}`;if(!groups.has(id))groups.set(id,{id,aggregateId:aggregate.id,arrayId:aggregate.arrayId,tagArrayId:tag.cell.arrayId,applications:[],propagations:[],states:[]});
    const after=[update.w.eventId,tag.w.eventId].sort((a,b)=>c.pos.get(a)-c.pos.get(b)).at(-1);
    const presenceWrites=updates.filter(p=>p.w.activationId===tag.w.activationId&&sameIndex(p,tag)&&p.cell.arrayId!==tag.cell.arrayId&&p.cell.arrayId!==update.cell.arrayId&&num(p.w.value)!==null&&num(p.w.value)!==0&&!p.w.dataInputs?.length).map(p=>p.w.eventId);
    groups.get(id).applications.push({index:update.cell.index,coverage:node.coverage,coverageEvidenceExecutionId:shape.afterExecutionId,aggregateOperator:update.operator,tagOperator:tag.operator,neutralValue:neutral[tag.operator]??null,presenceWriteExecutionIds:presenceWrites,aggregateWriteExecutionId:update.w.eventId,tagWriteExecutionId:tag.w.eventId,deltaReadExecutionId:tag.delta.eventId,afterExecutionId:after,evidenceExecutionIds:unique([update.w.eventId,tag.w.eventId,tag.delta.eventId,update.calc?.eventId,tag.calc?.eventId,shape.afterExecutionId].filter(Boolean))});
+   pairedLayouts.set(`${aggregate.id}:${update.cell.index}:${update.w.eventId}`,{writeExecutionId:update.w.eventId,shape});
   }
  }
  // After a paired site establishes the array/index relationship, retain calls

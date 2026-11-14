@@ -52,12 +52,15 @@ export function arrayStorageExtent(plan,{objects,events}){
       // Overlapping union alternatives do not disprove a declared array member.
       return bounds.find(b=>!b.scalar)??bounds[0]??null;
     }
-    return {end:base+size,scalar:key===wanted};
+    return layoutKey(key)===layoutKey(wanted)?{end:base+size,scalar:true}:null;
   }
   return (objectId,type,offset,size)=>{
     const wanted=identity.key(type),o=byObject.get(objectId);
     const singleRecord=type.kind==='record'&&size===type.sizeBits/8&&o?.cType?.kind!=='array'&&!indexed.get(objectId)?.has(wanted);
-    let scalar=false,subobject=false,array=false;
+    // A declared scalar remains one object even when passed as p[0].
+    // Pointer access alone does not turn its storage into an array.
+    let scalar=!!o?.cType&&!['record','array'].includes(o.cType.kind)&&
+      layoutKey(identity.key(o.cType))===layoutKey(wanted),subobject=false,array=false;
     for(const r of roots.get(objectId)?.values()??[]){
       const bound=descend(r.type,r.offset,r.type.sizeBits>0?r.type.sizeBits/8:(o?.size??0)-r.offset,offset,wanted);
       if(!bound)continue;subobject=true;size=Math.min(size,bound.end-offset);scalar||=bound.scalar;array||=bound.array??false;

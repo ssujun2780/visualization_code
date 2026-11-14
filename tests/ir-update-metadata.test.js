@@ -15,7 +15,8 @@ test('No6 access types and source operators preserve prefix/postfix routing and 
   assert.equal(trace.events.length,86);assert.equal(trace.events.filter(e=>e.kind==='CALC').length,11);
   for(const [l,position,oldValue,newValue]of [[5,'postfix','5','6'],[8,'prefix','6','7'],[11,'postfix','7','8'],[14,'prefix','8','9'],[25,'postfix','0','1']]){
     const events=trace.events.filter(e=>line(e)===l),reads=events.filter(e=>e.kind==='READ');
-    const read=reads[0],calc=events.find(e=>e.kind==='CALC'&&e.operator==='++'),write=events.find(e=>e.action==='write');
+    const calc=events.find(e=>e.kind==='CALC'&&e.operator==='++'),
+      read=reads.find(e=>calc.dataInputs.includes(e.eventId)),write=events.find(e=>e.action==='write');
     assert.equal(read.value.decimal,oldValue);assert.equal(calc.value.decimal,newValue);assert.equal(write.value.decimal,newValue);
     assert.equal(defs.get(calc.instructionId).expression.position,position);
     assert.ok(events.indexOf(read)<events.indexOf(calc)&&events.indexOf(calc)<events.indexOf(write));

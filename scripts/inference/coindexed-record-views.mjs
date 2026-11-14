@@ -38,6 +38,11 @@ export function coindexedRecordStructures(_plan,{events,objects=[],structures=[]
       groups.get(key).evidence.push({origin:proof.origin,accessExecutionIds:witness,arrayIds:ids,afterExecutionId:witness.at(-1)});
     }
   }
+  const eventsByObject=new Map(),endings=new Map(),accessesByArray=new Map();
+  for(const o of objects)if(o.endedBy){if(!endings.has(o.endedBy))endings.set(o.endedBy,[]);endings.get(o.endedBy).push(o.id);}
+  for(const e of events)for(const id of new Set([e.target?.objectId,e.objectId,...endings.get(e.eventId)??[]].filter(Boolean))){
+    if(!eventsByObject.has(id))eventsByObject.set(id,[]);eventsByObject.get(id).push(e);}
+  for(const a of work.accesses){if(!accessesByArray.has(a.target.arrayId))accessesByArray.set(a.target.arrayId,[]);accessesByArray.get(a.target.arrayId).push(a);}
   const result=[];
   // Preserve overlapping alternatives. Do not transitively fuse A/B and B/C.
   for(const group of groups.values()){
@@ -58,12 +63,14 @@ export function coindexedRecordStructures(_plan,{events,objects=[],structures=[]
     }
     // Track only visited indices, including fields whose bytes have not yet
     // been read. Every part remains a view of its original allocation.
-    for(const a of work.accesses)if(group.ids.includes(a.target.arrayId)&&validIndex(arrays.get(a.target.arrayId),a.target.index))discover(a.target.index,a.executionId);
+    for(const a of group.ids.flatMap(id=>accessesByArray.get(id)??[]).sort((a,b)=>positions.get(a.executionId)-positions.get(b.executionId)))if(validIndex(arrays.get(a.target.arrayId),a.target.index))discover(a.target.index,a.executionId);
     const parts=[...logicalNodes.values()].flatMap(n=>n.parts.map(p=>({...p,nodeId:n.id,index:n.index}))),partsByObject=new Map(),
       objectIds=new Set(own.map(a=>a.objectId));
     for(const p of parts){if(!partsByObject.has(p.range.objectId))partsByObject.set(p.range.objectId,[]);partsByObject.get(p.range.objectId).push(p);}
-    for(const e of events){
-      const upsertFields=[],upsertEdges=[],endedObjectIds=objects.filter(o=>objectIds.has(o.id)&&o.endedBy===e.eventId).map(o=>o.id),
+    const relevant=new Map([...objectIds].flatMap(id=>eventsByObject.get(id)??[]).map(e=>[e.eventId,e]));
+    for(const id of [...proofsAt.keys(),...terminalsAt.keys()])relevant.set(id,byEvent.get(id));
+    for(const e of [...relevant.values()].sort((a,b)=>positions.get(a.eventId)-positions.get(b.eventId))){
+      const upsertFields=[],upsertEdges=[],endedObjectIds=(endings.get(e.eventId)??[]).filter(id=>objectIds.has(id)),
         target=e.target??(e.objectId&&e.memoryState?{objectId:e.objectId,offset:0,size:e.memoryState.byteLength}:null);
       if(e.action==='object.end'&&objectIds.has(e.objectId))endedObjectIds.push(e.objectId);
       if(target&&['READ','WRITE','SPACE'].includes(e.kind))for(const p of partsByObject.get(target.objectId)??[]){

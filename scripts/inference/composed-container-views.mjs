@@ -99,12 +99,21 @@ function composedReferences(plan,{events,structures}){
   for(const head of rs.filter(r=>r.from!==r.to))for(const next of rs.filter(r=>r.from===head.to&&r.to===head.to)){
    const targets=rs.filter(r=>r.from===head.to&&r.to===head.from);
    for(const dest of targets.length?targets:[null]){
-    const edges=new Map(),ended=new Set(),states=[],proof=[head,dest,next].filter(Boolean).map(r=>r.reads[0]),discovered=proof.reduce((a,b)=>pos.get(a)>pos.get(b)?a:b);
-    for(const c of graph.changes){for(const e of c.upsertEdges)edges.set(e.id,e);for(const id of c.endedObjectIds)ended.add(id);
+    const edges=new Map(),edgeOrder=new Map(),byRole=new Map(),ended=new Set(),states=[],proof=[head,dest,next].filter(Boolean).map(r=>r.reads[0]),discovered=proof.reduce((a,b)=>pos.get(a)>pos.get(b)?a:b);
+    for(const c of graph.changes){for(const e of c.upsertEdges){const old=edges.get(e.id);if(!edgeOrder.has(e.id))edgeOrder.set(e.id,edgeOrder.size);edges.set(e.id,e);
+      // A clarified source role can move an existing edge between buckets.
+      // Keep the same first edge as the original insertion-ordered Map scan.
+      if(old&&(old.from!==e.from||old.roleId!==e.roleId)&&byRole.get(old.from)?.get(old.roleId)?.id===e.id){
+        const replacement=[...edges.values()].find(x=>x.from===old.from&&x.roleId===old.roleId);
+        if(replacement)byRole.get(old.from).set(old.roleId,replacement);else byRole.get(old.from).delete(old.roleId);
+      }
+      if(!byRole.has(e.from))byRole.set(e.from,new Map());const row=byRole.get(e.from),first=row.get(e.roleId);
+      if(!first||edgeOrder.get(e.id)<=edgeOrder.get(first.id))row.set(e.roleId,e);
+    }for(const id of c.endedObjectIds)ended.add(id);
       if(pos.get(c.afterExecutionId)<pos.get(discovered))continue;
       const nodes=graph.nodes.filter(n=>n.cType?.recordTypeId===head.from&&!ended.has(n.range.objectId)&&pos.get(n.discoveredAtExecutionId)<=pos.get(c.afterExecutionId)),
         ids=new Set(nodes.map(n=>n.id)),logical=[],containers=[],issues=[];
-      for(const node of nodes){const entry=[...edges.values()].find(e=>e.from===node.id&&e.roleId===head.id);if(!entry){issues.push(node.id);continue;}
+      for(const node of nodes){const entry=byRole.get(node.id)?.get(head.id);if(!entry){issues.push(node.id);continue;}
         let current=entry,termination=null;const seen=new Set(),members=[],linkEdgeIds=[];
         const end=(status,edge=current)=>({status,edgeId:edge.id,fromNodeId:edge.from,targetNodeId:edge.to??null,
           evidenceExecutionIds:[edge.lastObservationExecutionId]});
@@ -112,7 +121,7 @@ function composedReferences(plan,{events,structures}){
           if(current.status!=='in-bounds'||seen.has(current.to)||ended.has(byNode.get(current.to)?.range.objectId)){
             termination=end(seen.has(current.to)?'cycle':ended.has(byNode.get(current.to)?.range.objectId)?'ended-target':current.status);issues.push(current.id);break;}
           seen.add(current.to);members.push(current.to);
-          const target=dest&&[...edges.values()].find(e=>e.from===current.to&&e.roleId===dest.id),advance=[...edges.values()].find(e=>e.from===current.to&&e.roleId===next.id);
+          const target=dest&&byRole.get(current.to)?.get(dest.id),advance=byRole.get(current.to)?.get(next.id);
           if(target?.status==='in-bounds'&&ids.has(target.to))logical.push({id:`logical:${node.id}:${current.to}:${dest.id}`,from:node.id,to:target.to,viaNodeId:current.to,
             viaRange:byNode.get(current.to)?.range,sourceEdgeIds:[entry.id,target.id],evidenceExecutionIds:[entry.lastObservationExecutionId,target.lastObservationExecutionId]});
           else if(dest)issues.push(current.to);

@@ -18,11 +18,13 @@ export function storageRelationStructures(plan,{events,objects,structures=[],val
   const defs=new Map(plan.instructions.map(d=>[d.id,d])),byEvent=new Map(events.map(e=>[e.eventId,e])),eventOrder=new Map(events.map((e,i)=>[e.eventId,i])),
     byObject=new Map(objects.filter(o=>defs.get(byEvent.get(o.createdBy)?.instructionId)?.visibility!=='implementation').map(o=>[o.id,o])),
     flow=valueFlow??createValueFlow(plan,{events,resultDeliveries}),arrays=structures.filter(s=>s.kind==='array'),
-    nodes=new Map(),slots=new Map(),changes=[],alive=new Set(),relations=[];
+    nodes=new Map(),slots=new Map(),changes=[],alive=new Set(),relations=[],nodesByObject=new Map(),arraysByObject=new Map(),slotsByObject=new Map(),relationIds=new Set();
+  for(const a of arrays){if(!arraysByObject.has(a.objectId))arraysByObject.set(a.objectId,[]);arraysByObject.get(a.objectId).push(a);}
   const valid=r=>{const o=byObject.get(r?.objectId);return o&&Number.isSafeInteger(r.offset)&&r.offset>=0&&Number.isSafeInteger(r.size)&&r.size>=0&&r.offset+r.size<=o.size;};
   function node(range,e,type=null,kind='storage-range'){
     if(!valid(range))return null;const id=`storage:${key(range)}`;
-    if(!nodes.has(id))nodes.set(id,{id,range:{...range},kind,cType:type,discoveredAtExecutionId:e.eventId});
+    if(!nodes.has(id)){const n={id,range:{...range},kind,cType:type,discoveredAtExecutionId:e.eventId};nodes.set(id,n);
+      if(!nodesByObject.has(range.objectId))nodesByObject.set(range.objectId,[]);nodesByObject.get(range.objectId).push(n);}
     return id;
   }
   function record(objectId,offset,type,e){
@@ -30,12 +32,12 @@ export function storageRelationStructures(plan,{events,objects,structures=[],val
     return node({objectId,offset,size:type.sizeBits/8},e,type,'record');
   }
   function owner(range,e,expression,reference=false){
-    const typed=[...nodes.values()].filter(n=>n.kind==='record'&&contains(n.range,range)).sort((a,b)=>a.range.size-b.range.size)[0];
+    const typed=(nodesByObject.get(range.objectId)??[]).filter(n=>n.kind==='record'&&contains(n.range,range)).sort((a,b)=>a.range.size-b.range.size)[0];
     if(typed)return typed.id;
     // A member write can precede every pointer to its containing record.
     // Use the already known compiler array layout at this event, rather than
     // making that member an independent node until a later pointer read.
-    const records=arrays.filter(a=>a.elementType?.kind==='record'&&a.elementBytes>0&&contains(a.range,range)&&
+    const records=(arraysByObject.get(range.objectId)??[]).filter(a=>a.elementType?.kind==='record'&&a.elementBytes>0&&contains(a.range,range)&&
       (!a.discoveredAtExecutionId||eventOrder.get(a.discoveredAtExecutionId)<=eventOrder.get(e.eventId))).sort((a,b)=>a.range.size-b.range.size);
     for(const a of records){
       const offset=a.range.offset+Math.floor((range.offset-a.range.offset)/a.elementBytes)*a.elementBytes;
@@ -53,12 +55,17 @@ export function storageRelationStructures(plan,{events,objects,structures=[],val
         }
       }
     }
-    const array=arrays.filter(a=>a.elementType?.kind==='pointer'&&contains(a.range,range)).sort((a,b)=>a.range.size-b.range.size)[0];
+    const array=(arraysByObject.get(range.objectId)??[]).filter(a=>a.elementType?.kind==='pointer'&&contains(a.range,range)).sort((a,b)=>a.range.size-b.range.size)[0];
     return array?node(array.range,e,null,'pointer-array'):node(range,e,null,reference?'addressed-range':'storage-range');
   }
-  function dependencies(id,seen=new Set()){
-    if(seen.has(id))return [];seen.add(id);const e=byEvent.get(id);if(!e)return [];
-    return [e,...(e.dataInputs??[]).flatMap(x=>dependencies(x,seen))];
+  const dependencyCache=new Map();
+  function dependencies(id){
+    if(dependencyCache.has(id))return dependencyCache.get(id);
+    const out=[],seen=new Set(),pending=[id];
+    while(pending.length){const id=pending.pop();if(seen.has(id))continue;seen.add(id);const e=byEvent.get(id);if(!e)continue;
+      out.push(e);for(let i=(e.dataInputs?.length??0)-1;i>=0;i--)pending.push(e.dataInputs[i]);}
+    if(dependencyCache.size>=128)dependencyCache.delete(dependencyCache.keys().next().value);
+    dependencyCache.set(id,out);return out;
   }
   function pointerEdge(s,ref,e){
     let to=null;
@@ -95,9 +102,10 @@ export function storageRelationStructures(plan,{events,objects,structures=[],val
       }
       s.bytes=observeScalarBytes(s.bytes,{size:s.range.size,value:e.value.address??e.value.bits});
       s.edge=pointerEdge(s,ref,e);slots.set(id,s);upserts.push(s.edge);
+      if(!slotsByObject.has(s.range.objectId))slotsByObject.set(s.range.objectId,new Map());slotsByObject.get(s.range.objectId).set(id,s);
     }
     const written=e.target??(e.objectId&&e.memoryState?{objectId:e.objectId,offset:0,size:e.memoryState.byteLength}:null);
-    if(written&&['WRITE','SPACE'].includes(e.kind))for(const s of slots.values()){
+    if(written&&['WRITE','SPACE'].includes(e.kind))for(const s of slotsByObject.get(written.objectId)?.values()??[]){
       if(s.edge.lastObservationExecutionId===e.eventId||!overlap(s.range,written))continue;
       const bytes=observeScalarBytes(s.bytes,{size:s.range.size,snapshot:e.memoryState??{byteLength:written.size,ranges:[]},start:written.offset,offset:s.range.offset});
       if(!bytes)continue;s.bytes=bytes;
@@ -110,7 +118,7 @@ export function storageRelationStructures(plan,{events,objects,structures=[],val
   // Preserve cross-storage index/address uses, including indirection through
   // locals and real call parameters. Arithmetic remains an explicit transform;
   // it is never relabelled as an unchanged integer link.
-  const work=structures.find(s=>s.kind==='array-work'),arrayAt=t=>arrays.filter(a=>valid(t)&&contains(a.range,t)).sort((a,b)=>a.range.size-b.range.size)[0];
+  const work=structures.find(s=>s.kind==='array-work'),arrayAt=t=>(arraysByObject.get(t?.objectId)??[]).filter(a=>valid(t)&&contains(a.range,t)).sort((a,b)=>a.range.size-b.range.size)[0];
   for(const access of events.filter(e=>['READ','WRITE'].includes(e.kind)&&valid(e.target))){
     const targetArray=arrayAt(access.target);
     for(const input of access.addressInputs??[]){
@@ -119,7 +127,7 @@ export function storageRelationStructures(plan,{events,objects,structures=[],val
         if(r.kind!=='READ'||!valid(r.target)||numeric(r.value)===null||r.value?.cType?.kind==='pointer')continue;
         const sourceArray=arrayAt(r.target),expr=unwrap(defs.get(r.instructionId)?.expression);
         if(!sourceArray&&expr?.kind!=='MemberExpr')continue;
-        const id=`address-use:${r.eventId}:${access.eventId}`;if(relations.some(x=>x.id===id))continue;
+        const id=`address-use:${r.eventId}:${access.eventId}`;if(relationIds.has(id))continue;relationIds.add(id);
         const preserved=exact.has(r.eventId),source={objectId:r.target.objectId,offset:r.target.offset,size:r.target.size},
           target={objectId:access.target.objectId,offset:access.target.offset,size:access.target.size};
         const recordEndpoint=(a,t)=>a?.elementType?.kind==='record'?{objectId:a.objectId,

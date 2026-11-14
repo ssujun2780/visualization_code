@@ -143,7 +143,7 @@ export function arrayWorkStructures(plan,{events,objects,views,frames=[],structu
   // Return ports and other value destinations are not byte-addressable memory.
   const memoryRange=t=>{const o=byObject.get(t?.objectId);return !!o&&Number.isSafeInteger(t.offset)&&Number.isSafeInteger(t.size)&&t.offset>=0&&t.size>=0&&t.offset+t.size<=o.size;};
   const arrayAt=t=>memoryRange(t)&&arrays.filter(a=>a.objectId===t.objectId&&t.offset>=a.range.offset&&t.offset+t.size<=a.range.offset+a.range.size)
-    .sort((a,b)=>a.range.size-b.range.size)[0];
+    .sort((a,b)=>Number(geometry.get(b.id)?.extentKind==='declared-array')-Number(geometry.get(a.id)?.extentKind==='declared-array')||a.range.size-b.range.size)[0];
   const geometry=new Map(arrays.map(a=>[a.id,arrayGeometry(a,byObject.get(a.objectId))]));
   const location=t=>{const a=arrayAt(t);return a?arrayLocation(t,a,byObject.get(a.objectId)):span(t);};
   const overlap=(a,b)=>a?.objectId===b?.objectId&&a.offset<b.offset+b.size&&b.offset<a.offset+a.size;

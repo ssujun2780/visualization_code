@@ -228,9 +228,16 @@ export function embeddedArrayStructures(plan,{events,objects,views,storageExtent
         accesses:original.accesses.filter(a=>a.sequence>(changes[i-1]?.sequence??-1)&&a.sequence<(changes[i+1]?.sequence??Infinity)&&
           (!a.indexFields.includes(f.fieldNodeId)||a.addressInputs.some(id=>indexReadPositions(id,c,f).some(at=>at>(changes[i-1]?.sequence??-1)&&at<(changes[i+1]?.sequence??Infinity))))),
         copies:original.copies.filter(x=>x.write.sequence>(changes[i-1]?.sequence??-1)&&x.write.sequence<(changes[i+1]?.sequence??Infinity))}));
-      for(const g of groups){
+      for(const originalGroup of groups){const g={...originalGroup};
         const delta=g.after[f.fieldNodeId]-g.before[f.fieldNodeId],updates=g.updates.filter(u=>u.fieldNodeId===f.fieldNodeId);
         if(updates.length!==1||Math.abs(delta)!==1)continue;
+        // Adjacent mutations can bracket accesses from two loop iterations.
+        // Use the mutation's actual loop activation, including nested shifts,
+        // rather than borrowing the following iteration's reads or copies.
+        const controls=(byEvent.get(updates[0].executionId)?.controlInputs??[]).filter(id=>
+          ['ForStmt','WhileStmt','DoStmt'].includes(defs.get(byEvent.get(id)?.instructionId)?.controlKind));
+        const inOperation=a=>controls.every(id=>byEvent.get(a.executionId)?.controlInputs?.includes(id));
+        g.accesses=g.accesses.filter(inOperation);g.copies=(g.copies??[]).filter(x=>inOperation(x.write));
         // A count can be independent of the indexed head/tail expression.
         // Endpoint and opposite-direction mutation proofs below decide its role.
         const copies=[...g.copies??[]];

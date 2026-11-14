@@ -5,6 +5,7 @@ import {traceModel as traceSourceModel} from '../scripts/model/index.mjs';
 import {traceWithInference} from '../scripts/pipeline/trace-with-inference.mjs';
 import {compileAndRun} from "../scripts/instrumentation/toolchain.mjs";
 import {materializeMemory} from "../scripts/model/memory-state.mjs";
+import {encodeInference} from '../scripts/inference/index.mjs';
 
 // These backend assertions deliberately inspect raw LLVM observations. The
 // public animation IR contract is tested separately in ir-*.test.js.
@@ -21,7 +22,8 @@ async function checked(source,options={}) {
   const ids=new Set(result.trace.events.map(e=>e.eventId));
   assert.equal(ids.size,result.trace.events.length);
   for(const e of result.trace.events)for(const id of [...(e.dataInputs??[]),...(e.addressInputs??[]),...(e.controlInputs??[])])assert.ok(ids.has(id),`missing event ${id}`);
-  assert.ok(result.trace.frames.every(f=>f.ended));assert.doesNotThrow(()=>JSON.stringify(result));
+  assert.ok(result.trace.frames.every(f=>f.ended));
+  assert.doesNotThrow(()=>JSON.stringify({...result,...(result.inference?{inference:encodeInference(result.inference)}:{})}));
   return result;
 }
 
@@ -184,6 +186,17 @@ test("pointer cycles and arrays are proposed from actual layout and connections"
   assert.ok(r.trace.views.some(v=>v.kind==="array"&&v.count===2&&v.elementType==="[3 x i32]"));
 });
 
+test('distinct record types retain independent historical candidates through history retention',async()=>{
+  const r=await checked(`#include <stdio.h>
+  struct First{struct First* next;int value;};struct Second{long value;struct Second* next;};
+  int main(void){struct First a[2]={{0,3},{0,4}};struct Second b[2]={{5,0},{6,0}};
+    a[0].next=a+1;a[1].next=a;b[0].next=b+1;b[1].next=b;
+    printf("%d %ld\\n",a[0].next->value,b[0].next->value);return 0;}`,{inferRelations:true});
+  const groups=r.inference.structures.filter(s=>s.kind==='record-graph-candidate');
+  assert.equal(groups.length,2);assert.equal(new Set(groups.map(s=>s.id)).size,2);
+  assert.ok(groups.every(s=>s.id&&s.nodeCount===2&&s.edgeCount===2&&s.cyclic));
+});
+
 test("full C identifier and record renaming does not change topology inference",async()=>{
   const make=(t,p,f)=>`#include <stdlib.h>\nstruct ${t}{struct ${t}*${f};};int main(void){struct ${t}*${p}=calloc(2,sizeof *${p});${p}[0].${f}=&${p}[1];${p}[1].${f}=${p};free(${p});return 0;}`;
   const a=await checked(make("Tree","grid","array"),{inferRelations:true}),b=await checked(make("Array","graph","node"),{inferRelations:true});
@@ -256,11 +269,25 @@ test("event limit and worker deadline stop infinite execution with a partial tra
 test("the same automatic path observes the unchanged 900-line C11 regex program",async()=>{
   const source=await readFile(new URL("../examples/c/regex_equivalence.c",import.meta.url),"utf8");
   // Large end-to-end fixture: supply separate recording and inference budgets.
-  // The default 16 MiB / 25 s stop this case; limit behavior is tested separately.
+  // Execution must finish. The existing inference history/root budgets remain
+  // bounded; they must report their omissions, never timeout or crash instead.
   const r=await checked(source,{stdin:"ab\na(b|c)\n",maxEvents:200000,maxObservationBytes:64*1024*1024,timeoutMs:40000,inferenceTimeoutMs:120000,inferRelations:true});
   assert.equal(r.stdout,'NOT EQUIVALENT\nWITNESS "ac"\nLENGTH 2\nACCEPTED_BY 2\n');
   assert.ok(r.plan.instructions.length>1000);assert.ok(r.trace.events.length>10000);
   assert.ok(r.trace.events.some(e=>e.action==="call.begin"&&e.indirectAddress));
-  assert.equal(r.inference.status,'completed',JSON.stringify(r.inference.diagnostics));
+  assert.equal(r.inference.status,'partial');
+  assert.ok(r.inference.diagnostics.length>0);
+  for(const d of r.inference.diagnostics){
+    assert.equal(d.code,'structure-inference-limit');assert.equal(d.scope,'visualization-only');
+    assert.ok(['pointer-roots','omittedRoots','omittedStates'].includes(d.resource));
+    if(d.resource==='pointer-roots')assert.ok(d.occurrences>0&&d.limit>0&&d.firstExecutionId);
+    else assert.ok(d.omitted>0&&d.structureId&&d.firstExecutionId);
+    if(d.resource==='omittedStates'){
+      const s=r.inference.structures.find(s=>s.id===d.structureId);
+      assert.ok(s);assert.equal(s.states.length,d.retainedStates);assert.ok(d.retainedStates<=d.limit);
+      assert.ok(d.historyGapFromExecutionId&&d.historyGapToExecutionId);
+      assert.equal(s.states.at(-1).afterExecutionId,d.historyGapToExecutionId);
+    }
+  }
   assert.ok(r.inference.structures.some(s=>s.kind==='record-graph-candidate'&&s.edgeCount>0));
 });
