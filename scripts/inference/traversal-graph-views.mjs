@@ -7,6 +7,7 @@ import {observeGraphStorage} from './graph-storage-observations.mjs';
 import {neighborhoodProofs} from './neighborhood-proofs.mjs';
 import {graphEdgeIdentity,mergeGraphEvidence} from './graph-proof-identity.mjs';
 import {indexedNeighborhoodProofs} from './indexed-neighborhood-proofs.mjs';
+import {edgeListProofs} from './edge-list-proofs.mjs';
 const overlap=(a,b)=>a?.objectId===b?.objectId&&a.offset<b.offset+b.size&&b.offset<a.offset+a.size;
 const num=v=>Number(v?.decimal??v?.signed??v?.unsigned);
 const unique=a=>[...new Set(a)];
@@ -122,6 +123,7 @@ export function traversalGraphStructures(plan,trace,{maxEvidence=8192,maxStates=
   }
   for(const {array,proof} of neighborhoodProofs(plan,trace,flow))add(array,proof);
   for(const {array,proof} of indexedNeighborhoodProofs(plan,trace,flow))add(array,proof);
+  for(const {array,proof} of edgeListProofs(plan,trace,flow))add(array,proof);
   const result=[];
   for(const {array:a,evidence,omitted}of groups.values()){
     const at=new Map(),edges=new Map(),nodes=new Map(),states=[],ended=new Set();let omittedEdges=0,history=stateHistoryCoverage(maxStates);
@@ -140,7 +142,9 @@ export function traversalGraphStructures(plan,trace,{maxEvidence=8192,maxStates=
         edges.set(p.edgeIdentity,mergeGraphEvidence(edges.get(p.edgeIdentity),{...p,id:p.edgeIdentity,from:node(p.fromIndex),to:node(p.toIndex),status:'observed'}));changed=true;
       }
       if(!changed||!nodes.size)continue;
-      const ns=[...nodes.values()],es=[...edges.values()].map(p=>({...p,status:ended.has(a.objectId)||p.sourceSlots.some(r=>ended.has(r.objectId))?'ended':p.status,
+      const ns=[...nodes.values()],es=[...edges.values()].map(p=>({...p,
+        weightRange:p.properties.filter(x=>x.role==='edge-update-attribute').length===1?p.properties.find(x=>x.role==='edge-update-attribute').source:undefined,
+        status:ended.has(a.objectId)||p.sourceSlots.some(r=>ended.has(r.objectId))?'ended':p.status,
         properties:p.properties.map(x=>({...x,status:ended.has(x.source.objectId)?'ended-source':x.status??'observed'}))}));
       const links=es.filter(e=>e.status==='observed'),shape={...topology(ns,links),
         maxChildren:Math.max(0,...ns.map(n=>links.filter(e=>e.from===n.id).length)),
